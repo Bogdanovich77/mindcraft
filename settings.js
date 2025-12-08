@@ -9,6 +9,13 @@ const settings = {
     "auto_open_ui": true, // opens UI in browser on startup
     
     "base_profile": "survival", // survival, assistant, creative, or god_mode
+    
+    // LangGraph agent system configuration
+    "agent_system": "langgraph", // "legacy" or "langgraph"
+    "enable_cognitive_architecture": true,
+    "enable_reactive_layer": true,
+    "enable_learning_systems": true,
+    
     "profiles": [
         //"./andy.json",
         // "./profiles/gpt.json",
@@ -20,10 +27,13 @@ const settings = {
         // "./profiles/mistral.json",
         // "./profiles/deepseek.json",
         // "./profiles/mercury.json",
-         "./profiles/andy-4.json", // Supports up to 75 messages!
+         "./profiles/andy-4.json", // Now with LangGraph v2 cognitive architecture!
+         "./profiles/Loner.json", // Military-style survival agent
+         "./profiles/MasterChief.json", // Leadership-focused agent
 
         // using more than 1 profile requires you to /msg each bot indivually
         // individual profiles override values from the base profile
+        // All profiles now support LangGraph v2 with structured personalities
     ],
 
     "load_memory": true, // load memory from previous session

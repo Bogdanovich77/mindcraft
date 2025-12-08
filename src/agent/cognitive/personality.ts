@@ -112,15 +112,15 @@ export class PersonalitySystem {
         break;
         
       case 'trade':
-        influence = (traits.agreeableness * 0.3) + 
-                   (traits.extraversion * 0.3) + 
-                   (traits.openness * 0.2) + 
-                   (1 - traits.competitiveness) * 0.2);
+        influence = (traits.agreeableness * 0.3) +
+                   (traits.extraversion * 0.3) +
+                   (traits.openness * 0.2) +
+                   (1 - traits.competitiveness) * 0.2;
         break;
     }
     
     // Apply confidence modifier
-    influence = influence * (0.5 + traits.confidence * 0.5);
+    influence = influence * (0.5 + this.profile.confidence * 0.5);
     
     return Math.max(0, Math.min(1, influence));
   }

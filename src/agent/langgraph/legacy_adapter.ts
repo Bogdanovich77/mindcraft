@@ -360,12 +360,8 @@ export class LegacyControllerAdapter {
     /**
      * Set a goal using legacy system
      */
-    async setGoal(name?: string, quantity?: number): Promise<void> {
-        if (name !== undefined) {
-            await this.controller.setGoal(name, quantity || 1);
-        } else {
-            await this.controller.setGoal(null, 1);
-        }
+    async setGoal(name: string | null = null, quantity: number = 1): Promise<void> {
+        await this.controller.setGoal(name as null | undefined, quantity);
     }
 
     /**
