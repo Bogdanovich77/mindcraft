@@ -1,0 +1,14 @@
+diff --git a/node_modules/mineflayer-armor-manager/dist/lib/isArmor.js b/node_modules/mineflayer-armor-manager/dist/lib/isArmor.js
+index 908f2e1..5351bbe 100644
+--- a/node_modules/mineflayer-armor-manager/dist/lib/isArmor.js
++++ b/node_modules/mineflayer-armor-manager/dist/lib/isArmor.js
+@@ -4,6 +4,9 @@ exports.isArmor = void 0;
+ const armor_1 = require("../data/armor");
+ const armorTypes = Object.keys(armor_1.TypeDestination);
+ const isArmor = (itemId, versionData) => {
++    if (!versionData || !versionData.findItemOrBlockById) {
++        return false; // Can't determine if it's armor without version data
++    }
+     const item = versionData.findItemOrBlockById(itemId);
+     return item && (armorTypes.some((type) => item.name.endsWith(type))
+         || armor_1.offhandMaterials.some((type) => item.name === type));

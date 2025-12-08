@@ -59,7 +59,11 @@ export function createMindServer(host_public = false, port = 8080) {
         let curAgentName = null;
         console.log('Client connected');
 
-        agentsStatusUpdate(socket);
+        try {
+            agentsStatusUpdate(socket);
+        } catch (error) {
+            console.error('Failed to send initial agents status update:', error);
+        }
 
         socket.on('create-agent', async (settings, callback) => {
             console.log('API create agent...');
@@ -91,7 +95,11 @@ export function createMindServer(host_public = false, port = 8080) {
                     mindcraft.destroyAgent(name);
                     delete agent_connections[name];
                 }
-                agentsStatusUpdate();
+                try {
+                    agentsStatusUpdate();
+                } catch (error) {
+                    console.error('Failed to update agents status on create-agent:', error);
+                }
             }
             else {
                 console.error('Agent name is required in profile');
@@ -110,7 +118,11 @@ export function createMindServer(host_public = false, port = 8080) {
         socket.on('connect-agent-process', (agentName) => {
             if (agent_connections[agentName]) {
                 agent_connections[agentName].socket = socket;
-                agentsStatusUpdate();
+                try {
+                    agentsStatusUpdate();
+                } catch (error) {
+                    console.error('Failed to update agents status on connect-agent-process:', error);
+                }
             }
         });
 
@@ -119,7 +131,11 @@ export function createMindServer(host_public = false, port = 8080) {
                 agent_connections[agentName].socket = socket;
                 agent_connections[agentName].in_game = true;
                 curAgentName = agentName;
-                agentsStatusUpdate();
+                try {
+                    agentsStatusUpdate();
+                } catch (error) {
+                    console.error('Failed to update agents status on login-agent:', error);
+                }
             }
             else {
                 console.warn(`Unregistered agent ${agentName} tried to login`);
@@ -131,7 +147,11 @@ export function createMindServer(host_public = false, port = 8080) {
                 console.log(`Agent ${curAgentName} disconnected`);
                 agent_connections[curAgentName].in_game = false;
                 agent_connections[curAgentName].socket = null;
-                agentsStatusUpdate();
+                try {
+                    agentsStatusUpdate();
+                } catch (error) {
+                    console.error('Failed to update agents status on disconnect:', error);
+                }
             }
             if (agent_listeners.includes(socket)) {
                 removeListener(socket);
@@ -144,20 +164,45 @@ export function createMindServer(host_public = false, port = 8080) {
                 return;
             }
             console.log(`${curAgentName} sending message to ${agentName}: ${json.message}`);
-            agent_connections[agentName].socket.emit('chat-message', curAgentName, json);
+            if (agent_connections[agentName].socket) {
+                try {
+                    agent_connections[agentName].socket.emit('chat-message', curAgentName, json);
+                } catch (error) {
+                    console.error(`Failed to emit chat-message to agent ${agentName}:`, error);
+                }
+            } else {
+                console.warn(`Agent ${agentName} socket is null, cannot send chat message`);
+            }
         });
 
         socket.on('set-agent-settings', (agentName, settings) => {
             const agent = agent_connections[agentName];
             if (agent) {
                 agent.setSettings(settings);
-                agent.socket.emit('restart-agent');
+                if (agent.socket) {
+                    try {
+                        agent.socket.emit('restart-agent');
+                    } catch (error) {
+                        console.error(`Failed to emit restart-agent to agent ${agentName}:`, error);
+                    }
+                } else {
+                    console.warn(`Agent ${agentName} socket is null, cannot emit restart-agent`);
+                }
             }
         });
 
         socket.on('restart-agent', (agentName) => {
             console.log(`Restarting agent: ${agentName}`);
-            agent_connections[agentName].socket.emit('restart-agent');
+            const agent = agent_connections[agentName];
+            if (agent && agent.socket) {
+                try {
+                    agent.socket.emit('restart-agent');
+                } catch (error) {
+                    console.error(`Failed to emit restart-agent to agent ${agentName}:`, error);
+                }
+            } else {
+                console.warn(`Agent ${agentName} not found or socket is null, cannot emit restart-agent`);
+            }
         });
 
         socket.on('stop-agent', (agentName) => {
@@ -173,7 +218,11 @@ export function createMindServer(host_public = false, port = 8080) {
                 mindcraft.destroyAgent(agentName);
                 delete agent_connections[agentName];
             }
-            agentsStatusUpdate();
+            try {
+                agentsStatusUpdate();
+            } catch (error) {
+                console.error('Failed to update agents status on destroy-agent:', error);
+            }
         });
 
         socket.on('stop-all-agents', () => {
@@ -201,15 +250,23 @@ export function createMindServer(host_public = false, port = 8080) {
 				console.warn(`Agent ${agentName} not in game, cannot send message via MindServer.`);
 				return
 			}
-			try {
-				agent_connections[agentName].socket.emit('send-message', data)
-			} catch (error) {
-				console.error('Error: ', error);
+			if (agent_connections[agentName].socket) {
+				try {
+					agent_connections[agentName].socket.emit('send-message', data)
+				} catch (error) {
+					console.error(`Failed to emit send-message to agent ${agentName}:`, error);
+				}
+			} else {
+				console.warn(`Agent ${agentName} socket is null, cannot send message`);
 			}
 		});
 
         socket.on('bot-output', (agentName, message) => {
-            io.emit('bot-output', agentName, message);
+            try {
+                io.emit('bot-output', agentName, message);
+            } catch (error) {
+                console.error(`Failed to emit bot-output:`, error);
+            }
         });
 
         socket.on('listen-to-agents', () => {
@@ -233,13 +290,17 @@ function agentsStatusUpdate(socket) {
     for (let agentName in agent_connections) {
         const conn = agent_connections[agentName];
         agents.push({
-            name: agentName, 
+            name: agentName,
             in_game: conn.in_game,
             viewerPort: conn.viewer_port,
             socket_connected: !!conn.socket
         });
     };
-    socket.emit('agents-status', agents);
+    try {
+        socket.emit('agents-status', agents);
+    } catch (error) {
+        console.error('Failed to emit agents-status:', error);
+    }
 }
 
 
@@ -253,17 +314,30 @@ function addListener(listener_socket) {
                 let agent = agent_connections[agentName];
                 if (agent.in_game) {
                     try {
-                        const state = await new Promise((resolve) => {
-                            agent.socket.emit('get-full-state', (s) => resolve(s));
-                        });
-                        states[agentName] = state;
+                        if (agent.socket) {
+                            const state = await new Promise((resolve) => {
+                                try {
+                                    agent.socket.emit('get-full-state', (s) => resolve(s));
+                                } catch (error) {
+                                    console.error(`Failed to emit get-full-state to agent ${agentName}:`, error);
+                                    resolve({ error: String(error) });
+                                }
+                            });
+                            states[agentName] = state;
+                        } else {
+                            states[agentName] = { error: 'Socket is null' };
+                        }
                     } catch (e) {
                         states[agentName] = { error: String(e) };
                     }
                 }
             }
             for (let listener of agent_listeners) {
-                listener.emit('state-update', states);
+                try {
+                    listener.emit('state-update', states);
+                } catch (error) {
+                    console.error('Failed to emit state-update to listener:', error);
+                }
             }
         }, 1000);
     }

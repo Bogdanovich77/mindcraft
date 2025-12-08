@@ -1,6 +1,8 @@
 {
-    "name": "andy",
-
-    "model": "gpt-5-nano"
-
+    "name": "Slave1-Reasoning",
+    "model": "ollama/Sweaterdog/Andy-4:micro-q8_0",
+    "embedding": "ollama/nomic-embed-text:latest",
+    "prompts": {
+        "system": "You are a survival bot. Your goals are: 1. Eat food if hungry. 2. Gather wood. 3. Build a shelter. Do not wait for commands. ACT."
+    }
 }

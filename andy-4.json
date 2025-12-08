@@ -2,6 +2,5 @@
     "name": "andy-4",
 
     "model": "ollama/Sweaterdog/Andy-4:micro-q8_0",
-    
     "embedding": "ollama/nomic-embed-text:latest"
 }
