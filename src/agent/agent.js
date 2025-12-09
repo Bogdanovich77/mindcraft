@@ -80,7 +80,13 @@ export class Agent {
                 // wait for a bit so stats are not undefined
                 await new Promise((resolve) => setTimeout(resolve, 1000));
                 
-                console.log(`${this.name} spawned.`);
+                // Ensure bot.entity is available before setting up message handlers
+                if (!this.bot.entity) {
+                    console.error('Bot entity not available after spawn. This should not happen.');
+                    process.exit(0);
+                }
+                
+                console.log(`${this.name} spawned with entity at position:`, this.bot.entity.position);
                 this.clearBotLogs();
               
                 this._setupEventHandlers(save_data, init_message);
@@ -219,6 +225,12 @@ export class Agent {
         await this.checkTaskDone();
         if (!source || !message) {
             console.warn('Received empty message from', source);
+            return false;
+        }
+        
+        // Check if bot is fully initialized before processing messages
+        if (!this.bot.entity) {
+            console.warn('Cannot process message: Bot entity not yet available (still spawning...)');
             return false;
         }
 

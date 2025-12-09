@@ -7,16 +7,16 @@
 
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import { StateGraph, START, END, Annotation } from '@langchain/langgraph';
-import { PurposeCore } from '../cognitive/purpose_core.ts';
-import { ReactiveBehaviorLayerImpl } from './reactive_layer.ts';
-import { InterruptController } from './interrupt_controller.ts';
-import { InterruptPriority, ProcessingPhase } from './interfaces.ts';
+import { PurposeCore } from '../cognitive/purpose_core.js';
+import { ReactiveBehaviorLayerImpl } from './reactive_layer.js';
+import { InterruptController } from './interrupt_controller.js';
+import { InterruptPriority, ProcessingPhase } from './interfaces.js';
 import { Prompter } from '../../models/prompter.js';
 import {
     messageAnalysisNode,
     conversationProcessingNode,
     responseRoutingNode
-} from './state_nodes.ts';
+} from './state_nodes.js';
 
 export class LangGraphAgent {
     constructor() {
@@ -97,69 +97,9 @@ export class LangGraphAgent {
      * Initialize the LangGraph state graph
      */
     async initializeStateGraph() {
-        // Create state graph with proper LangGraph schema
-        const AgentState = Annotation.Root({
-            context: Annotation({
-                position: { x: 0, y: 0, z: 0 },
-                health: 20,
-                food: 20,
-                experience: 0,
-                dimension: 'overworld',
-                timeOfDay: 0,
-                weather: 'clear',
-                nearbyEntities: [],
-                nearbyBlocks: [],
-                inventory: [],
-                equipment: {},
-                lastMessage: undefined
-            }),
-            reactive: Annotation({
-                activeMode: 'none',
-                emergencyConditions: [],
-                lastReactiveAction: undefined,
-                interruptHistory: []
-            }),
-            cognitive: Annotation({
-                purposeCore: {},
-                currentGoal: null,
-                activeGoals: [],
-                decisionHistory: [],
-                memory: {
-                    working: {
-                        currentFocus: null,
-                        activeTasks: [],
-                        buffer: []
-                    },
-                    episodic: {
-                        episodes: []
-                    }
-                },
-                processing: {
-                    currentPhase: 'perception',
-                    cognitiveLoad: 0,
-                    processingHistory: []
-                }
-            }),
-            executive: Annotation({
-                currentAction: null,
-                actionQueue: [],
-                lastDecision: null,
-                processingTime: 0,
-                conversationalResponse: undefined,
-                lastResponse: undefined,
-                responseHistory: [],
-                processingMode: 'action'
-            }),
-            metadata: Annotation({
-                agentId: '',
-                startTime: Date.now(),
-                lastUpdate: Date.now(),
-                version: '1.0.0',
-                performanceMode: 'balanced'
-            })
-        });
-        
-        this.stateGraph = new StateGraph(AgentState)
+        // Create state graph with simplified schema (compatible with current LangGraph version)
+        // Using any type to avoid LangGraph type complexities for now
+        this.stateGraph = new StateGraph<any>({})
             .addNode('perception', this.handlePerception.bind(this))
             .addNode('message_analysis', messageAnalysisNode)
             .addNode('conversation_processing', conversationProcessingNode)
@@ -239,6 +179,9 @@ export class LangGraphAgent {
         this.bot.on('spawn', () => {
             console.log(`${this.name} spawned in Minecraft world`);
             this.initializeAgentState();
+            
+            // Process any pending messages that were received before initialization
+            this.processPendingMessages();
         });
 
         this.bot.on('chat', (username, message) => {
@@ -260,13 +203,16 @@ export class LangGraphAgent {
      * Initialize agent state
      */
     initializeAgentState() {
+        // Check if bot.entity is available before accessing position
+        const position = this.bot.entity ? this.bot.entity.position : { x: 0, y: 64, z: 0 };
+        
         this.agentState = {
             context: {
-                position: this.bot.entity.position,
-                health: this.bot.health,
-                hunger: this.bot.food,
-                dimension: this.bot.game.dimension,
-                time: this.bot.time.timeOfDay,
+                position: position,
+                health: this.bot.health || 20,
+                hunger: this.bot.food || 20,
+                dimension: this.bot.game ? this.bot.game.dimension : 'overworld',
+                time: this.bot.time ? this.bot.time.timeOfDay : 0,
                 inventory: this.getInventorySnapshot(),
                 nearbyEntities: this.getNearbyEntities(),
                 environmentalFactors: this.getEnvironmentalFactors(),
@@ -323,11 +269,56 @@ export class LangGraphAgent {
     }
 
     /**
+     * Process pending messages that were received before agent state was initialized
+     */
+    async processPendingMessages() {
+        if (!this.pendingMessages || this.pendingMessages.length === 0) {
+            return;
+        }
+
+        console.log(`${this.name} processing ${this.pendingMessages.length} pending messages`);
+        
+        // Process each pending message
+        for (const { username, message, timestamp } of this.pendingMessages) {
+            try {
+                // Update agent state with pending message
+                this.agentState.context.lastMessage = {
+                    source: username,
+                    message,
+                    timestamp: timestamp,
+                    type: this.determineMessageType(message),
+                    priority: this.calculateMessagePriority(message)
+                };
+                
+                // Process through state graph
+                await this.processCognitiveCycle();
+                
+            } catch (error) {
+                console.error(`Error processing pending message from ${username}:`, error);
+            }
+        }
+        
+        // Clear pending messages
+        this.pendingMessages = [];
+    }
+
+    /**
      * Handle incoming messages
      */
     async handleMessage(username, message) {
         try {
             console.log(`${this.name} received message from ${username}: ${message}`);
+            
+            // Check if agent state is initialized
+            if (!this.agentState) {
+                console.warn(`${this.name} agent state not initialized, deferring message processing`);
+                // Store message for later processing
+                if (!this.pendingMessages) {
+                    this.pendingMessages = [];
+                }
+                this.pendingMessages.push({ username, message, timestamp: Date.now() });
+                return;
+            }
             
             // Update agent state with new message
             this.agentState.context.lastMessage = {
@@ -356,7 +347,7 @@ export class LangGraphAgent {
                 return;
             }
             
-            // Update context
+            // Update context with null checks
             this.updateContext();
             
             // Check if this is a conversational message that needs immediate processing
@@ -382,6 +373,12 @@ export class LangGraphAgent {
      */
     async processConversationalMessage() {
         try {
+            // Check if agent state is available
+            if (!this.agentState || !this.agentState.context) {
+                console.warn(`${this.name} agent state not available for conversation processing`);
+                return;
+            }
+            
             const message = this.agentState.context.lastMessage;
             if (!message) return;
             
@@ -420,13 +417,13 @@ export class LangGraphAgent {
      */
     
     async handlePerception(state) {
-        // Update sensory information
+        // Update sensory information with null checks
         const updatedState = { ...state };
         updatedState.context = {
             ...updatedState.context,
-            position: this.bot.entity.position,
-            health: this.bot.health,
-            hunger: this.bot.food,
+            position: this.bot.entity ? this.bot.entity.position : state.context.position || { x: 0, y: 64, z: 0 },
+            health: this.bot.health || state.context.health || 20,
+            hunger: this.bot.food || state.context.hunger || 20,
             inventory: this.getInventorySnapshot(),
             nearbyEntities: this.getNearbyEntities(),
             timestamp: Date.now()
@@ -687,9 +684,9 @@ export class LangGraphAgent {
         
         this.agentState.context = {
             ...this.agentState.context,
-            position: this.bot.entity.position,
-            health: this.bot.health,
-            hunger: this.bot.food,
+            position: this.bot.entity ? this.bot.entity.position : this.agentState.context.position || { x: 0, y: 64, z: 0 },
+            health: this.bot.health || this.agentState.context.health || 20,
+            hunger: this.bot.food || this.agentState.context.hunger || 20,
             timestamp: Date.now()
         };
     }
@@ -703,12 +700,18 @@ export class LangGraphAgent {
     }
 
     getNearbyEntities() {
+        // Check if bot.entity is available
+        if (!this.bot.entity || !this.bot.entities) {
+            return [];
+        }
+        
+        const botPosition = this.bot.entity.position;
         return Object.values(this.bot.entities)
-            .filter(entity => entity.position.distanceTo(this.bot.entity.position) < 32)
+            .filter(entity => entity.position && botPosition && entity.position.distanceTo(botPosition) < 32)
             .map(entity => ({
                 name: entity.name || entity.type,
                 position: entity.position,
-                distance: entity.position.distanceTo(this.bot.entity.position),
+                distance: entity.position.distanceTo(botPosition),
                 type: entity.type
             }));
     }
@@ -723,7 +726,12 @@ export class LangGraphAgent {
     }
 
     calculateDangerLevel() {
-        const hostileEntities = this.getNearbyEntities()
+        const nearbyEntities = this.getNearbyEntities();
+        if (!nearbyEntities || nearbyEntities.length === 0) {
+            return 0;
+        }
+        
+        const hostileEntities = nearbyEntities
             .filter(entity => this.isHostileEntity(entity.type));
         
         return Math.min(1.0, hostileEntities.length * 0.2);
@@ -733,15 +741,19 @@ export class LangGraphAgent {
         // Time pressure based on health, hunger, and time of day
         let pressure = 0;
         
-        if (this.bot.health < 10) pressure += 0.3;
-        if (this.bot.food < 10) pressure += 0.2;
-        if (this.bot.time.timeOfDay > 12000) pressure += 0.1; // Night time
+        if (this.bot.health && this.bot.health < 10) pressure += 0.3;
+        if (this.bot.food && this.bot.food < 10) pressure += 0.2;
+        if (this.bot.time && this.bot.time.timeOfDay > 12000) pressure += 0.1; // Night time
         
         return Math.min(1.0, pressure);
     }
 
     calculateResourceAvailability() {
         // Simple heuristic based on inventory
+        if (!this.bot.inventory || !this.bot.inventory.items) {
+            return 0;
+        }
+        
         const items = this.bot.inventory.items();
         const hasTools = items.some(item => item.name.includes('pickaxe') || item.name.includes('axe'));
         const hasFood = items.some(item => item.name.includes('food') || item.name.includes('bread'));
@@ -751,7 +763,12 @@ export class LangGraphAgent {
 
     calculateSocialPressure() {
         // Based on nearby players and recent messages
-        const nearbyPlayers = this.getNearbyEntities()
+        const nearbyEntities = this.getNearbyEntities();
+        if (!nearbyEntities || nearbyEntities.length === 0) {
+            return 0;
+        }
+        
+        const nearbyPlayers = nearbyEntities
             .filter(entity => entity.type === 'player');
         
         return Math.min(1.0, nearbyPlayers.length * 0.3);
@@ -813,9 +830,9 @@ export class LangGraphAgent {
     }
 
     updateHealthState() {
-        if (this.agentState) {
-            this.agentState.context.health = this.bot.health;
-            this.agentState.context.hunger = this.bot.food;
+        if (this.agentState && this.agentState.context) {
+            this.agentState.context.health = this.bot.health || this.agentState.context.health || 20;
+            this.agentState.context.hunger = this.bot.food || this.agentState.context.hunger || 20;
         }
     }
 

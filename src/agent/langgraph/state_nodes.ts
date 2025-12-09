@@ -776,11 +776,17 @@ async function generateConversationalResponse(message: any, state: AgentState): 
     // Get the agent instance from the context (this would be passed in during node execution)
     // For now, we'll use the placeholder implementation but with better integration points
     
-    const personality = state.cognitive.purpose.personality;
-    const context = state.context;
+    // Add null checks for accessing state properties
+    const personality = (state.cognitive && state.cognitive.purpose && state.cognitive.purpose.personality)
+        ? state.cognitive.purpose.personality
+        : { extraversion: 0.5, agreeableness: 0.5, conscientiousness: 0.5 };
     
-    // Build conversation history
-    const history = state.executive.responseHistory.slice(-5); // Last 5 conversations
+    const context = state.context || { position: { x: 0, y: 64, z: 0 }, agentId: 'unknown' };
+    
+    // Build conversation history with null check
+    const history = (state.executive && state.executive.responseHistory)
+        ? state.executive.responseHistory.slice(-5)
+        : []; // Last 5 conversations
     
     // Generate response based on personality and context
     // This will be overridden by the agent's prompter integration
@@ -833,33 +839,37 @@ async function updateConversationContext(state: AgentState, message: any, proces
     }
   };
   
-  // Add to episodic memory
-  state.cognitive.memory.episodic.episodes.push({
-    id: conversationEntry.id,
-    timestamp: conversationEntry.timestamp,
-    duration: processingResult.processingTime,
-    location: state.context.position,
-    participants: [message.source, state.metadata.agentId],
-    actions: [{
-      actor: state.metadata.agentId,
-      action: 'respond',
-      target: message.source,
-      timestamp: Date.now(),
-      result: processingResult.response
-    }],
-    outcomes: [processingResult.response],
-    emotionalImpact: calculateEmotionalImpact(processingResult.response),
-    importance: calculateConversationImportance(message, processingResult),
-    tags: ['conversation', 'social']
-  });
+  // Add to episodic memory with null checks
+  if (state.cognitive && state.cognitive.memory && state.cognitive.memory.episodic) {
+    state.cognitive.memory.episodic.episodes.push({
+      id: conversationEntry.id,
+      timestamp: conversationEntry.timestamp,
+      duration: processingResult.processingTime,
+      location: state.context.position || { x: 0, y: 64, z: 0 },
+      participants: [message.source, state.metadata ? state.metadata.agentId : 'unknown'],
+      actions: [{
+        actor: state.metadata ? state.metadata.agentId : 'unknown',
+        action: 'respond',
+        target: message.source,
+        timestamp: Date.now(),
+        result: processingResult.response
+      }],
+      outcomes: [processingResult.response],
+      emotionalImpact: calculateEmotionalImpact(processingResult.response),
+      importance: calculateConversationImportance(message, processingResult),
+      tags: ['conversation', 'social']
+    });
+  }
   
-  // Update working memory with conversation context
-  state.cognitive.memory.working.buffer.push({
-    content: conversationEntry,
-    type: 'conversation',
-    timestamp: Date.now(),
-    priority: 0.7
-  });
+  // Update working memory with conversation context with null checks
+  if (state.cognitive && state.cognitive.memory && state.cognitive.memory.working && state.cognitive.memory.working.buffer) {
+    state.cognitive.memory.working.buffer.push({
+      content: conversationEntry,
+      type: 'conversation',
+      timestamp: Date.now(),
+      priority: 0.7
+    });
+  }
 }
 
 async function sendResponseToUser(state: AgentState): Promise<void> {

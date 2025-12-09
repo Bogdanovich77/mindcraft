@@ -5,12 +5,13 @@
  * Integrates with the existing Mindcraft systems while providing enhanced capabilities.
  */
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
-import { StateGraph, START, END } from '@langchain/langgraph';
-import { PersonalitySystem } from '../cognitive/personality.js';
+import { StateGraph, START, END, Annotation } from '@langchain/langgraph';
 import { PurposeCore } from '../cognitive/purpose_core.js';
 import { ReactiveBehaviorLayerImpl } from './reactive_layer.js';
 import { InterruptController } from './interrupt_controller.js';
 import { InterruptPriority, ProcessingPhase } from './interfaces.js';
+import { Prompter } from '../../models/prompter.js';
+import { messageAnalysisNode, conversationProcessingNode, responseRoutingNode } from './state_nodes.js';
 export class LangGraphAgent {
     constructor() {
         this.profile = null;
@@ -22,6 +23,8 @@ export class LangGraphAgent {
         this.agentState = null;
         this.name = null;
         this.isInitialized = false;
+        this.prompter = null;
+        this.conversationHistory = [];
     }
     /**
      * Initialize the LangGraph agent
@@ -66,28 +69,41 @@ export class LangGraphAgent {
             learningRate: this.profile.behavior?.adaptationRate || 0.1,
             decisionTimeLimit: 2000
         });
-        console.log('Cognitive components initialized');
+        // Initialize Prompter for conversation processing
+        this.prompter = new Prompter(this, this.profile);
+        await this.prompter.initExamples();
+        console.log('Cognitive components and prompter initialized');
     }
     /**
      * Initialize the LangGraph state graph
      */
     async initializeStateGraph() {
-        // Create state graph with empty schema
-        this.stateGraph = new StateGraph({})
+        // Create state graph with simplified schema (compatible with current LangGraph version)
+        // Using any type to avoid LangGraph type complexities for now
+        this.stateGraph = new StateGraph < any > ({})
             .addNode('perception', this.handlePerception.bind(this))
+            .addNode('message_analysis', messageAnalysisNode)
+            .addNode('conversation_processing', conversationProcessingNode)
             .addNode('reactive_check', this.handleReactiveCheck.bind(this))
             .addNode('cognitive_processing', this.handleCognitiveProcessing.bind(this))
             .addNode('action_execution', this.handleActionExecution.bind(this))
             .addNode('learning_update', this.handleLearningUpdate.bind(this))
+            .addNode('response_routing', responseRoutingNode)
             .addEdge(START, 'perception')
-            .addEdge('perception', 'reactive_check')
+            .addEdge('perception', 'message_analysis')
+            .addConditionalEdges('message_analysis', this.determineProcessingMode.bind(this), {
+            'conversational': 'conversation_processing',
+            'action': 'reactive_check'
+        })
+            .addEdge('conversation_processing', 'response_routing')
             .addConditionalEdges('reactive_check', this.shouldProcessCognitively.bind(this), {
             'reactive_action': 'action_execution',
             'cognitive_processing': 'cognitive_processing'
         })
             .addEdge('cognitive_processing', 'action_execution')
             .addEdge('action_execution', 'learning_update')
-            .addEdge('learning_update', END);
+            .addEdge('learning_update', 'response_routing')
+            .addEdge('response_routing', END);
         // Compile the graph
         this.compiledGraph = this.stateGraph.compile();
         console.log('LangGraph state graph initialized');
@@ -126,6 +142,8 @@ export class LangGraphAgent {
         this.bot.on('spawn', () => {
             console.log(`${this.name} spawned in Minecraft world`);
             this.initializeAgentState();
+            // Process any pending messages that were received before initialization
+            this.processPendingMessages();
         });
         this.bot.on('chat', (username, message) => {
             if (username !== this.name) {
@@ -143,36 +161,96 @@ export class LangGraphAgent {
      * Initialize agent state
      */
     initializeAgentState() {
+        // Check if bot.entity is available before accessing position
+        const position = this.bot.entity ? this.bot.entity.position : { x: 0, y: 64, z: 0 };
         this.agentState = {
             context: {
-                position: this.bot.entity.position,
-                health: this.bot.health,
-                hunger: this.bot.food,
-                dimension: this.bot.game.dimension,
-                time: this.bot.time.timeOfDay,
+                position: position,
+                health: this.bot.health || 20,
+                hunger: this.bot.food || 20,
+                dimension: this.bot.game ? this.bot.game.dimension : 'overworld',
+                time: this.bot.time ? this.bot.time.timeOfDay : 0,
                 inventory: this.getInventorySnapshot(),
                 nearbyEntities: this.getNearbyEntities(),
-                environmentalFactors: this.getEnvironmentalFactors()
+                environmentalFactors: this.getEnvironmentalFactors(),
+                lastMessage: undefined
             },
             reactive: {
                 activeMode: null,
                 emergencyLevel: 0,
-                lastReactiveAction: null
+                lastReactiveAction: null,
+                emergencyConditions: [],
+                interruptHistory: []
             },
             cognitive: {
                 purposeCore: this.purposeCore.getState(),
                 currentGoal: null,
                 activeGoals: [],
-                decisionHistory: []
+                decisionHistory: [],
+                memory: {
+                    working: {
+                        currentFocus: null,
+                        activeTasks: [],
+                        buffer: []
+                    },
+                    episodic: {
+                        episodes: []
+                    }
+                },
+                processing: {
+                    currentPhase: 'perception',
+                    cognitiveLoad: 0,
+                    processingHistory: []
+                }
             },
             executive: {
                 currentAction: null,
                 actionQueue: [],
                 lastDecision: null,
-                processingTime: 0
+                processingTime: 0,
+                conversationalResponse: undefined,
+                lastResponse: undefined,
+                responseHistory: [],
+                processingMode: 'action'
+            },
+            metadata: {
+                agentId: this.name,
+                startTime: Date.now(),
+                lastUpdate: Date.now(),
+                version: '1.0.0',
+                performanceMode: 'balanced'
             }
         };
         console.log('Agent state initialized');
+    }
+    /**
+     * Process pending messages that were received before agent state was initialized
+     */
+    async processPendingMessages() {
+        if (!this.pendingMessages || this.pendingMessages.length === 0) {
+            return;
+        }
+        console.log(`${this.name} processing ${this.pendingMessages.length} pending messages`);
+        // Process each pending message
+        for (const { username, message, timestamp } of this.pendingMessages) {
+            try {
+                // Update agent state with pending message
+                this.agentState.context.lastMessage = {
+                    source: username,
+                    message,
+                    timestamp: timestamp,
+                    type: this.determineMessageType(message),
+                    priority: this.calculateMessagePriority(message)
+                };
+                // Process through state graph
+                await this.processCognitiveCycle();
+            }
+            catch (error) {
+                console.error(`Error processing pending message from ${username}:`, error);
+            }
+        }
+        // Clear pending messages
+        this.pendingMessages = [];
     }
     /**
      * Handle incoming messages
@@ -180,11 +258,23 @@ export class LangGraphAgent {
     async handleMessage(username, message) {
         try {
             console.log(`${this.name} received message from ${username}: ${message}`);
+            // Check if agent state is initialized
+            if (!this.agentState) {
+                console.warn(`${this.name} agent state not initialized, deferring message processing`);
+                // Store message for later processing
+                if (!this.pendingMessages) {
+                    this.pendingMessages = [];
+                }
+                this.pendingMessages.push({ username, message, timestamp: Date.now() });
+                return;
+            }
             // Update agent state with new message
             this.agentState.context.lastMessage = {
-                username,
+                source: username,
                 message,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                type: this.determineMessageType(message),
+                priority: this.calculateMessagePriority(message)
             };
             // Process through state graph
             await this.processCognitiveCycle();
@@ -202,9 +292,15 @@ export class LangGraphAgent {
                 console.warn('Agent not fully initialized, skipping cognitive cycle');
                 return;
             }
-            // Update context
+            // Update context with null checks
             this.updateContext();
-            // Run through state graph
+            // Check if this is a conversational message that needs immediate processing
+            if (this.agentState.context.lastMessage &&
+                this.determineProcessingMode(this.agentState) === 'conversational') {
+                await this.processConversationalMessage();
+                return;
+            }
+            // Run through state graph for action processing
             const result = await this.compiledGraph.invoke(this.agentState);
             // Update agent state with result
             this.agentState = result;
@@ -214,16 +310,53 @@ export class LangGraphAgent {
         }
     }
     /**
+     * Process conversational messages using prompter system
+     */
+    async processConversationalMessage() {
+        try {
+            // Check if agent state is available
+            if (!this.agentState || !this.agentState.context) {
+                console.warn(`${this.name} agent state not available for conversation processing`);
+                return;
+            }
+            const message = this.agentState.context.lastMessage;
+            if (!message)
+                return;
+            console.log(`${this.name} processing conversational message: "${message.message}"`);
+            // Generate response using prompter
+            const response = await this.generateConversationalResponse(message, this.agentState);
+            // Route response back to user
+            await this.routeResponse(message.source, response);
+            // Update conversation history
+            const responseRecord = {
+                source: message.source,
+                message: message.message,
+                response: response,
+                timestamp: Date.now(),
+                processingMode: 'conversational',
+                responseTime: Date.now() - message.timestamp,
+                success: true
+            };
+            this.agentState.executive.responseHistory.push(responseRecord);
+            this.agentState.executive.lastResponse = responseRecord;
+            // Clear the message from context
+            this.agentState.context.lastMessage = undefined;
+        }
+        catch (error) {
+            console.error('Error processing conversational message:', error);
+        }
+    }
+    /**
      * State graph node handlers
      */
     async handlePerception(state) {
-        // Update sensory information
+        // Update sensory information with null checks
         const updatedState = { ...state };
         updatedState.context = {
             ...updatedState.context,
-            position: this.bot.entity.position,
-            health: this.bot.health,
-            hunger: this.bot.food,
+            position: this.bot.entity ? this.bot.entity.position : state.context.position || { x: 0, y: 64, z: 0 },
+            health: this.bot.health || state.context.health || 20,
+            hunger: this.bot.food || state.context.hunger || 20,
             inventory: this.getInventorySnapshot(),
             nearbyEntities: this.getNearbyEntities(),
             timestamp: Date.now()
@@ -303,14 +436,138 @@ export class LangGraphAgent {
     shouldProcessCognitively(state) {
         return state.reactive.emergencyLevel > 0.6 ? 'reactive_action' : 'cognitive_processing';
     }
+    determineProcessingMode(state) {
+        if (!state.context.lastMessage) {
+            return 'action';
+        }
+        const message = state.context.lastMessage.message.toLowerCase();
+        // Check for action commands
+        const actionCommands = [
+            'go to', 'move to', 'walk to', 'run to',
+            'get', 'take', 'pick up', 'collect',
+            'craft', 'build', 'place', 'break',
+            'attack', 'fight', 'defend',
+            'follow', 'stop', 'wait', '!'
+        ];
+        const isActionCommand = actionCommands.some(cmd => message.includes(cmd));
+        return isActionCommand ? 'action' : 'conversational';
+    }
+    determineMessageType(message) {
+        const lowerMessage = message.toLowerCase();
+        // Check for action commands
+        const actionCommands = [
+            'go to', 'move to', 'walk to', 'run to',
+            'get', 'take', 'pick up', 'collect',
+            'craft', 'build', 'place', 'break',
+            'attack', 'fight', 'defend',
+            'follow', 'stop', 'wait'
+        ];
+        const isActionCommand = actionCommands.some(cmd => lowerMessage.includes(cmd));
+        return isActionCommand ? 'command' : 'conversational';
+    }
+    calculateMessagePriority(message) {
+        const lowerMessage = message.toLowerCase();
+        const urgencyIndicators = ['help', 'urgent', 'quick', 'fast', 'now', 'emergency', '!'];
+        let priority = 0.5; // Base priority
+        urgencyIndicators.forEach(indicator => {
+            if (lowerMessage.includes(indicator)) {
+                priority += 0.2;
+            }
+        });
+        // Add priority for exclamation marks
+        const exclamationCount = (message.match(/!/g) || []).length;
+        priority += Math.min(0.3, exclamationCount * 0.1);
+        return Math.min(1.0, priority);
+    }
+    /**
+     * Generate conversational response using prompter system
+     */
+    async generateConversationalResponse(message, state) {
+        if (!this.prompter) {
+            return 'I apologize, but my conversation system is not initialized.';
+        }
+        try {
+            // Build conversation history for prompter
+            const history = this.buildConversationHistory(state);
+            // Use prompter to generate response
+            const response = await this.prompter.promptConvo(history);
+            console.log(`${this.name} generated response: "${response}"`);
+            return response;
+        }
+        catch (error) {
+            console.error('Error generating conversational response:', error);
+            return 'I apologize, but I\'m having trouble processing that right now.';
+        }
+    }
+    /**
+     * Build conversation history for prompter
+     */
+    buildConversationHistory(state) {
+        const history = [];
+        // Add recent conversation history
+        const recentResponses = state.executive.responseHistory.slice(-5);
+        recentResponses.forEach(record => {
+            history.push({
+                role: 'user',
+                content: record.message
+            });
+            history.push({
+                role: 'assistant',
+                content: record.response
+            });
+        });
+        // Add current message
+        if (state.context.lastMessage) {
+            history.push({
+                role: 'user',
+                content: state.context.lastMessage.message
+            });
+        }
+        return history;
+    }
+    /**
+     * Route response back to user
+     */
+    async routeResponse(source, response) {
+        try {
+            console.log(`${this.name} full response to ${source}: "${response}"`);
+            if (this.bot && this.bot.chat) {
+                // Send response through Minecraft chat
+                this.bot.chat(response);
+            }
+            else {
+                // Fallback to console for testing
+                console.log(`${this.name} to ${source}: ${response}`);
+            }
+        }
+        catch (error) {
+            console.error('Error routing response:', error);
+        }
+    }
+    /**
+     * Test conversation processing
+     */
+    async testConversationProcessing(testMessage, source = 'test_user') {
+        console.log(`\n=== Testing Conversation Processing ===`);
+        console.log(`Message: "${testMessage}" from ${source}`);
+        try {
+            // Simulate receiving a message
+            await this.handleMessage(source, testMessage);
+            console.log(`=== Test Complete ===\n`);
+        }
+        catch (error) {
+            console.error('Test failed:', error);
+            console.log(`=== Test Failed ===\n`);
+        }
+    }
     updateContext() {
         if (!this.agentState)
             return;
         this.agentState.context = {
             ...this.agentState.context,
-            position: this.bot.entity.position,
-            health: this.bot.health,
-            hunger: this.bot.food,
+            position: this.bot.entity ? this.bot.entity.position : this.agentState.context.position || { x: 0, y: 64, z: 0 },
+            health: this.bot.health || this.agentState.context.health || 20,
+            hunger: this.bot.food || this.agentState.context.hunger || 20,
             timestamp: Date.now()
         };
     }
@@ -322,12 +579,17 @@ export class LangGraphAgent {
         }));
     }
     getNearbyEntities() {
+        // Check if bot.entity is available
+        if (!this.bot.entity || !this.bot.entities) {
+            return [];
+        }
+        const botPosition = this.bot.entity.position;
         return Object.values(this.bot.entities)
-            .filter(entity => entity.position.distanceTo(this.bot.entity.position) < 32)
+            .filter(entity => entity.position && botPosition && entity.position.distanceTo(botPosition) < 32)
             .map(entity => ({
             name: entity.name || entity.type,
             position: entity.position,
-            distance: entity.position.distanceTo(this.bot.entity.position),
+            distance: entity.position.distanceTo(botPosition),
             type: entity.type
         }));
     }
@@ -340,23 +602,30 @@ export class LangGraphAgent {
         };
     }
     calculateDangerLevel() {
-        const hostileEntities = this.getNearbyEntities()
+        const nearbyEntities = this.getNearbyEntities();
+        if (!nearbyEntities || nearbyEntities.length === 0) {
+            return 0;
+        }
+        const hostileEntities = nearbyEntities
             .filter(entity => this.isHostileEntity(entity.type));
         return Math.min(1.0, hostileEntities.length * 0.2);
     }
     calculateTimePressure() {
         // Time pressure based on health, hunger, and time of day
         let pressure = 0;
-        if (this.bot.health < 10)
+        if (this.bot.health && this.bot.health < 10)
             pressure += 0.3;
-        if (this.bot.food < 10)
+        if (this.bot.food && this.bot.food < 10)
             pressure += 0.2;
-        if (this.bot.time.timeOfDay > 12000)
+        if (this.bot.time && this.bot.time.timeOfDay > 12000)
             pressure += 0.1; // Night time
         return Math.min(1.0, pressure);
     }
     calculateResourceAvailability() {
         // Simple heuristic based on inventory
+        if (!this.bot.inventory || !this.bot.inventory.items) {
+            return 0;
+        }
         const items = this.bot.inventory.items();
         const hasTools = items.some(item => item.name.includes('pickaxe') || item.name.includes('axe'));
         const hasFood = items.some(item => item.name.includes('food') || item.name.includes('bread'));
@@ -364,7 +633,11 @@ export class LangGraphAgent {
     }
     calculateSocialPressure() {
         // Based on nearby players and recent messages
-        const nearbyPlayers = this.getNearbyEntities()
+        const nearbyEntities = this.getNearbyEntities();
+        if (!nearbyEntities || nearbyEntities.length === 0) {
+            return 0;
+        }
+        const nearbyPlayers = nearbyEntities
             .filter(entity => entity.type === 'player');
         return Math.min(1.0, nearbyPlayers.length * 0.3);
     }
@@ -420,9 +693,9 @@ export class LangGraphAgent {
         return hostileTypes.some(type => entityType.toLowerCase().includes(type));
     }
     updateHealthState() {
-        if (this.agentState) {
-            this.agentState.context.health = this.bot.health;
-            this.agentState.context.hunger = this.bot.food;
+        if (this.agentState && this.agentState.context) {
+            this.agentState.context.health = this.bot.health || this.agentState.context.health || 20;
+            this.agentState.context.hunger = this.bot.food || this.agentState.context.hunger || 20;
         }
     }
     handleDeath() {

@@ -303,6 +303,11 @@ export const actionsList = [
         description: 'Place a given block in the current location. Do NOT use to build structures, only use for single blocks/torches.',
         params: {'type': { type: 'BlockOrItemName', description: 'The block type to place.' }},
         perform: runAsAction(async (agent, type) => {
+            // Check if bot.entity is available
+            if (!agent.bot.entity) {
+                skills.log(agent.bot, 'Cannot place block: Bot entity not yet available (still spawning...)');
+                return;
+            }
             let pos = agent.bot.entity.position;
             await skills.placeBlock(agent.bot, type, pos.x, pos.y, pos.z);
         })

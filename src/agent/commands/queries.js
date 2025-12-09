@@ -13,13 +13,19 @@ const pad = (str) => {
 export const queryList = [
     {
         name: "!stats",
-        description: "Get your bot's location, health, hunger, and time of day.", 
+        description: "Get your bot's location, health, hunger, and time of day.",
         perform: function (agent) {
             let bot = agent.bot;
             let res = 'STATS';
-            let pos = bot.entity.position;
-            // display position to 2 decimal places
-            res += `\n- Position: x: ${pos.x.toFixed(2)}, y: ${pos.y.toFixed(2)}, z: ${pos.z.toFixed(2)}`;
+            
+            // Check if bot.entity is available before accessing position
+            if (!bot.entity) {
+                res += '\n- Position: Not yet available (bot still spawning...)';
+            } else {
+                let pos = bot.entity.position;
+                // display position to 2 decimal places
+                res += `\n- Position: x: ${pos.x.toFixed(2)}, y: ${pos.y.toFixed(2)}, z: ${pos.z.toFixed(2)}`;
+            }
             // Gameplay
             res += `\n- Gamemode: ${bot.game.gameMode}`;
             res += `\n- Health: ${Math.round(bot.health)} / 20`;
@@ -68,6 +74,12 @@ export const queryList = [
         description: "Get your bot's inventory.",
         perform: function (agent) {
             let bot = agent.bot;
+            
+            // Check if bot is fully initialized
+            if (!bot.entity) {
+                return pad('INVENTORY: Not yet available (bot still spawning...)');
+            }
+            
             let inventory = world.getInventoryCounts(bot);
             let res = 'INVENTORY';
             for (const item in inventory) {
@@ -105,6 +117,12 @@ export const queryList = [
         description: "Get the blocks near the bot.",
         perform: function (agent) {
             let bot = agent.bot;
+            
+            // Check if bot is fully initialized
+            if (!bot.entity) {
+                return pad('NEARBY_BLOCKS: Not yet available (bot still spawning...)');
+            }
+            
             let res = 'NEARBY_BLOCKS';
             let blocks = world.getNearestBlocks(bot);
             let block_details = new Set();
@@ -121,7 +139,7 @@ export const queryList = [
             }
             if (block_details.size === 0) {
                 res += ': none';
-            } 
+            }
             else {
                 res += '\n- ' + world.getSurroundingBlocks(bot).join('\n- ');
                 res += `\n- First Solid Block Above Head: ${world.getFirstBlockAboveHead(bot, null, 32)}`;
@@ -149,6 +167,12 @@ export const queryList = [
         description: "Get the nearby players and entities.",
         perform: function (agent) {
             let bot = agent.bot;
+            
+            // Check if bot is fully initialized
+            if (!bot.entity) {
+                return pad('NEARBY_ENTITIES: Not yet available (bot still spawning...)');
+            }
+            
             let res = 'NEARBY_ENTITIES';
             let players = world.getNearbyPlayerNames(bot);
             let bots = convoManager.getInGameAgents().filter(b => b !== agent.name);
