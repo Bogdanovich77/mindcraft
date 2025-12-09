@@ -10,7 +10,7 @@ import { StateGraph, START, END, Annotation } from '@langchain/langgraph';
 import { PurposeCore } from '../cognitive/purpose_core.js';
 import { ReactiveBehaviorLayerImpl } from './reactive_layer.js';
 import { InterruptController } from './interrupt_controller.js';
-import { InterruptPriority, ProcessingPhase } from './interfaces.js';
+import { InterruptPriority, ProcessingPhase, AgentStateAnnotation } from './interfaces.js';
 import { Prompter } from '../../models/prompter.js';
 import {
     messageAnalysisNode,
@@ -97,9 +97,8 @@ export class LangGraphAgent {
      * Initialize the LangGraph state graph
      */
     async initializeStateGraph() {
-        // Create state graph with simplified schema (compatible with current LangGraph version)
-        // Using any type to avoid LangGraph type complexities for now
-        this.stateGraph = new StateGraph<any>({})
+        // Create state graph with proper annotation schema
+        this.stateGraph = new StateGraph(AgentStateAnnotation)
             .addNode('perception', this.handlePerception.bind(this))
             .addNode('message_analysis', messageAnalysisNode)
             .addNode('conversation_processing', conversationProcessingNode)

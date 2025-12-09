@@ -3,7 +3,7 @@
  * Defines the complete agent state structure supporting both reactive and cognitive components
  */
 
-import { StateGraph } from "@langchain/langgraph";
+import { StateGraph, Annotation } from "@langchain/langgraph";
 import { Bot } from "mineflayer";
 
 // ============================================================================
@@ -545,10 +545,37 @@ export interface AgentState {
 }
 
 // ============================================================================
+// LANGGRAPH STATE ANNOTATION
+// ============================================================================
+
+export const AgentStateAnnotation = Annotation.Root({
+  // Core context
+  context: Annotation<WorldContext>,
+  
+  // Reactive layer (always active)
+  reactive: Annotation<ReactiveState>,
+  
+  // Cognitive layer (LangGraph managed)
+  cognitive: Annotation<CognitiveState>,
+  
+  // Executive control
+  executive: Annotation<ExecutiveState>,
+  
+  // System metadata
+  metadata: Annotation<{
+    agentId: string;
+    startTime: number;
+    lastUpdate: number;
+    version: string;
+    performanceMode: 'survival' | 'balanced' | 'cognitive';
+  }>
+});
+
+// ============================================================================
 // LANGGRAPH STATE GRAPH TYPE
 // ============================================================================
 
-export type AgentStateGraph = StateGraph<AgentState>;
+export type AgentStateGraph = StateGraph<typeof AgentStateAnnotation>;
 
 // ============================================================================
 // REACTIVE INTEGRATION INTERFACES

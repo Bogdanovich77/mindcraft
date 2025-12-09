@@ -27,8 +27,8 @@ const settings = {
         // "./profiles/mistral.json",
         // "./profiles/deepseek.json",
         // "./profiles/mercury.json",
-         "./profiles/andy-4.json", // Now with LangGraph v2 cognitive architecture!
-         "./profiles/Loner.json", // Military-style survival agent
+        // "./profiles/andy-4.json", // Now with LangGraph v2 cognitive architecture!
+        //"./profiles/Loner.json", // Military-style survival agent
          "./profiles/MasterChief.json", // Leadership-focused agent
 
         // using more than 1 profile requires you to /msg each bot indivually
@@ -50,7 +50,7 @@ const settings = {
     "language": "en", // translate to/from this language. Supports these language names: https://cloud.google.com/translate/docs/languages
     "render_bot_view": true, // show bot's view in browser at localhost:3000, 3001...
 
-    "allow_insecure_coding": false, // allows newAction command and model can write/run code on your computer. enable at own risk
+    "allow_insecure_coding": true, // allows newAction command and model can write/run code on your computer. enable at own risk
     "allow_vision": false, // allows vision model to interpret screenshots as inputs
     "blocked_actions" : ["!checkBlueprint", "!checkBlueprintLevel", "!getBlueprint", "!getBlueprintLevel"] , // commands to disable and remove from docs. Ex: ["!setMode"]
     "code_timeout_mins": -1, // minutes code is allowed to run. -1 for no timeout
