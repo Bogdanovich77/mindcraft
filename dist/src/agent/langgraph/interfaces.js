@@ -2,6 +2,7 @@
  * Core TypeScript interfaces for the Mindcraft LangGraph hybrid agent system
  * Defines the complete agent state structure supporting both reactive and cognitive components
  */
+import { Annotation } from "@langchain/langgraph";
 // ============================================================================
 // INTERRUPT PRIORITY SYSTEM
 // ============================================================================
@@ -21,3 +22,18 @@ export var ProcessingPhase;
     ProcessingPhase["EXECUTION"] = "execution";
     ProcessingPhase["REFLECTION"] = "reflection";
 })(ProcessingPhase || (ProcessingPhase = {}));
+// ============================================================================
+// LANGGRAPH STATE ANNOTATION
+// ============================================================================
+export const AgentStateAnnotation = Annotation.Root({
+    // Core context
+    context: (Annotation),
+    // Reactive layer (always active)
+    reactive: (Annotation),
+    // Cognitive layer (LangGraph managed)
+    cognitive: (Annotation),
+    // Executive control
+    executive: (Annotation),
+    // System metadata
+    metadata: (Annotation)
+});
