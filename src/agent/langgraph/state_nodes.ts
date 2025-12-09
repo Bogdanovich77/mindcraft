@@ -3,8 +3,8 @@
  * Defines the core processing nodes: perception, analysis, planning, decision, execution, and reflection
  */
 
-import { AgentState, ProcessingPhase, AgentAction, DecisionOption, WorldContext, InterruptPriority } from './interfaces';
-import { InterruptController } from './interrupt_controller';
+import { AgentState, ProcessingPhase, AgentAction, DecisionOption, WorldContext, InterruptPriority } from './interfaces.js';
+import { InterruptController } from './interrupt_controller.js';
 
 /**
  * Perception Node - Gather and process sensory information from the world

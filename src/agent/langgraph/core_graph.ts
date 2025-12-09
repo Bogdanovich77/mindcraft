@@ -10,9 +10,9 @@ import {
   InterruptPriority, 
   ReactiveBehaviorLayer,
   ProcessingPhase 
-} from './interfaces';
-import { InterruptController } from './interrupt_controller';
-import { createReactiveBehaviorLayer } from './reactive_layer';
+} from './interfaces.js';
+import { InterruptController } from './interrupt_controller.js';
+import { createReactiveBehaviorLayer } from './reactive_layer.js';
 import {
   perceptionNode,
   analysisNode,
@@ -21,7 +21,7 @@ import {
   executionNode,
   reflectionNode,
   emergencyResponseNode
-} from './state_nodes';
+} from './state_nodes.js';
 import { Bot } from 'mineflayer';
 
 /**
@@ -65,8 +65,8 @@ export class HybridAgentGraph {
 
   constructor(bot: Bot) {
     this.bot = bot;
-    this.graph = new StateGraph({} as any);
-    this.interruptController = new InterruptController();
+    this.graph = new StateGraph();
+    this.interruptController = new InterruptController('default-bot');
     this.reactiveLayer = createReactiveBehaviorLayer(this.interruptController, bot);
     
     this.setupGraph();

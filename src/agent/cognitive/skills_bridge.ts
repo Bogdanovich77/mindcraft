@@ -12,7 +12,7 @@ import {
   ExperienceEvent,
   ExperienceSource,
   ExperienceContext
-} from './skill_types';
+} from './skill_types.js';
 
 // Import the actual system classes
 import { SkillsSystem } from './skills_system.js';

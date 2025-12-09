@@ -1,9 +1,9 @@
-import * as Mindcraft from './src/mindcraft/mindcraft.js';
-import settings from './settings.js';
+import * as Mindcraft from './dist/src/mindcraft/mindcraft.js';
+import settings from './dist/settings.js';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { readFileSync } from 'fs';
-import { createAgentLoader } from './src/agent/langgraph_agent_loader.js';
+import { createAgentLoader } from './dist/src/agent/langgraph_agent_loader.js';
 
 function parseArguments() {
     return yargs(hideBin(process.argv))

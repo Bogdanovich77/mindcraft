@@ -14,7 +14,7 @@ import {
   LearningCharacteristics,
   SynergyType,
   TransferMechanism
-} from './skill_types';
+} from './skill_types.js';
 
 export enum SynergyStrength {
   VERY_WEAK = 'very_weak',

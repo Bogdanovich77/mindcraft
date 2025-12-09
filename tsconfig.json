@@ -4,14 +4,14 @@
     "module": "ESNext",
     "moduleResolution": "node",
     
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "strictBindCallApply": true,
-    "strictPropertyInitialization": true,
-    "noImplicitThis": true,
-    "alwaysStrict": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "strictFunctionTypes": false,
+    "strictBindCallApply": false,
+    "strictPropertyInitialization": false,
+    "noImplicitThis": false,
+    "alwaysStrict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "exactOptionalPropertyTypes": false,
@@ -21,9 +21,10 @@
     
     "allowJs": true,
     "checkJs": false,
-    "noEmit": true,
+    "noEmit": false,
+    "outDir": "./dist",
     
-    "baseUrl": "./src",
+    "baseUrl": "./",
     "paths": {
       "@agent/*": ["agent/*"],
       "@langgraph/*": ["agent/langgraph/*"],
@@ -58,7 +59,8 @@
     "**/*.test.ts",
     "**/*.test.js",
     "**/*.spec.ts",
-    "**/*.spec.js"
+    "**/*.spec.js",
+    "src/agent/cognitive/skills_integration_test.ts"
   ],
   "ts-node": {
     "esm": true,

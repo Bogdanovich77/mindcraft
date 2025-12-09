@@ -3,7 +3,7 @@ import type {
   MemoryQuery, 
   WorldContext,
   ActionRecord 
-} from '../langgraph/interfaces';
+} from '../langgraph/interfaces.js';
 
 /**
  * Episodic memory system for storing events with forgetting curves and consolidation

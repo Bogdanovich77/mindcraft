@@ -4,8 +4,8 @@ import type {
   ProceduralAdaptation,
   MemoryQuery,
   WorldContext 
-} from '../langgraph/interfaces';
-import type { ExtendedEpisodicEvent } from './episodic_memory';
+} from '../langgraph/interfaces.js';
+import type { ExtendedEpisodicEvent } from './episodic_memory.js';
 
 /**
  * Procedural memory system for storing skills, routines, and strategies with adaptation

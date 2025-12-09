@@ -5,11 +5,11 @@
  * and the existing legacy profile system for backward compatibility.
  */
 
-import { PurposeCore } from './purpose_core';
-import { PersonalitySystem } from './personality';
-import { MotivationSystem } from './motivations';
-import { ValueSystem } from './values';
-import { EthicsSystem } from './ethics';
+import { PurposeCore } from './purpose_core.js';
+import { PersonalitySystem } from './personality.js';
+import { MotivationSystem } from './motivations.js';
+import { ValueSystem } from './values.js';
+import { EthicsSystem } from './ethics.js';
 
 export interface LegacyProfile {
   id?: string;

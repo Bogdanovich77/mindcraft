@@ -1,8 +1,8 @@
-import { SemanticMemory } from './semantic_memory';
-import { EpisodicMemory, type ExtendedEpisodicEvent } from './episodic_memory';
-import { ProceduralMemory } from './procedural_memory';
-import { WorkingMemory } from './working_memory';
-import { ConsolidationEngine } from './consolidation_engine';
+import { SemanticMemory } from './semantic_memory.js';
+import { EpisodicMemory, type ExtendedEpisodicEvent } from './episodic_memory.js';
+import { ProceduralMemory } from './procedural_memory.js';
+import { WorkingMemory } from './working_memory.js';
+import { ConsolidationEngine } from './consolidation_engine.js';
 import type {
   AgentState,
   WorldContext,
@@ -17,8 +17,8 @@ import type {
   WorkingMemoryState,
   WorkingMemoryItem,
   MemoryStatistics
-} from '../langgraph/interfaces';
-import type { ThreatPattern } from './semantic_memory';
+} from '../langgraph/interfaces.js';
+import type { ThreatPattern } from './semantic_memory.js';
 
 /**
  * Main memory system orchestrator that coordinates all memory components

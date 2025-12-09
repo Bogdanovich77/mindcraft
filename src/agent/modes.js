@@ -303,29 +303,94 @@ const modes_list = [
     }
 ];
 
+// FAST-PATH: Optimized execute function for <100ms emergency response
 async function execute(mode, agent, func, timeout=-1) {
+    const startTime = process.hrtime.bigint();
+    
     if (agent.self_prompter.isActive())
         agent.self_prompter.stopLoop();
     let interrupted_action = agent.actions.currentActionLabel;
     mode.active = true;
-    let code_return = await agent.actions.runAction(`mode:${mode.name}`, async () => {
-        await func();
-    }, { timeout });
+    
+    // FAST-PATH: Emergency modes get optimized execution
+    const isEmergencyMode = mode.interrupts && mode.interrupts.includes('all');
+    const effectiveTimeout = isEmergencyMode ? (timeout > 0 ? Math.min(timeout, 80) : 80) : timeout;
+    
+    // Wrap the function to handle PathStopped errors with performance optimization
+    const wrappedFunc = async () => {
+        try {
+            await func();
+        } catch (error) {
+            // FAST-PATH: Optimized error handling for PathStopped
+            if (error.message && error.message.includes('PathStopped')) {
+                // Silent logging for performance - only log if slow
+                const executionTime = Number(process.hrtime.bigint() - startTime) / 1000000;
+                if (executionTime > 30 || !isEmergencyMode) {
+                    console.log(`[MODES] Mode ${mode.name} interrupted (PathStopped) after ${executionTime.toFixed(1)}ms`);
+                }
+                
+                // Fast pathfinder cleanup
+                if (agent.bot.pathfinder) {
+                    agent.bot.pathfinder.stop();
+                    agent.bot.pathfinder.setGoal(null);
+                }
+                
+                // Fast bot control reset
+                try {
+                    agent.bot.clearControlStates();
+                    if (agent.bot.targetDigBlock) {
+                        agent.bot.stopDigging();
+                    }
+                } catch (cleanupError) {
+                    // Silent error handling for performance
+                }
+                
+                // Re-throw as a special interrupt signal
+                throw new Error(`PathStopped: Mode ${mode.name} interrupted gracefully`);
+            }
+            
+            // Re-throw other errors as-is
+            throw error;
+        }
+    };
+    
+    let code_return = await agent.actions.runAction(`mode:${mode.name}`, wrappedFunc, { timeout: effectiveTimeout });
     mode.active = false;
-    console.log(`Mode ${mode.name} finished executing, code_return: ${code_return.message}`);
+    
+    // FAST-PATH: Optimized completion handling
+    const executionTime = Number(process.hrtime.bigint() - startTime) / 1000000;
+    
+    // Check if the execution was interrupted by PathStopped
+    if (code_return.message && code_return.message.includes('PathStopped')) {
+        code_return.success = true; // Treat as success since this is expected
+        code_return.message = `Mode ${mode.name} interrupted gracefully`;
+        
+        // Performance validation for emergency modes
+        if (isEmergencyMode && executionTime > 50) {
+            console.warn(`[MODES] Emergency mode ${mode.name} took ${executionTime.toFixed(1)}ms (target: <50ms)`);
+        }
+    } else {
+        // Conditional logging for performance
+        if (executionTime > (isEmergencyMode ? 50 : 100)) {
+            console.log(`[MODES] Mode ${mode.name} completed in ${executionTime.toFixed(1)}ms`);
+        }
+    }
 
-    let should_reprompt = 
-        interrupted_action && // it interrupted a previous action
-        !agent.actions.resume_func && // there is no resume function
-        !agent.self_prompter.isActive() && // self prompting is not on
-        !code_return.interrupted; // this mode action was not interrupted by something else
+    // FAST-PATH: Optimized reprompt logic (skip for emergency modes)
+    if (!isEmergencyMode) {
+        let should_reprompt =
+            interrupted_action && // it interrupted a previous action
+            !agent.actions.resume_func && // there is no resume function
+            !agent.self_prompter.isActive() && // self prompting is not on
+            !code_return.interrupted; // this mode action was not interrupted by something else
 
-    if (should_reprompt) {
-        // auto prompt to respond to the interruption
-        let role = convoManager.inConversation() ? agent.last_sender : 'system';
-        let logs = agent.bot.modes.flushBehaviorLog();
-        agent.handleMessage(role, `(AUTO MESSAGE)Your previous action '${interrupted_action}' was interrupted by ${mode.name}.
-        Your behavior log: ${logs}\nRespond accordingly.`);
+        if (should_reprompt) {
+            // auto prompt to respond to the interruption
+            let role = convoManager.inConversation() ? agent.last_sender : 'system';
+            let logs = agent.bot.modes.flushBehaviorLog();
+            agent.handleMessage(role, `(AUTO MESSAGE)Your previous action '${interrupted_action}' was interrupted by ${mode.name}.
+            Your behavior log: ${logs}\nRespond accordingly.`);
+        }
     }
 }
 
@@ -396,16 +461,46 @@ class ModeController {
         return res;
     }
 
+    // FAST-PATH: Optimized update loop for <100ms emergency response
     async update() {
+        const updateStart = process.hrtime.bigint();
+        
         if (_agent.isIdle()) {
             this.unPauseAll();
         }
-        for (let mode of modes_list) {
-            let interruptible = mode.interrupts.some(i => i === 'all') || mode.interrupts.some(i => i === _agent.actions.currentActionLabel);
-            if (mode.on && !mode.paused && !mode.active && (_agent.isIdle() || interruptible)) {
+        
+        // FAST-PATH: Prioritize emergency modes for early execution
+        const emergencyModes = modes_list.filter(mode =>
+            mode.interrupts && mode.interrupts.includes('all')
+        );
+        
+        const normalModes = modes_list.filter(mode =>
+            !mode.interrupts || !mode.interrupts.includes('all')
+        );
+        
+        // Check emergency modes first
+        for (let mode of emergencyModes) {
+            if (mode.on && !mode.paused && !mode.active) {
                 await mode.update(_agent);
+                if (mode.active) break; // Exit early if emergency mode is active
             }
-            if (mode.active) break;
+        }
+        
+        // Only check normal modes if no emergency is active
+        if (!emergencyModes.some(m => m.active)) {
+            for (let mode of normalModes) {
+                let interruptible = mode.interrupts && (mode.interrupts.some(i => i === 'all') || mode.interrupts.some(i => i === _agent.actions.currentActionLabel));
+                if (mode.on && !mode.paused && !mode.active && (_agent.isIdle() || interruptible)) {
+                    await mode.update(_agent);
+                }
+                if (mode.active) break;
+            }
+        }
+        
+        // FAST-PATH: Performance monitoring (only log if slow)
+        const updateTime = Number(process.hrtime.bigint() - updateStart) / 1000000;
+        if (updateTime > 20) { // Log if update takes more than 20ms
+            console.log(`[MODES] Update cycle took ${updateTime.toFixed(1)}ms`);
         }
     }
 

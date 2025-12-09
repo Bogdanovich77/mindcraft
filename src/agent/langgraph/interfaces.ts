@@ -78,7 +78,7 @@ export interface ReactiveState {
 }
 
 export interface EmergencyCondition {
-  type: 'drowning' | 'burning' | 'low_health' | 'hostile_nearby' | 'stuck' | 'falling';
+  type: 'drowning' | 'burning' | 'low_health' | 'hostile_nearby' | 'stuck' | 'falling' | 'pathfinder_stuck';
   severity: number;
   detectedAt: number;
   position: { x: number; y: number; z: number };

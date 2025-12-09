@@ -1,5 +1,5 @@
-import type { WorldContext } from '../langgraph/interfaces';
-import type { MemorySystem } from './memory_system';
+import type { WorldContext } from '../langgraph/interfaces.js';
+import type { MemorySystem } from './memory_system.js';
 
 /**
  * Bridge for migrating from legacy MemoryBank to enhanced memory system

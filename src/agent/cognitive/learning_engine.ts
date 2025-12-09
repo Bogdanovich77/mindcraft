@@ -19,9 +19,9 @@ import {
   SkillProgress,
   LearningMethod,
   SkillsSystemConfig
-} from './skill_types';
+} from './skill_types.js';
 
-import { PersonalitySystem } from './personality';
+import { PersonalitySystem } from './personality.js';
 
 export interface LearningEngineConfig {
   // Learning rates and modifiers

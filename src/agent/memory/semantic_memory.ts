@@ -3,7 +3,7 @@ import type {
   SemanticRelationship, 
   MemoryQuery, 
   WorldContext 
-} from '../langgraph/interfaces';
+} from '../langgraph/interfaces.js';
 
 /**
  * Semantic memory system for storing concepts, relationships, schemas, and prototypes

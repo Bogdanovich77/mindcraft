@@ -14,7 +14,7 @@ import {
   LearningSession,
   SkillProgress,
   LearningMethod
-} from './skill_types';
+} from './skill_types.js';
 
 export interface ExperienceTrackerConfig {
   // Collection settings

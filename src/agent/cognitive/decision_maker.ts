@@ -5,10 +5,10 @@
  * utility scores for action selection. Always respects reactive interrupts.
  */
 
-import { PersonalitySystem, PersonalityExperience } from './personality';
-import { MotivationSystem, MotivationEvent } from './motivations';
-import { ValueSystem, ValueEvent } from './values';
-import { EthicsSystem } from './ethics';
+import { PersonalitySystem, PersonalityExperience } from './personality.js';
+import { MotivationSystem, MotivationEvent } from './motivations.js';
+import { ValueSystem, ValueEvent } from './values.js';
+import { EthicsSystem } from './ethics.js';
 
 export interface ActionOption {
   id: string;

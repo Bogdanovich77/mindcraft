@@ -2,9 +2,9 @@ import type {
   SemanticConcept, 
   ProceduralSkill, 
   WorldContext 
-} from '../langgraph/interfaces';
-import type { ExtendedEpisodicEvent, ExtractedPattern } from './episodic_memory';
-import type { ThreatPattern } from './semantic_memory';
+} from '../langgraph/interfaces.js';
+import type { ExtendedEpisodicEvent, ExtractedPattern } from './episodic_memory.js';
+import type { ThreatPattern } from './semantic_memory.js';
 
 /**
  * Memory consolidation engine for pattern extraction and learning

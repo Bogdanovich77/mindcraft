@@ -8,8 +8,8 @@ const { readFileSync, writeFileSync } = require('fs');
 class VLLMModelTester {
     constructor(modelConfig = {}) {
         this.modelConfig = {
-            model: modelConfig.model || 'deepseek-ai/DeepSeek-R1-Distill-Qwen-32B',
-            url: modelConfig.url || 'http://0.0.0.0:8000/v1',
+            model: modelConfig.model || 'Qwen/Qwen3-VL-30B-A3B-Instruct-FP8',
+            url: modelConfig.url || 'http://localhost:8000/v1',
             params: modelConfig.params || {}
         };
         

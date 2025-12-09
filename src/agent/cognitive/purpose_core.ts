@@ -5,11 +5,11 @@
  * Provides purpose-driven decision making while respecting reactive interrupts.
  */
 
-import { PersonalitySystem, PersonalityExperience } from './personality';
-import { MotivationSystem, MotivationEvent } from './motivations';
-import { ValueSystem, ValueEvent } from './values';
-import { EthicsSystem } from './ethics';
-import { PurposeDrivenDecisionMaker, ActionOption, DecisionContext, UtilityBreakdown } from './decision_maker';
+import { PersonalitySystem, PersonalityExperience } from './personality.js';
+import { MotivationSystem, MotivationEvent } from './motivations.js';
+import { ValueSystem, ValueEvent } from './values.js';
+import { EthicsSystem } from './ethics.js';
+import { PurposeDrivenDecisionMaker, ActionOption, DecisionContext, UtilityBreakdown } from './decision_maker.js';
 
 export interface PurposeCoreState {
   personality: any;

@@ -4,8 +4,8 @@ import type {
   MemoryQuery,
   AgentState,
   WorldContext 
-} from '../langgraph/interfaces';
-import type { ExtendedEpisodicEvent } from './episodic_memory';
+} from '../langgraph/interfaces.js';
+import type { ExtendedEpisodicEvent } from './episodic_memory.js';
 
 /**
  * Working memory system with attention management and capacity limits

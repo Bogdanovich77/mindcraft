@@ -4,6 +4,78 @@ import pf from 'mineflayer-pathfinder';
 import Vec3 from 'vec3';
 import settings from "../../../settings.js";
 
+// Import pathfinder state management (will be available when integrated)
+let pathfinderManager = null;
+let interruptiblePathfinder = null;
+let botId = 'default';
+
+/**
+ * Initialize pathfinder state management for skills
+ */
+export function initializePathfinderStateManagement(bot, botIdentifier = 'default') {
+    try {
+        // Import dynamically to avoid circular dependencies
+        const { PathfinderStateManager } = require('../langgraph/pathfinder_state.js');
+        pathfinderManager = PathfinderStateManager.getInstance();
+        botId = botIdentifier;
+        
+        // Register this bot with the pathfinder manager
+        interruptiblePathfinder = pathfinderManager.registerPathfinder(botId, bot);
+        console.log(`[SKILLS] Initialized pathfinder state management for bot ${botId}`);
+        return true;
+    } catch (error) {
+        console.warn('[SKILLS] Could not initialize pathfinder state management:', error.message);
+        return false;
+    }
+}
+
+/**
+ * Start a tracked pathfinding operation
+ */
+async function startTrackedPathfinding(type, goal, source, options = {}) {
+    if (interruptiblePathfinder) {
+        try {
+            const operationId = await interruptiblePathfinder.startOperation(type, goal, source, options);
+            console.log(`[SKILLS] Started tracked pathfinding operation ${operationId} for ${type}`);
+            return operationId;
+        } catch (error) {
+            console.warn(`[SKILLS] Failed to start tracked pathfinding:`, error.message);
+            return null;
+        }
+    }
+    return null;
+}
+
+/**
+ * Complete a tracked pathfinding operation
+ */
+function completeTrackedPathfinding(operationId, result = 'success') {
+    if (interruptiblePathfinder && operationId) {
+        try {
+            interruptiblePathfinder.completeOperation(operationId, result);
+            console.log(`[SKILLS] Completed pathfinding operation ${operationId} with result: ${result}`);
+        } catch (error) {
+            console.warn(`[SKILLS] Failed to complete pathfinding operation:`, error.message);
+        }
+    }
+}
+
+/**
+ * Enhanced pathfinding with state tracking
+ */
+async function trackedGoToGoal(bot, goal, source = 'unknown', options = {}) {
+    const operationId = await startTrackedPathfinding('goto', goal, source, options);
+    
+    try {
+        await goToGoal(bot, goal);
+        completeTrackedPathfinding(operationId, 'success');
+        return true;
+    } catch (error) {
+        completeTrackedPathfinding(operationId, error.message && error.message.includes('PathStopped') ? 'interrupted' : 'failed');
+        throw error;
+    }
+}
+
 const blockPlaceDelay = settings.block_place_delay == null ? 0 : settings.block_place_delay;
 const useDelay = blockPlaceDelay > 0;
 
@@ -90,7 +162,23 @@ export async function craftRecipe(bot, itemName, num=1) {
     }
     
     if (craftingTable && bot.entity.position.distanceTo(craftingTable.position) > 4) {
-        await goToNearestBlock(bot, 'crafting_table', 4, craftingTableRange);
+        const operationId = await startTrackedPathfinding('goto', craftingTable.position, 'craftRecipe', {
+            timeout: 15000,
+            priority: 2,
+            metadata: { blockType: 'crafting_table', purpose: 'crafting' }
+        });
+        
+        try {
+            await goToNearestBlock(bot, 'crafting_table', 4, craftingTableRange);
+            completeTrackedPathfinding(operationId, 'success');
+        } catch (err) {
+            if (err.message && err.message.includes('PathStopped')) {
+                completeTrackedPathfinding(operationId, 'interrupted');
+                throw err;
+            }
+            completeTrackedPathfinding(operationId, 'failed');
+            throw err;
+        }
     }
 
     const recipe = recipes[0];
@@ -175,7 +263,23 @@ export async function smeltItem(bot, itemName, num=1) {
         return false;
     }
     if (bot.entity.position.distanceTo(furnaceBlock.position) > 4) {
-        await goToNearestBlock(bot, 'furnace', 4, furnaceRange);
+        const operationId = await startTrackedPathfinding('goto', furnaceBlock.position, 'smeltItem', {
+            timeout: 15000,
+            priority: 2,
+            metadata: { blockType: 'furnace', purpose: 'smelting' }
+        });
+        
+        try {
+            await goToNearestBlock(bot, 'furnace', 4, furnaceRange);
+            completeTrackedPathfinding(operationId, 'success');
+        } catch (err) {
+            if (err.message && err.message.includes('PathStopped')) {
+                completeTrackedPathfinding(operationId, 'interrupted');
+                throw err;
+            }
+            completeTrackedPathfinding(operationId, 'failed');
+            throw err;
+        }
     }
     bot.modes.pause('unstuck');
     await bot.lookAt(furnaceBlock.position);
@@ -286,7 +390,23 @@ export async function clearNearestFurnace(bot) {
         return false;
     }
     if (bot.entity.position.distanceTo(furnaceBlock.position) > 4) {
-        await goToNearestBlock(bot, 'furnace', 4, 32);
+        const operationId = await startTrackedPathfinding('goto', furnaceBlock.position, 'clearNearestFurnace', {
+            timeout: 15000,
+            priority: 2,
+            metadata: { blockType: 'furnace', purpose: 'clearing' }
+        });
+        
+        try {
+            await goToNearestBlock(bot, 'furnace', 4, 32);
+            completeTrackedPathfinding(operationId, 'success');
+        } catch (err) {
+            if (err.message && err.message.includes('PathStopped')) {
+                completeTrackedPathfinding(operationId, 'interrupted');
+                throw err;
+            }
+            completeTrackedPathfinding(operationId, 'failed');
+            throw err;
+        }
     }
 
     console.log('clearing furnace...');
@@ -347,7 +467,23 @@ export async function attackEntity(bot, entity, kill=true) {
     if (!kill) {
         if (bot.entity.position.distanceTo(pos) > 5) {
             console.log('moving to mob...')
-            await goToPosition(bot, pos.x, pos.y, pos.z);
+            const operationId = await startTrackedPathfinding('goto', pos, 'attackEntity', {
+                timeout: 10000,
+                priority: 1,
+                metadata: { entityType: entity.name, purpose: 'attack' }
+            });
+            
+            try {
+                await goToPosition(bot, pos.x, pos.y, pos.z);
+                completeTrackedPathfinding(operationId, 'success');
+            } catch (err) {
+                if (err.message && err.message.includes('PathStopped')) {
+                    completeTrackedPathfinding(operationId, 'interrupted');
+                    throw err;
+                }
+                completeTrackedPathfinding(operationId, 'failed');
+                throw err;
+            }
         }
         console.log('attacking mob...')
         await bot.attack(entity);
@@ -385,15 +521,68 @@ export async function defendSelf(bot, range=9) {
         if (bot.entity.position.distanceTo(enemy.position) >= 4 && enemy.name !== 'creeper' && enemy.name !== 'phantom') {
             try {
                 bot.pathfinder.setMovements(new pf.Movements(bot));
-                await bot.pathfinder.goto(new pf.goals.GoalFollow(enemy, 3.5), true);
-            } catch (err) {/* might error if entity dies, ignore */}
+                const goal = new pf.goals.GoalFollow(enemy, 3.5);
+                const operationId = await startTrackedPathfinding('follow', goal, 'defendSelf', {
+                    timeout: 8000,
+                    priority: 1,
+                    metadata: { entityType: enemy.name, purpose: 'defend' }
+                });
+                
+                try {
+                    await bot.pathfinder.goto(goal, true);
+                    completeTrackedPathfinding(operationId, 'success');
+                } catch (pathErr) {
+                    if (pathErr.message && pathErr.message.includes('PathStopped')) {
+                        completeTrackedPathfinding(operationId, 'interrupted');
+                    } else {
+                        completeTrackedPathfinding(operationId, 'failed');
+                    }
+                    throw pathErr;
+                }
+            } catch (err) {
+                // Handle PathStopped errors as expected interruptions
+                if (err.message && err.message.includes('PathStopped')) {
+                    console.log('[SKILLS] defendSelf pathfinding interrupted gracefully (PathStopped)');
+                    if (bot.pathfinder) {
+                        bot.pathfinder.stop();
+                    }
+                    throw err;
+                }
+                // Other errors might be expected if entity dies, so ignore
+            }
         }
         if (bot.entity.position.distanceTo(enemy.position) <= 2) {
             try {
                 bot.pathfinder.setMovements(new pf.Movements(bot));
                 let inverted_goal = new pf.goals.GoalInvert(new pf.goals.GoalFollow(enemy, 2));
-                await bot.pathfinder.goto(inverted_goal, true);
-            } catch (err) {/* might error if entity dies, ignore */}
+                const operationId = await startTrackedPathfinding('avoid', inverted_goal, 'defendSelf', {
+                    timeout: 5000,
+                    priority: 1,
+                    metadata: { entityType: enemy.name, purpose: 'close_combat' }
+                });
+                
+                try {
+                    await bot.pathfinder.goto(inverted_goal, true);
+                    completeTrackedPathfinding(operationId, 'success');
+                } catch (pathErr) {
+                    if (pathErr.message && pathErr.message.includes('PathStopped')) {
+                        completeTrackedPathfinding(operationId, 'interrupted');
+                    } else {
+                        completeTrackedPathfinding(operationId, 'failed');
+                    }
+                    throw pathErr;
+                }
+            } catch (err) {
+                // Handle PathStopped errors as expected interruptions
+                if (err.message && err.message.includes('PathStopped')) {
+                    console.log('[SKILLS] defendSelf pathfinding interrupted gracefully (PathStopped)');
+                    if (bot.pathfinder) {
+                        bot.pathfinder.stop();
+                    }
+                    throw err;
+                }
+                // Other errors might be expected if entity dies, so ignore
+            }
         }
         bot.pvp.attack(enemy);
         attacked = true;
@@ -497,10 +686,26 @@ export async function collectBlock(bot, blockType, num=1, exclude=null) {
                 success = await useToolOnBlock(bot, 'bucket', block);
             }
             else if (mc.mustCollectManually(blockType)) {
-                await goToPosition(bot, block.position.x, block.position.y, block.position.z, 2);
-                await bot.dig(block);
-                await pickupNearbyItems(bot);
-                success = true;
+                const operationId = await startTrackedPathfinding('goto', block.position, 'collectBlock', {
+                    timeout: 15000,
+                    priority: 2,
+                    metadata: { blockType, purpose: 'collecting' }
+                });
+                
+                try {
+                    await goToPosition(bot, block.position.x, block.position.y, block.position.z, 2);
+                    completeTrackedPathfinding(operationId, 'success');
+                    await bot.dig(block);
+                    await pickupNearbyItems(bot);
+                    success = true;
+                } catch (err) {
+                    if (err.message && err.message.includes('PathStopped')) {
+                        completeTrackedPathfinding(operationId, 'interrupted');
+                        throw err;
+                    }
+                    completeTrackedPathfinding(operationId, 'failed');
+                    throw err;
+                }
             }
             else {
                 await bot.collectBlock.collect(block);
@@ -544,7 +749,28 @@ export async function pickupNearbyItems(bot) {
         let movements = new pf.Movements(bot);
         movements.canDig = false;
         bot.pathfinder.setMovements(movements);
-        await goToGoal(bot, new pf.goals.GoalFollow(nearestItem, 1));
+        const goal = new pf.goals.GoalFollow(nearestItem, 1);
+        const operationId = await startTrackedPathfinding('collect', goal, 'pickupNearbyItems', {
+            timeout: 15000,
+            priority: 2,
+            metadata: { itemType: 'item', distance: nearestItem.distance }
+        });
+        
+        try {
+            await goToGoal(bot, goal);
+            completeTrackedPathfinding(operationId, 'success');
+        } catch (err) {
+            // Handle PathStopped errors as expected interruptions
+            if (err.message && err.message.includes('PathStopped')) {
+                console.log('[SKILLS] pickupNearbyItems pathfinding interrupted gracefully (PathStopped)');
+                completeTrackedPathfinding(operationId, 'interrupted');
+                throw err;
+            }
+            // Handle other pathfinding errors
+            console.log('[SKILLS] pickupNearbyItems pathfinding error:', err.message);
+            completeTrackedPathfinding(operationId, 'failed');
+            throw err;
+        }
         await new Promise(resolve => setTimeout(resolve, 200));
         let prev = nearestItem;
         nearestItem = getNearestItem(bot);
@@ -587,7 +813,28 @@ export async function breakBlockAt(bot, x, y, z) {
             movements.canPlaceOn = false;
             movements.allow1by1towers = false;
             bot.pathfinder.setMovements(movements);
-            await goToGoal(bot, new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4));
+            const goal = new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4);
+            const operationId = await startTrackedPathfinding('goto', goal, 'breakBlockAt', {
+                timeout: 20000,
+                priority: 1,
+                metadata: { blockType: block.name, position: pos }
+            });
+            
+            try {
+                await goToGoal(bot, goal);
+                completeTrackedPathfinding(operationId, 'success');
+            } catch (err) {
+                // Handle PathStopped errors as expected interruptions
+                if (err.message && err.message.includes('PathStopped')) {
+                    console.log('[SKILLS] breakBlockAt pathfinding interrupted gracefully (PathStopped)');
+                    completeTrackedPathfinding(operationId, 'interrupted');
+                    throw err;
+                }
+                // Handle other pathfinding errors
+                console.log('[SKILLS] breakBlockAt pathfinding error:', err.message);
+                completeTrackedPathfinding(operationId, 'failed');
+                throw err;
+            }
         }
         if (bot.game.gameMode !== 'creative') {
             await bot.tool.equipForBlock(block);
@@ -759,14 +1006,48 @@ export async function placeBlock(bot, blockType, x, y, z, placeOn='bottom', dont
         let goal = new pf.goals.GoalNear(targetBlock.position.x, targetBlock.position.y, targetBlock.position.z, 2);
         let inverted_goal = new pf.goals.GoalInvert(goal);
         bot.pathfinder.setMovements(new pf.Movements(bot));
-        await bot.pathfinder.goto(inverted_goal);
+        try {
+            await bot.pathfinder.goto(inverted_goal);
+        } catch (err) {
+            // Handle PathStopped errors as expected interruptions
+            if (err.message && err.message.includes('PathStopped')) {
+                console.log('[SKILLS] placeBlock pathfinding interrupted gracefully (PathStopped)');
+                if (bot.pathfinder) {
+                    bot.pathfinder.stop();
+                }
+                throw err;
+            }
+            // Handle other pathfinding errors
+            console.log('[SKILLS] placeBlock pathfinding error:', err.message);
+            if (bot.pathfinder) {
+                bot.pathfinder.stop();
+            }
+            throw err;
+        }
     }
     if (bot.entity.position.distanceTo(targetBlock.position) > 4.5) {
         // too far
         let pos = targetBlock.position;
         let movements = new pf.Movements(bot);
         bot.pathfinder.setMovements(movements);
-        await goToGoal(bot, new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4));
+        try {
+            await goToGoal(bot, new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4));
+        } catch (err) {
+            // Handle PathStopped errors as expected interruptions
+            if (err.message && err.message.includes('PathStopped')) {
+                console.log('[SKILLS] placeBlock pathfinding interrupted gracefully (PathStopped)');
+                if (bot.pathfinder) {
+                    bot.pathfinder.stop();
+                }
+                throw err;
+            }
+            // Handle other pathfinding errors
+            console.log('[SKILLS] placeBlock pathfinding error:', err.message);
+            if (bot.pathfinder) {
+                bot.pathfinder.stop();
+            }
+            throw err;
+        }
     }
 
     // will throw error if an entity is in the way, and sometimes even if the block was placed
@@ -887,7 +1168,23 @@ export async function putInChest(bot, itemName, num=-1) {
         return false;
     }
     let to_put = num === -1 ? item.count : Math.min(num, item.count);
-    await goToPosition(bot, chest.position.x, chest.position.y, chest.position.z, 2);
+    const operationId = await startTrackedPathfinding('goto', chest.position, 'putInChest', {
+        timeout: 15000,
+        priority: 2,
+        metadata: { blockType: 'chest', purpose: 'storage' }
+    });
+    
+    try {
+        await goToPosition(bot, chest.position.x, chest.position.y, chest.position.z, 2);
+        completeTrackedPathfinding(operationId, 'success');
+    } catch (err) {
+        if (err.message && err.message.includes('PathStopped')) {
+            completeTrackedPathfinding(operationId, 'interrupted');
+            throw err;
+        }
+        completeTrackedPathfinding(operationId, 'failed');
+        throw err;
+    }
     const chestContainer = await bot.openContainer(chest);
     await chestContainer.deposit(item.type, null, to_put);
     await chestContainer.close();
@@ -910,7 +1207,23 @@ export async function takeFromChest(bot, itemName, num=-1) {
         log(bot, `Could not find a chest nearby.`);
         return false;
     }
-    await goToPosition(bot, chest.position.x, chest.position.y, chest.position.z, 2);
+    const operationId = await startTrackedPathfinding('goto', chest.position, 'takeFromChest', {
+        timeout: 15000,
+        priority: 2,
+        metadata: { blockType: 'chest', purpose: 'storage' }
+    });
+    
+    try {
+        await goToPosition(bot, chest.position.x, chest.position.y, chest.position.z, 2);
+        completeTrackedPathfinding(operationId, 'success');
+    } catch (err) {
+        if (err.message && err.message.includes('PathStopped')) {
+            completeTrackedPathfinding(operationId, 'interrupted');
+            throw err;
+        }
+        completeTrackedPathfinding(operationId, 'failed');
+        throw err;
+    }
     const chestContainer = await bot.openContainer(chest);
     
     // Find all matching items in the chest
@@ -954,7 +1267,23 @@ export async function viewChest(bot) {
         log(bot, `Could not find a chest nearby.`);
         return false;
     }
-    await goToPosition(bot, chest.position.x, chest.position.y, chest.position.z, 2);
+    const operationId = await startTrackedPathfinding('goto', chest.position, 'viewChest', {
+        timeout: 15000,
+        priority: 2,
+        metadata: { blockType: 'chest', purpose: 'viewing' }
+    });
+    
+    try {
+        await goToPosition(bot, chest.position.x, chest.position.y, chest.position.z, 2);
+        completeTrackedPathfinding(operationId, 'success');
+    } catch (err) {
+        if (err.message && err.message.includes('PathStopped')) {
+            completeTrackedPathfinding(operationId, 'interrupted');
+            throw err;
+        }
+        completeTrackedPathfinding(operationId, 'failed');
+        throw err;
+    }
     const chestContainer = await bot.openContainer(chest);
     let items = chestContainer.containerItems();
     if (items.length === 0) {
@@ -1015,7 +1344,23 @@ export async function giveToPlayer(bot, itemType, username, num=1) {
         log(bot, `Could not find ${username}.`);
         return false;
     }
-    await goToPlayer(bot, username, 3);
+    const operationId = await startTrackedPathfinding('goto_player', username, 'giveToPlayer', {
+        timeout: 20000,
+        priority: 2,
+        metadata: { username, purpose: 'giving_items' }
+    });
+    
+    try {
+        await goToPlayer(bot, username, 3);
+        completeTrackedPathfinding(operationId, 'success');
+    } catch (err) {
+        if (err.message && err.message.includes('PathStopped')) {
+            completeTrackedPathfinding(operationId, 'interrupted');
+            throw err;
+        }
+        completeTrackedPathfinding(operationId, 'failed');
+        throw err;
+    }
     // if we are 2 below the player
     log(bot, bot.entity.position.y, player.position.y);
     if (bot.entity.position.y < player.position.y - 1) {
@@ -1107,7 +1452,34 @@ export async function goToGoal(bot, goal) {
         return true;
     } catch (err) {
         clearInterval(doorCheckInterval);
-        // we need to catch so we can clean up the door check interval, then rethrow the error
+        
+        // Handle PathStopped errors as expected interruptions
+        if (err.message && err.message.includes('PathStopped')) {
+            console.log('[SKILLS] Pathfinding interrupted gracefully (PathStopped)');
+            // Enhanced cleanup using state manager if available
+            if (interruptiblePathfinder) {
+                interruptiblePathfinder.stopAllOperations('pathstopped_interrupt');
+            } else {
+                // Fallback cleanup
+                if (bot.pathfinder) {
+                    bot.pathfinder.stop();
+                }
+            }
+            // Re-throw for higher level handling
+            throw err;
+        }
+        
+        // Handle other pathfinding errors
+        console.log('[SKILLS] Pathfinding error:', err.message);
+        // Enhanced cleanup using state manager if available
+        if (interruptiblePathfinder) {
+            interruptiblePathfinder.stopAllOperations('pathfinding_error');
+        } else {
+            // Fallback cleanup
+            if (bot.pathfinder) {
+                bot.pathfinder.stop();
+            }
+        }
         throw err;
     }
 }
@@ -1201,13 +1573,25 @@ export async function goToPosition(bot, x, y, z, min_distance=2) {
         return true;
     }
     
+    const goal = new pf.goals.GoalNear(x, y, z, min_distance);
+    const operationId = await startTrackedPathfinding('goto', goal, 'goToPosition', {
+        timeout: 30000,
+        priority: 1,
+        metadata: { x, y, z, min_distance }
+    });
+    
     const checkDigProgress = () => {
         if (bot.targetDigBlock) {
             const targetBlock = bot.targetDigBlock;
             const itemId = bot.heldItem ? bot.heldItem.type : null;
             if (!targetBlock.canHarvest(itemId)) {
                 log(bot, `Pathfinding stopped: Cannot break ${targetBlock.name} with current tools.`);
-                bot.pathfinder.stop();
+                // Enhanced cleanup
+                if (interruptiblePathfinder) {
+                    interruptiblePathfinder.stopAllOperations('cannot_break_block');
+                } else {
+                    bot.pathfinder.stop();
+                }
                 bot.stopDigging();
             }
         }
@@ -1216,8 +1600,10 @@ export async function goToPosition(bot, x, y, z, min_distance=2) {
     const progressInterval = setInterval(checkDigProgress, 1000);
     
     try {
-        await goToGoal(bot, new pf.goals.GoalNear(x, y, z, min_distance));
+        await goToGoal(bot, goal);
         clearInterval(progressInterval);
+        completeTrackedPathfinding(operationId, 'success');
+        
         const distance = bot.entity.position.distanceTo(new Vec3(x, y, z));
         if (distance <= min_distance+1) {
             log(bot, `You have reached at ${x}, ${y}, ${z}.`);
@@ -1228,8 +1614,19 @@ export async function goToPosition(bot, x, y, z, min_distance=2) {
             return false;
         }
     } catch (err) {
-        log(bot, `Pathfinding stopped: ${err.message}.`);
         clearInterval(progressInterval);
+        
+        // Handle PathStopped errors as expected interruptions
+        if (err.message && err.message.includes('PathStopped')) {
+            console.log('[SKILLS] goToPosition interrupted gracefully (PathStopped)');
+            completeTrackedPathfinding(operationId, 'interrupted');
+            // Re-throw for higher level handling
+            throw err;
+        }
+        
+        // Handle other pathfinding errors
+        log(bot, `Pathfinding stopped: ${err.message}.`);
+        completeTrackedPathfinding(operationId, 'failed');
         return false;
     }
 }
@@ -1322,7 +1719,23 @@ export async function goToPlayer(bot, username, distance=3) {
     distance = Math.max(distance, 0.5);
     const goal = new pf.goals.GoalFollow(player, distance);
 
-    await goToGoal(bot, goal, true);
+    const operationId = await startTrackedPathfinding('follow_player', goal, 'goToPlayer', {
+        timeout: 25000,
+        priority: 2,
+        metadata: { username, purpose: 'navigation' }
+    });
+    
+    try {
+        await goToGoal(bot, goal, true);
+        completeTrackedPathfinding(operationId, 'success');
+    } catch (err) {
+        if (err.message && err.message.includes('PathStopped')) {
+            completeTrackedPathfinding(operationId, 'interrupted');
+            throw err;
+        }
+        completeTrackedPathfinding(operationId, 'failed');
+        throw err;
+    }
 
     log(bot, `You have reached ${username}.`);
 }
@@ -1430,7 +1843,23 @@ export async function moveAway(bot, distance) {
         }
     }
 
-    await goToGoal(bot, inverted_goal);
+    const operationId = await startTrackedPathfinding('move_away', inverted_goal, 'moveAway', {
+        timeout: 15000,
+        priority: 2,
+        metadata: { distance, purpose: 'escaping' }
+    });
+    
+    try {
+        await goToGoal(bot, inverted_goal);
+        completeTrackedPathfinding(operationId, 'success');
+    } catch (err) {
+        if (err.message && err.message.includes('PathStopped')) {
+            completeTrackedPathfinding(operationId, 'interrupted');
+            throw err;
+        }
+        completeTrackedPathfinding(operationId, 'failed');
+        throw err;
+    }
     let new_pos = bot.entity.position;
     log(bot, `Moved away from ${pos.floored()} to ${new_pos.floored()}.`);
     return true;
@@ -1447,7 +1876,23 @@ export async function moveAwayFromEntity(bot, entity, distance=16) {
     let goal = new pf.goals.GoalFollow(entity, distance);
     let inverted_goal = new pf.goals.GoalInvert(goal);
     bot.pathfinder.setMovements(new pf.Movements(bot));
-    await bot.pathfinder.goto(inverted_goal);
+    const operationId = await startTrackedPathfinding('move_away_entity', inverted_goal, 'moveAwayFromEntity', {
+        timeout: 15000,
+        priority: 1,
+        metadata: { entityType: entity.name, distance, purpose: 'escaping' }
+    });
+    
+    try {
+        await bot.pathfinder.goto(inverted_goal);
+        completeTrackedPathfinding(operationId, 'success');
+    } catch (err) {
+        if (err.message && err.message.includes('PathStopped')) {
+            completeTrackedPathfinding(operationId, 'interrupted');
+            throw err;
+        }
+        completeTrackedPathfinding(operationId, 'failed');
+        throw err;
+    }
     return true;
 }
 
@@ -1466,7 +1911,23 @@ export async function avoidEnemies(bot, distance=16) {
         const follow = new pf.goals.GoalFollow(enemy, distance+1); // move a little further away
         const inverted_goal = new pf.goals.GoalInvert(follow);
         bot.pathfinder.setMovements(new pf.Movements(bot));
-        bot.pathfinder.setGoal(inverted_goal, true);
+        const operationId = await startTrackedPathfinding('avoid_enemies', inverted_goal, 'avoidEnemies', {
+            timeout: 20000,
+            priority: 1,
+            metadata: { distance, purpose: 'avoiding_hostiles' }
+        });
+        
+        try {
+            bot.pathfinder.setGoal(inverted_goal, true);
+            completeTrackedPathfinding(operationId, 'success');
+        } catch (err) {
+            if (err.message && err.message.includes('PathStopped')) {
+                completeTrackedPathfinding(operationId, 'interrupted');
+                throw err;
+            }
+            completeTrackedPathfinding(operationId, 'failed');
+            throw err;
+        }
         await new Promise(resolve => setTimeout(resolve, 500));
         enemy = world.getNearestEntityWhere(bot, entity => mc.isHostile(entity), distance);
         if (bot.interrupt_code) {
@@ -1529,10 +1990,44 @@ export async function useDoor(bot, door_pos=null) {
         return false;
     }
 
-    bot.pathfinder.setGoal(new pf.goals.GoalNear(door_pos.x, door_pos.y, door_pos.z, 1));
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    while (bot.pathfinder.isMoving()) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+    try {
+        const goal = new pf.goals.GoalNear(door_pos.x, door_pos.y, door_pos.z, 1);
+        const operationId = await startTrackedPathfinding('goto', goal, 'useDoor', {
+            timeout: 10000,
+            priority: 2,
+            metadata: { purpose: 'using_door' }
+        });
+        
+        try {
+            bot.pathfinder.setGoal(goal, 1);
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            while (bot.pathfinder.isMoving()) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+            completeTrackedPathfinding(operationId, 'success');
+        } catch (pathErr) {
+            if (pathErr.message && pathErr.message.includes('PathStopped')) {
+                completeTrackedPathfinding(operationId, 'interrupted');
+            } else {
+                completeTrackedPathfinding(operationId, 'failed');
+            }
+            throw pathErr;
+        }
+    } catch (err) {
+        // Handle PathStopped errors as expected interruptions
+        if (err.message && err.message.includes('PathStopped')) {
+            console.log('[SKILLS] useDoor pathfinding interrupted gracefully (PathStopped)');
+            if (bot.pathfinder) {
+                bot.pathfinder.stop();
+            }
+            throw err;
+        }
+        // Handle other pathfinding errors
+        console.log('[SKILLS] useDoor pathfinding error:', err.message);
+        if (bot.pathfinder) {
+            bot.pathfinder.stop();
+        }
+        throw err;
     }
     
     let door_block = bot.blockAt(door_pos);
@@ -1569,7 +2064,23 @@ export async function goToBed(bot) {
         return false;
     }
     let loc = beds[0];
-    await goToPosition(bot, loc.x, loc.y, loc.z);
+    const operationId = await startTrackedPathfinding('goto', loc, 'goToBed', {
+        timeout: 20000,
+        priority: 2,
+        metadata: { purpose: 'sleeping' }
+    });
+    
+    try {
+        await goToPosition(bot, loc.x, loc.y, loc.z);
+        completeTrackedPathfinding(operationId, 'success');
+    } catch (err) {
+        if (err.message && err.message.includes('PathStopped')) {
+            completeTrackedPathfinding(operationId, 'interrupted');
+            throw err;
+        }
+        completeTrackedPathfinding(operationId, 'failed');
+        throw err;
+    }
     const bed = bot.blockAt(loc);
     await bot.sleep(bed);
     log(bot, `You are in bed.`);
@@ -1630,7 +2141,24 @@ export async function tillAndSow(bot, x, y, z, seedType=null) {
     if (bot.entity.position.distanceTo(block.position) > 4.5) {
         let pos = block.position;
         bot.pathfinder.setMovements(new pf.Movements(bot));
-        await goToGoal(bot, new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4));
+        const goal = new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4);
+        const operationId = await startTrackedPathfinding('goto', goal, 'tillAndSow', {
+            timeout: 15000,
+            priority: 2,
+            metadata: { seedType, purpose: 'farming' }
+        });
+        
+        try {
+            await goToGoal(bot, goal);
+            completeTrackedPathfinding(operationId, 'success');
+        } catch (err) {
+            if (err.message && err.message.includes('PathStopped')) {
+                completeTrackedPathfinding(operationId, 'interrupted');
+                throw err;
+            }
+            completeTrackedPathfinding(operationId, 'failed');
+            throw err;
+        }
     }
     if (block.name !== 'farmland') {
         let hoe = bot.inventory.items().find(item => item.name.includes('hoe'));
@@ -1675,7 +2203,24 @@ export async function activateNearestBlock(bot, type) {
     if (bot.entity.position.distanceTo(block.position) > 4.5) {
         let pos = block.position;
         bot.pathfinder.setMovements(new pf.Movements(bot));
-        await goToGoal(bot, new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4));
+        const goal = new pf.goals.GoalNear(pos.x, pos.y, pos.z, 4);
+        const operationId = await startTrackedPathfinding('goto', goal, 'activateNearestBlock', {
+            timeout: 15000,
+            priority: 2,
+            metadata: { type, purpose: 'activation' }
+        });
+        
+        try {
+            await goToGoal(bot, goal);
+            completeTrackedPathfinding(operationId, 'success');
+        } catch (err) {
+            if (err.message && err.message.includes('PathStopped')) {
+                completeTrackedPathfinding(operationId, 'interrupted');
+                throw err;
+            }
+            completeTrackedPathfinding(operationId, 'failed');
+            throw err;
+        }
     }
     await bot.activateBlock(block);
     log(bot, `Activated ${type} at x:${block.position.x.toFixed(1)}, y:${block.position.y.toFixed(1)}, z:${block.position.z.toFixed(1)}.`);
@@ -1730,7 +2275,23 @@ async function findAndGoToVillager(bot, id) {
         try {
             bot.modes.pause('unstuck');
             const goal = new pf.goals.GoalFollow(entity, 2);
-            await goToGoal(bot, goal);
+            const operationId = await startTrackedPathfinding('follow', goal, 'findAndGoToVillager', {
+                timeout: 20000,
+                priority: 2,
+                metadata: { entityType: 'villager', purpose: 'trading' }
+            });
+            
+            try {
+                await goToGoal(bot, goal);
+                completeTrackedPathfinding(operationId, 'success');
+            } catch (err) {
+                if (err.message && err.message.includes('PathStopped')) {
+                    completeTrackedPathfinding(operationId, 'interrupted');
+                    throw err;
+                }
+                completeTrackedPathfinding(operationId, 'failed');
+                throw err;
+            }
             
             
             log(bot, 'Successfully reached villager');
@@ -2015,7 +2576,23 @@ export async function useToolOn(bot, toolName, targetName) {
             log(bot, `Could not find any ${targetName}.`);
             return false;
         }
-        await goToPosition(bot, entity.position.x, entity.position.y, entity.position.z);
+        const operationId = await startTrackedPathfinding('goto', entity.position, 'useToolOn', {
+            timeout: 20000,
+            priority: 2,
+            metadata: { toolName, targetName, purpose: 'tool_use' }
+        });
+        
+        try {
+            await goToPosition(bot, entity.position.x, entity.position.y, entity.position.z);
+            completeTrackedPathfinding(operationId, 'success');
+        } catch (err) {
+            if (err.message && err.message.includes('PathStopped')) {
+                completeTrackedPathfinding(operationId, 'interrupted');
+                throw err;
+            }
+            completeTrackedPathfinding(operationId, 'failed');
+            throw err;
+        }
         if (toolName === 'hand') {
             await bot.unequip('hand');
         }
@@ -2060,7 +2637,23 @@ export async function useToolOn(bot, toolName, targetName) {
      */
 
     const distance = toolName === 'water_bucket' && block.name !== 'lava' ? 1.5 : 2;
-    await goToPosition(bot, block.position.x, block.position.y, block.position.z, distance);
+    const operationId = await startTrackedPathfinding('goto', block.position, 'useToolOnBlock', {
+        timeout: 15000,
+        priority: 2,
+        metadata: { toolName, blockType: block.name, purpose: 'tool_use' }
+    });
+    
+    try {
+        await goToPosition(bot, block.position.x, block.position.y, block.position.z, distance);
+        completeTrackedPathfinding(operationId, 'success');
+    } catch (err) {
+        if (err.message && err.message.includes('PathStopped')) {
+            completeTrackedPathfinding(operationId, 'interrupted');
+            throw err;
+        }
+        completeTrackedPathfinding(operationId, 'failed');
+        throw err;
+    }
     await bot.lookAt(block.position.offset(0.5, 0.5, 0.5));
 
     // if block in view is closer than the target block, it is in our way. try to move closer
@@ -2076,7 +2669,23 @@ export async function useToolOn(bot, toolName, targetName) {
         log(bot, `Block ${blockInView.name} is in the way, moving closer...`);
         // choose random block next to target block, go to it
         const nearbyPos = block.position.offset(Math.random() * 2 - 1, 0, Math.random() * 2 - 1);
-        await goToPosition(bot, nearbyPos.x, nearbyPos.y, nearbyPos.z, 1);
+        const operationId = await startTrackedPathfinding('goto', nearbyPos, 'useToolOnBlock', {
+            timeout: 10000,
+            priority: 2,
+            metadata: { toolName, purpose: 'repositioning' }
+        });
+        
+        try {
+            await goToPosition(bot, nearbyPos.x, nearbyPos.y, nearbyPos.z, 1);
+            completeTrackedPathfinding(operationId, 'success');
+        } catch (err) {
+            if (err.message && err.message.includes('PathStopped')) {
+                completeTrackedPathfinding(operationId, 'interrupted');
+                throw err;
+            }
+            completeTrackedPathfinding(operationId, 'failed');
+            throw err;
+        }
         await bot.lookAt(block.position.offset(0.5, 0.5, 0.5));
         if (viewBlocked()) {
             const blockInView = bot.blockAtCursor(5);

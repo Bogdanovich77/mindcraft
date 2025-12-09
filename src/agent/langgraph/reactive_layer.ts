@@ -1,16 +1,33 @@
 /**
  * Reactive Behavior Integration Layer for Mindcraft LangGraph System
  * Wraps existing modes system and integrates with cognitive processing
+ * Optimized for <100ms survival response requirements
  */
 
-import { AgentState, InterruptPriority, ReactiveMode, ReactiveBehaviorLayer, InterruptController, Agent, ProcessingPhase } from './interfaces';
+import { AgentState, InterruptPriority, ReactiveMode, ReactiveBehaviorLayer, InterruptController, Agent, ProcessingPhase } from './interfaces.js';
 import { Bot } from 'mineflayer';
+import { PathfinderStateManager } from './pathfinder_state.js';
+
+// Performance monitoring for reactive layer
+interface ReactiveMetrics {
+  modeExecutionTime: number;
+  emergencyResponseTime: number;
+  totalModeExecutions: number;
+  emergencyExecutions: number;
+  averageExecutionTime: number;
+  lastModeSwitch: number;
+  modeSwitchCount: number;
+}
+
+// Pre-allocated mode objects for fast switching
+const PREALLOCATED_MODES = new Map<string, any>();
 
 // Import existing modes system (would need to be adapted to ES modules)
-// import { ModeController } from '../modes';
+// import { ModeController } from '../modes.js';
 
 /**
- * Wrapper for existing reactive modes to integrate with new architecture
+ * OPTIMIZED: Wrapper for existing reactive modes to integrate with new architecture
+ * Optimized for fast mode switching and execution
  */
 export class LegacyModeWrapper implements ReactiveMode {
   public readonly name: string;
@@ -18,36 +35,164 @@ export class LegacyModeWrapper implements ReactiveMode {
   
   private legacyMode: any; // Would be the actual mode from modes.js
   private executeFunction: (bot: Bot) => Promise<void>;
+  private isEmergencyMode: boolean;
 
   constructor(name: string, priority: InterruptPriority, legacyMode: any, executeFunction: (bot: Bot) => Promise<void>) {
     this.name = name;
     this.priority = priority;
     this.legacyMode = legacyMode;
     this.executeFunction = executeFunction;
+    this.isEmergencyMode = priority <= InterruptPriority.SURVIVAL;
+    
+    // Pre-allocate mode object for fast switching
+    if (!PREALLOCATED_MODES.has(name)) {
+      PREALLOCATED_MODES.set(name, {
+        name,
+        priority,
+        active: false,
+        lastExecution: 0,
+        executionCount: 0
+      });
+    }
   }
 
+  /**
+   * FAST-PATH: Execute mode with performance monitoring and optimized error handling
+   */
   async execute(agent: Agent): Promise<void> {
-    const startTime = Date.now();
+    const startTime = process.hrtime.bigint();
+    const modeData = PREALLOCATED_MODES.get(this.name);
+    
+    if (modeData) {
+      modeData.active = true;
+      modeData.lastExecution = Date.now();
+      modeData.executionCount++;
+    }
     
     try {
-      // Execute the legacy mode function
-      await this.executeFunction(agent.bot);
+      // FAST-PATH: Emergency modes get optimized execution
+      if (this.isEmergencyMode) {
+        await this.executeEmergencyMode(agent);
+      } else {
+        await this.executeFunction(agent.bot);
+      }
       
       // Record successful execution
-      const executionTime = Date.now() - startTime;
-      console.log(`[REACTIVE] Mode ${this.name} executed in ${executionTime}ms`);
+      const endTime = process.hrtime.bigint();
+      const executionTime = Number(endTime - startTime) / 1000000; // Convert to ms
       
-      // Update performance metrics if available
-      if (agent.state.executive.performanceMetrics.reactiveResponseTime) {
-        agent.state.executive.performanceMetrics.reactiveResponseTime.push(executionTime);
+      // Update performance metrics
+      this.updateExecutionMetrics(agent, executionTime, 'success');
+      
+      // Conditional logging for performance
+      if (executionTime > (this.isEmergencyMode ? 50 : 100)) {
+        console.log(`[REACTIVE] Mode ${this.name} executed in ${executionTime.toFixed(1)}ms`);
       }
       
     } catch (error) {
-      console.error(`[REACTIVE] Error executing mode ${this.name}:`, error);
+      const endTime = process.hrtime.bigint();
+      const executionTime = Number(endTime - startTime) / 1000000; // Convert to ms;
       
-      // Record failed execution
-      const executionTime = Date.now() - startTime;
-      console.log(`[REACTIVE] Mode ${this.name} failed after ${executionTime}ms`);
+      // FAST-PATH: Optimized error handling for PathStopped
+      if (error.message && error.message.includes('PathStopped')) {
+        // Silent handling for performance - only log if slow
+        if (executionTime > 30) {
+          console.log(`[REACTIVE] Mode ${this.name} interrupted (PathStopped) after ${executionTime.toFixed(1)}ms`);
+        }
+        
+        // Fast pathfinder cleanup
+        this.performFastPathfinderCleanup(agent);
+        this.updateExecutionMetrics(agent, executionTime, 'interrupted');
+        return; // Success - this was an expected interruption
+      }
+      
+      // Handle other errors
+      console.error(`[REACTIVE] Error executing mode ${this.name}:`, error.message);
+      this.performFastPathfinderCleanup(agent);
+      this.updateExecutionMetrics(agent, executionTime, 'error');
+    } finally {
+      if (modeData) {
+        modeData.active = false;
+      }
+    }
+  }
+
+  /**
+   * FAST-PATH: Optimized execution for emergency modes
+   */
+  private async executeEmergencyMode(agent: Agent): Promise<void> {
+    // Emergency modes get immediate execution with minimal overhead
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Emergency timeout')), 80); // 80ms timeout for emergencies
+    });
+    
+    try {
+      await Promise.race([
+        this.executeFunction(agent.bot),
+        timeoutPromise
+      ]);
+    } catch (error) {
+      if (error.message === 'Emergency timeout') {
+        console.warn(`[REACTIVE] Emergency mode ${this.name} timed out`);
+        // Force pathfinder stop and continue
+        if (agent.bot.pathfinder) {
+          agent.bot.pathfinder.stop();
+        }
+        return; // Don't fail the entire execution
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * FAST-PATH: Optimized pathfinder cleanup for emergencies
+   */
+  private performFastPathfinderCleanup(agent: Agent): void {
+    try {
+      // Get bot ID from agent metadata
+      const botId = agent.state.metadata?.agentId || 'unknown';
+      const pathfinderManager = PathfinderStateManager.getInstance();
+      const pathfinder = pathfinderManager.getPathfinder(botId);
+
+      if (pathfinder) {
+        // Fast cleanup without validation for emergencies
+        pathfinder.stopAllOperations('emergency_interrupt');
+      } else {
+        // Fallback cleanup
+        if (agent.bot.pathfinder) {
+          agent.bot.pathfinder.stop();
+          agent.bot.pathfinder.setGoal(null as any);
+        }
+        this.resetBotControls(agent.bot);
+      }
+    } catch (error) {
+      // Silent error handling for performance
+      // Only log if this is critical
+      if (this.isEmergencyMode) {
+        console.warn(`[REACTIVE] Emergency cleanup failed:`, error.message);
+      }
+    }
+  }
+
+  /**
+   * Update execution metrics for performance monitoring
+   */
+  private updateExecutionMetrics(agent: Agent, executionTime: number, result: string): void {
+    if (agent.state.executive.performanceMetrics.reactiveResponseTime) {
+      agent.state.executive.performanceMetrics.reactiveResponseTime.push(executionTime);
+    }
+    
+    // Update reactive layer metrics if available
+    if ((agent.state.reactive as any).metrics) {
+      const metrics = (agent.state.reactive as any).metrics;
+      metrics.totalModeExecutions++;
+      if (this.isEmergencyMode) {
+        metrics.emergencyExecutions++;
+      }
+      metrics.averageExecutionTime =
+        (metrics.averageExecutionTime * (metrics.totalModeExecutions - 1) + executionTime) /
+        metrics.totalModeExecutions;
+      metrics.modeExecutionTime = executionTime;
     }
   }
 
@@ -109,21 +254,143 @@ export class LegacyModeWrapper implements ReactiveMode {
         return InterruptPriority.COGNITIVE;
     }
   }
+
+  /**
+   * Perform enhanced pathfinder cleanup using state manager
+   */
+  private performPathfinderCleanup(agent: Agent, reason: string): void {
+    try {
+      // Get bot ID from agent metadata or use a default
+      const botId = agent.state.metadata?.agentId || 'unknown';
+      const pathfinderManager = PathfinderStateManager.getInstance();
+      const pathfinder = pathfinderManager.getPathfinder(botId);
+
+      if (pathfinder) {
+        console.log(`[REACTIVE] Performing enhanced pathfinder cleanup for bot ${botId}. Reason: ${reason}`);
+        
+        // Stop all pathfinder operations
+        pathfinder.stopAllOperations(reason);
+        
+        // Validate state after cleanup
+        const validation = pathfinder.validateState();
+        if (!validation.isValid) {
+          console.warn(`[REACTIVE] Pathfinder state validation failed after cleanup:`, validation.issues);
+          
+          // Attempt recovery if there are issues
+          if (validation.corruptedOperations.length > 0) {
+            console.log(`[REACTIVE] Attempting pathfinder recovery for ${validation.corruptedOperations.length} corrupted operations`);
+            pathfinder.recoverFromCorruption();
+          }
+        }
+        
+        // Log cleanup metrics
+        const metrics = pathfinder.getMetrics();
+        console.log(`[REACTIVE] Pathfinder cleanup completed. Active operations: ${metrics.currentActiveOperations}, Average cleanup time: ${metrics.averageCleanupTime}ms`);
+      } else {
+        // Fallback to basic cleanup if state manager not available
+        console.log(`[REACTIVE] Using basic pathfinder cleanup for bot ${botId}. Reason: ${reason}`);
+        
+        if (agent.bot.pathfinder) {
+          agent.bot.pathfinder.stop();
+          agent.bot.pathfinder.setGoal(null as any);
+        }
+        
+        // Reset bot controls
+        this.resetBotControls(agent.bot);
+      }
+    } catch (cleanupError) {
+      console.error(`[REACTIVE] Error during enhanced pathfinder cleanup:`, cleanupError);
+      
+      // Ultimate fallback - try to stop pathfinder directly
+      try {
+        if (agent.bot.pathfinder) {
+          agent.bot.pathfinder.stop();
+        }
+        this.resetBotControls(agent.bot);
+      } catch (fallbackError) {
+        console.error(`[REACTIVE] Even fallback pathfinder cleanup failed:`, fallbackError);
+      }
+    }
+  }
+
+  /**
+   * Reset all bot controls to safe state
+   */
+  private resetBotControls(bot: Bot): void {
+    try {
+      bot.setControlState('forward', false);
+      bot.setControlState('back', false);
+      bot.setControlState('left', false);
+      bot.setControlState('right', false);
+      bot.setControlState('jump', false);
+      bot.setControlState('sprint', false);
+      bot.setControlState('sneak', false);
+      
+      // Stop any active digging
+      if (bot.targetDigBlock) {
+        bot.stopDigging();
+      }
+    } catch (error) {
+      console.warn(`[REACTIVE] Error resetting bot controls:`, error);
+    }
+  }
 }
 
 /**
- * Main reactive behavior layer implementation
+ * OPTIMIZED: Main reactive behavior layer implementation
+ * Optimized for <100ms survival response requirements
  */
 export class ReactiveBehaviorLayerImpl implements ReactiveBehaviorLayer {
   private modes: ReactiveMode[] = [];
   private interruptController: InterruptController;
   private modeController: any; // Would be the existing ModeController
   private lastModeCheck: number = 0;
-  private modeCheckInterval: number = 100; // Check modes every 100ms
+  private modeCheckInterval: number = 50; // Reduced to 50ms for faster response
+  private pathfinderManager: PathfinderStateManager;
+  private botId: string;
+  private lastPathfinderCleanup: number = 0;
+  private pathfinderCleanupInterval: number = 15000; // Reduced to 15 seconds for better maintenance
+  
+  // Performance optimization: fast-path mode switching
+  private currentMode: ReactiveMode | null = null;
+  private lastModeSwitch: number = 0;
+  private modeSwitchCooldown: number = 25; // 25ms minimum between switches
+  private emergencyModeCache: Map<string, ReactiveMode> = new Map();
+  
+  // Performance metrics
+  private metrics: ReactiveMetrics = {
+    modeExecutionTime: 0,
+    emergencyResponseTime: 0,
+    totalModeExecutions: 0,
+    emergencyExecutions: 0,
+    averageExecutionTime: 0,
+    lastModeSwitch: 0,
+    modeSwitchCount: 0
+  };
 
-  constructor(interruptController: InterruptController, bot: Bot) {
+  constructor(interruptController: InterruptController, bot: Bot, botId: string = 'default') {
     this.interruptController = interruptController;
+    this.botId = botId;
+    this.pathfinderManager = PathfinderStateManager.getInstance();
+    
+    // Register pathfinder with state manager
+    this.pathfinderManager.registerPathfinder(botId, bot);
+    
     this.initializeModes(bot);
+    this.preallocateEmergencyModes();
+  }
+
+  /**
+   * FAST-PATH: Pre-allocate emergency modes for instant access
+   */
+  private preallocateEmergencyModes(): void {
+    // Cache emergency modes for instant access
+    const emergencyModeNames = ['self_preservation', 'self_defense', 'cowardice'];
+    for (const mode of this.modes) {
+      if (emergencyModeNames.includes(mode.name)) {
+        this.emergencyModeCache.set(mode.name, mode);
+      }
+    }
   }
 
   /**
@@ -214,30 +481,186 @@ export class ReactiveBehaviorLayerImpl implements ReactiveBehaviorLayer {
   }
 
   /**
-   * Main update loop for reactive behavior layer
+   * FAST-PATH: Optimized main update loop for reactive behavior layer
+   * Prioritizes emergency detection and response
    */
   async update(agent: Agent, deltaTime: number): Promise<void> {
+    const startTime = process.hrtime.bigint();
     const now = Date.now();
     
-    // Check emergency conditions first
+    // FAST-PATH: Emergency detection first (highest priority)
     const priority = this.interruptController.checkEmergencyConditions(agent.state);
     
-    // If emergency detected, execute immediate response
+    // If emergency detected, execute immediate response and bypass everything else
     if (priority <= InterruptPriority.SURVIVAL) {
-      await this.executeReactiveResponse(agent, priority);
-      return; // Bypass cognitive processing
+      await this.executeFastEmergencyResponse(agent, priority);
+      this.updateMetrics(startTime, priority);
+      return; // Early exit for emergencies
     }
     
-    // Check for opportunistic behaviors at regular intervals
+    // Only perform maintenance if no emergency and enough time has passed
+    if (now - this.lastPathfinderCleanup > this.pathfinderCleanupInterval) {
+      // Non-blocking maintenance
+      this.performPeriodicPathfinderMaintenance(agent).catch(() => {}); // Ignore errors for performance
+      this.lastPathfinderCleanup = now;
+    }
+    
+    // Check for opportunistic behaviors at regular intervals (reduced frequency)
     if (now - this.lastModeCheck > this.modeCheckInterval) {
       await this.checkOpportunisticBehaviors(agent);
       this.lastModeCheck = now;
     }
     
-    // Monitor cognitive processing and interrupt if needed
+    // Monitor cognitive processing and interrupt if needed (only if not in reflection)
     if (agent.state.cognitive.processing.currentPhase !== ProcessingPhase.REFLECTION) {
       await this.monitorAndInterruptIfNeeded(agent);
     }
+    
+    this.updateMetrics(startTime, priority);
+  }
+
+  /**
+   * FAST-PATH: Optimized emergency response with minimal overhead
+   */
+  private async executeFastEmergencyResponse(agent: Agent, priority: InterruptPriority): Promise<void> {
+    const responseStart = process.hrtime.bigint();
+    
+    try {
+      // FAST-PATH: Use cached emergency mode for instant access
+      const emergencyType = agent.state.reactive.emergencyConditions[0]?.type;
+      let activeMode: ReactiveMode | null = null;
+      
+      if (emergencyType) {
+        // Try to get cached emergency mode
+        switch (emergencyType) {
+          case 'drowning':
+          case 'burning':
+          case 'falling':
+            activeMode = this.emergencyModeCache.get('self_preservation');
+            break;
+          case 'hostile_nearby':
+            activeMode = this.emergencyModeCache.get('self_defense');
+            break;
+          case 'low_health':
+            activeMode = this.emergencyModeCache.get('cowardice');
+            break;
+        }
+      }
+      
+      // Fallback to mode selection if cache miss
+      if (!activeMode) {
+        activeMode = this.selectReactiveMode(agent, priority);
+      }
+      
+      if (!activeMode) {
+        console.warn('[REACTIVE] No emergency mode available for priority:', priority);
+        return;
+      }
+      
+      // Fast mode switch with cooldown check
+      if (this.canSwitchMode(activeMode)) {
+        await this.executeModeWithTimeout(agent, activeMode, priority);
+        this.recordModeSwitch(activeMode);
+      }
+      
+      // Update agent state
+      agent.state.reactive.lastReactiveAction = {
+        mode: activeMode.name,
+        priority,
+        timestamp: Date.now(),
+        context: agent.state.context,
+        action: activeMode.name,
+        result: 'success'
+      };
+      
+      const responseTime = Number(process.hrtime.bigint() - responseStart) / 1000000;
+      this.metrics.emergencyResponseTime = responseTime;
+      this.metrics.emergencyExecutions++;
+      
+      // Validate performance requirements
+      if (priority <= InterruptPriority.EMERGENCY && responseTime > 50) {
+        console.warn(`[REACTIVE] Emergency response took ${responseTime.toFixed(1)}ms (target: <50ms)`);
+      } else if (priority === InterruptPriority.SURVIVAL && responseTime > 100) {
+        console.warn(`[REACTIVE] Survival response took ${responseTime.toFixed(1)}ms (target: <100ms)`);
+      }
+      
+    } catch (error) {
+      console.error('[REACTIVE] Emergency response failed:', error.message);
+      
+      // Record failed response
+      agent.state.reactive.lastReactiveAction = {
+        mode: 'emergency_failed',
+        priority,
+        timestamp: Date.now(),
+        context: agent.state.context,
+        action: 'none',
+        result: 'failed'
+      };
+    }
+  }
+
+  /**
+   * FAST-PATH: Execute mode with timeout and performance monitoring
+   */
+  private async executeModeWithTimeout(agent: Agent, mode: ReactiveMode, priority: InterruptPriority): Promise<void> {
+    const timeout = priority <= InterruptPriority.EMERGENCY ? 80 : 150; // Different timeouts for different priorities
+    
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Mode execution timeout')), timeout);
+    });
+    
+    try {
+      await Promise.race([
+        mode.execute(agent),
+        timeoutPromise
+      ]);
+    } catch (error) {
+      if (error.message === 'Mode execution timeout') {
+        console.warn(`[REACTIVE] Mode ${mode.name} timed out after ${timeout}ms`);
+        // Force cleanup and continue
+        this.forcePathfinderCleanup('mode_timeout');
+        return; // Don't fail the entire execution
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * FAST-PATH: Check if mode can be switched (implements cooldown)
+   */
+  private canSwitchMode(mode: ReactiveMode): boolean {
+    const now = Date.now();
+    
+    // Emergency modes can always switch
+    if (mode.priority <= InterruptPriority.SURVIVAL) {
+      return true;
+    }
+    
+    // Non-emergency modes respect cooldown
+    return now - this.lastModeSwitch > this.modeSwitchCooldown;
+  }
+
+  /**
+   * Record mode switch for metrics
+   */
+  private recordModeSwitch(mode: ReactiveMode): void {
+    this.currentMode = mode;
+    this.lastModeSwitch = Date.now();
+    this.metrics.modeSwitchCount++;
+    this.metrics.lastModeSwitch = this.lastModeSwitch;
+  }
+
+  /**
+   * Update performance metrics
+   */
+  private updateMetrics(startTime: bigint, priority: InterruptPriority): void {
+    const executionTime = Number(process.hrtime.bigint() - startTime) / 1000000;
+    
+    this.metrics.totalModeExecutions++;
+    this.metrics.modeExecutionTime = executionTime;
+    this.metrics.averageExecutionTime =
+      (this.metrics.averageExecutionTime * (this.metrics.totalModeExecutions - 1) + executionTime) /
+      this.metrics.totalModeExecutions;
   }
 
   /**
@@ -433,11 +856,114 @@ export class ReactiveBehaviorLayerImpl implements ReactiveBehaviorLayer {
   }
 
   /**
+   * Perform periodic pathfinder maintenance
+   */
+  private async performPeriodicPathfinderMaintenance(agent: Agent): Promise<void> {
+    try {
+      const pathfinder = this.pathfinderManager.getPathfinder(this.botId);
+      if (!pathfinder) return;
+
+      console.log(`[REACTIVE] Performing periodic pathfinder maintenance for bot ${this.botId}`);
+
+      // Validate current state
+      const validation = pathfinder.validateState();
+      
+      if (!validation.isValid) {
+        console.warn(`[REACTIVE] Pathfinder state issues detected:`, validation.issues);
+        
+        // Attempt recovery for minor issues
+        if (validation.corruptedOperations.length <= 2) {
+          console.log(`[REACTIVE] Attempting automatic recovery for ${validation.corruptedOperations.length} corrupted operations`);
+          pathfinder.recoverFromCorruption();
+        } else {
+          // For major issues, force complete cleanup
+          console.log(`[REACTIVE] Major pathfinder corruption detected, forcing complete cleanup`);
+          pathfinder.stopAllOperations('periodic_maintenance_cleanup');
+          pathfinder.recoverFromCorruption();
+        }
+      }
+
+      // Log performance metrics
+      const metrics = pathfinder.getMetrics();
+      if (metrics.currentActiveOperations > 0) {
+        console.log(`[REACTIVE] Pathfinder status: ${metrics.currentActiveOperations} active operations, ${metrics.interruptedOperations} interrupted, ${metrics.averageCleanupTime}ms avg cleanup`);
+      }
+
+      // Check for memory leaks or performance issues
+      if (metrics.currentActiveOperations > 5) {
+        console.warn(`[REACTIVE] High number of active pathfinder operations (${metrics.currentActiveOperations}), may indicate stuck operations`);
+        
+        // Force cleanup of old operations
+        const activeOps = pathfinder.getActiveOperations();
+        const now = Date.now();
+        const oldOps = activeOps.filter(op => now - op.startTime > 60000); // Operations older than 1 minute
+        
+        if (oldOps.length > 0) {
+          console.log(`[REACTIVE] Cleaning up ${oldOps.length} old pathfinder operations`);
+          oldOps.forEach(op => {
+            pathfinder.stopAllOperations('old_operation_cleanup');
+          });
+        }
+      }
+
+    } catch (error) {
+      console.error(`[REACTIVE] Error during periodic pathfinder maintenance:`, error);
+    }
+  }
+
+  /**
+   * Get pathfinder state information for debugging
+   */
+  getPathfinderState(): any {
+    const pathfinder = this.pathfinderManager.getPathfinder(this.botId);
+    if (!pathfinder) {
+      return { available: false };
+    }
+
+    return {
+      available: true,
+      activeOperations: pathfinder.getActiveOperations(),
+      metrics: pathfinder.getMetrics(),
+      validation: pathfinder.validateState()
+    };
+  }
+
+  /**
+   * Force pathfinder cleanup (for emergency situations)
+   */
+  forcePathfinderCleanup(reason: string = 'manual_force_cleanup'): void {
+    console.log(`[REACTIVE] Force cleaning up pathfinder for bot ${this.botId}. Reason: ${reason}`);
+    
+    const pathfinder = this.pathfinderManager.getPathfinder(this.botId);
+    if (pathfinder) {
+      pathfinder.stopAllOperations(reason);
+      pathfinder.recoverFromCorruption();
+    }
+  }
+
+  /**
    * Reset reactive layer state
    */
   reset(): void {
     this.lastModeCheck = 0;
+    this.lastPathfinderCleanup = 0;
+    
+    // Cleanup pathfinder state
+    this.forcePathfinderCleanup('reactive_layer_reset');
+    
     console.log('[REACTIVE] Reactive layer reset');
+  }
+
+  /**
+   * Cleanup resources when destroying the reactive layer
+   */
+  destroy(): void {
+    console.log(`[REACTIVE] Destroying reactive layer for bot ${this.botId}`);
+    
+    // Unregister pathfinder from state manager
+    this.pathfinderManager.unregisterPathfinder(this.botId);
+    
+    console.log('[REACTIVE] Reactive layer destroyed');
   }
 }
 

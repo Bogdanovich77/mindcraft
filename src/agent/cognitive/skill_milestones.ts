@@ -20,7 +20,7 @@ import {
   SpecializationEffect,
   ExperienceEvent,
   SkillProgress
-} from './skill_types';
+} from './skill_types.js';
 
 export interface MilestoneProgress {
   milestoneId: string;
