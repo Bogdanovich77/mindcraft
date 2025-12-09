@@ -1,6 +1,6 @@
 {
   "name": "Slave3",
-  "model": "ollama/hf.co/unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF:Q4_K_XL",
+  "model": "ollama/hf.co/unsloth/Qwen3-30B-A3B-Instruct-2507-20000-GGUF:Q4_K_XL",
   "embedding": "ollama/nomic-embed-text:latest",
   "agentType": "langgraph_v2",
   "profileVersion": "2.0.0",
