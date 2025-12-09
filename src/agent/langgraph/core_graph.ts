@@ -20,7 +20,10 @@ import {
   decisionNode,
   executionNode,
   reflectionNode,
-  emergencyResponseNode
+  emergencyResponseNode,
+  messageAnalysisNode,
+  conversationProcessingNode,
+  responseRoutingNode
 } from './state_nodes.js';
 import { Bot } from 'mineflayer';
 
@@ -82,11 +85,14 @@ constructor(bot: Bot) {
     try {
       // Add all processing nodes
       this.graph.addNode("perception", perceptionNode);
+      this.graph.addNode("message_analysis", messageAnalysisNode);
+      this.graph.addNode("conversation_processing", conversationProcessingNode);
       this.graph.addNode("analysis", analysisNode);
       this.graph.addNode("planning", planningNode);
       this.graph.addNode("decision", decisionNode);
       this.graph.addNode("execution", executionNode);
       this.graph.addNode("reflection", reflectionNode);
+      this.graph.addNode("response_routing", responseRoutingNode);
       this.graph.addNode("emergency_response", emergencyResponseNode);
       
       // Set up conditional edges for interrupt handling
@@ -99,8 +105,23 @@ constructor(bot: Bot) {
         }
       );
       
+      // Perception leads to message analysis
+      this.graph.addEdge("perception", "message_analysis");
+      
+      // Message analysis routes to conversation or cognitive processing
+      this.graph.addConditionalEdges(
+        "message_analysis",
+        this.determineProcessingMode.bind(this),
+        {
+          conversational: "conversation_processing",
+          action: "analysis"
+        }
+      );
+      
+      // Conversation processing leads to response routing
+      this.graph.addEdge("conversation_processing", "response_routing");
+      
       // Main cognitive processing flow
-      this.graph.addEdge("perception", "analysis");
       this.graph.addEdge("analysis", "planning");
       this.graph.addEdge("planning", "decision");
       
@@ -118,9 +139,12 @@ constructor(bot: Bot) {
       // Execution leads to reflection
       this.graph.addEdge("execution", "reflection");
       
-      // Reflection can continue cognitive processing or end cycle
+      // Reflection leads to response routing for unified flow
+      this.graph.addEdge("reflection", "response_routing");
+      
+      // Response routing can continue processing or end cycle
       this.graph.addConditionalEdges(
-        "reflection",
+        "response_routing",
         this.shouldContinueProcessing.bind(this),
         {
           continue: "perception",
@@ -148,10 +172,13 @@ constructor(bot: Bot) {
     // Configure interrupt checking at critical decision points
     this.interruptPoints = [
       "perception",
-      "analysis", 
+      "message_analysis",
+      "conversation_processing",
+      "analysis",
       "planning",
       "decision",
-      "execution"
+      "execution",
+      "response_routing"
     ];
   }
 
@@ -176,6 +203,24 @@ constructor(bot: Bot) {
     }
     
     return "normal";
+  }
+
+  /**
+   * Determine processing mode based on message analysis
+   */
+  private async determineProcessingMode(state: AgentState): Promise<string> {
+    const processingMode = state.executive.processingMode;
+    const hasMessage = state.context.lastMessage !== undefined;
+    
+    // If we have a message and it's conversational, route to conversation processing
+    if (hasMessage && processingMode === 'conversational') {
+      console.log("[GRAPH] Routing to conversation processing");
+      return "conversational";
+    }
+    
+    // Otherwise, continue with action/cognitive processing
+    console.log("[GRAPH] Routing to cognitive processing");
+    return "action";
   }
 
   /**
@@ -332,14 +377,29 @@ constructor(bot: Bot) {
       let state = agent.state;
       
       state = { ...state, ...(await perceptionNode(state)) };
-      state = { ...state, ...(await analysisNode(state)) };
-      state = { ...state, ...(await planningNode(state)) };
-      state = { ...state, ...(await decisionNode(state)) };
+      state = { ...state, ...(await messageAnalysisNode(state)) };
       
-      const shouldExecuteResult = await this.shouldExecute(state);
-      if (shouldExecuteResult === "execute") {
-        state = { ...state, ...(await executionNode(state)) };
-        state = { ...state, ...(await reflectionNode(state)) };
+      // Check processing mode after message analysis
+      const processingMode = await this.determineProcessingMode(state);
+      
+      if (processingMode === "conversational") {
+        // Conversation processing flow
+        state = { ...state, ...(await conversationProcessingNode(state)) };
+        state = { ...state, ...(await responseRoutingNode(state)) };
+      } else {
+        // Cognitive processing flow
+        state = { ...state, ...(await analysisNode(state)) };
+        state = { ...state, ...(await planningNode(state)) };
+        state = { ...state, ...(await decisionNode(state)) };
+        
+        const shouldExecuteResult = await this.shouldExecute(state);
+        if (shouldExecuteResult === "execute") {
+          state = { ...state, ...(await executionNode(state)) };
+          state = { ...state, ...(await reflectionNode(state)) };
+        }
+        
+        // Route through response routing for unified flow
+        state = { ...state, ...(await responseRoutingNode(state)) };
       }
       
       // Update agent state
@@ -622,7 +682,11 @@ export function initializeAgentState(bot: Bot, agentId: string): AgentState {
         goalCompletionRate: 0.0,
         survivalEvents: 0,
         socialInteractions: 0
-      }
+      },
+      conversationalResponse: undefined,
+      lastResponse: undefined,
+      responseHistory: [],
+      processingMode: 'action'
     },
     
     // Metadata

@@ -7,11 +7,16 @@
 
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import { StateGraph, START, END, Annotation } from '@langchain/langgraph';
-import { PersonalitySystem } from '../cognitive/personality.js';
-import { PurposeCore } from '../cognitive/purpose_core.js';
-import { ReactiveBehaviorLayerImpl } from './reactive_layer.js';
-import { InterruptController } from './interrupt_controller.js';
-import { InterruptPriority, ProcessingPhase } from './interfaces.js';
+import { PurposeCore } from '../cognitive/purpose_core.ts';
+import { ReactiveBehaviorLayerImpl } from './reactive_layer.ts';
+import { InterruptController } from './interrupt_controller.ts';
+import { InterruptPriority, ProcessingPhase } from './interfaces.ts';
+import { Prompter } from '../../models/prompter.js';
+import {
+    messageAnalysisNode,
+    conversationProcessingNode,
+    responseRoutingNode
+} from './state_nodes.ts';
 
 export class LangGraphAgent {
     constructor() {
@@ -24,6 +29,8 @@ export class LangGraphAgent {
         this.agentState = null;
         this.name = null;
         this.isInitialized = false;
+        this.prompter = null;
+        this.conversationHistory = [];
     }
 
     /**
@@ -79,7 +86,11 @@ export class LangGraphAgent {
             decisionTimeLimit: 2000
         });
         
-        console.log('Cognitive components initialized');
+        // Initialize Prompter for conversation processing
+        this.prompter = new Prompter(this, this.profile);
+        await this.prompter.initExamples();
+        
+        console.log('Cognitive components and prompter initialized');
     }
 
     /**
@@ -99,7 +110,8 @@ export class LangGraphAgent {
                 nearbyEntities: [],
                 nearbyBlocks: [],
                 inventory: [],
-                equipment: {}
+                equipment: {},
+                lastMessage: undefined
             }),
             reactive: Annotation({
                 activeMode: 'none',
@@ -111,24 +123,62 @@ export class LangGraphAgent {
                 purposeCore: {},
                 currentGoal: null,
                 activeGoals: [],
-                decisionHistory: []
+                decisionHistory: [],
+                memory: {
+                    working: {
+                        currentFocus: null,
+                        activeTasks: [],
+                        buffer: []
+                    },
+                    episodic: {
+                        episodes: []
+                    }
+                },
+                processing: {
+                    currentPhase: 'perception',
+                    cognitiveLoad: 0,
+                    processingHistory: []
+                }
             }),
             executive: Annotation({
                 currentAction: null,
                 actionQueue: [],
                 lastDecision: null,
-                processingTime: 0
+                processingTime: 0,
+                conversationalResponse: undefined,
+                lastResponse: undefined,
+                responseHistory: [],
+                processingMode: 'action'
+            }),
+            metadata: Annotation({
+                agentId: '',
+                startTime: Date.now(),
+                lastUpdate: Date.now(),
+                version: '1.0.0',
+                performanceMode: 'balanced'
             })
         });
         
         this.stateGraph = new StateGraph(AgentState)
             .addNode('perception', this.handlePerception.bind(this))
+            .addNode('message_analysis', messageAnalysisNode)
+            .addNode('conversation_processing', conversationProcessingNode)
             .addNode('reactive_check', this.handleReactiveCheck.bind(this))
             .addNode('cognitive_processing', this.handleCognitiveProcessing.bind(this))
             .addNode('action_execution', this.handleActionExecution.bind(this))
             .addNode('learning_update', this.handleLearningUpdate.bind(this))
+            .addNode('response_routing', responseRoutingNode)
             .addEdge(START, 'perception')
-            .addEdge('perception', 'reactive_check')
+            .addEdge('perception', 'message_analysis')
+            .addConditionalEdges(
+                'message_analysis',
+                this.determineProcessingMode.bind(this),
+                {
+                    'conversational': 'conversation_processing',
+                    'action': 'reactive_check'
+                }
+            )
+            .addEdge('conversation_processing', 'response_routing')
             .addConditionalEdges(
                 'reactive_check',
                 this.shouldProcessCognitively.bind(this),
@@ -139,7 +189,8 @@ export class LangGraphAgent {
             )
             .addEdge('cognitive_processing', 'action_execution')
             .addEdge('action_execution', 'learning_update')
-            .addEdge('learning_update', END);
+            .addEdge('learning_update', 'response_routing')
+            .addEdge('response_routing', END);
         
         // Compile the graph
         this.compiledGraph = this.stateGraph.compile();
@@ -218,24 +269,53 @@ export class LangGraphAgent {
                 time: this.bot.time.timeOfDay,
                 inventory: this.getInventorySnapshot(),
                 nearbyEntities: this.getNearbyEntities(),
-                environmentalFactors: this.getEnvironmentalFactors()
+                environmentalFactors: this.getEnvironmentalFactors(),
+                lastMessage: undefined
             },
             reactive: {
                 activeMode: null,
                 emergencyLevel: 0,
-                lastReactiveAction: null
+                lastReactiveAction: null,
+                emergencyConditions: [],
+                interruptHistory: []
             },
             cognitive: {
                 purposeCore: this.purposeCore.getState(),
                 currentGoal: null,
                 activeGoals: [],
-                decisionHistory: []
+                decisionHistory: [],
+                memory: {
+                    working: {
+                        currentFocus: null,
+                        activeTasks: [],
+                        buffer: []
+                    },
+                    episodic: {
+                        episodes: []
+                    }
+                },
+                processing: {
+                    currentPhase: 'perception',
+                    cognitiveLoad: 0,
+                    processingHistory: []
+                }
             },
             executive: {
                 currentAction: null,
                 actionQueue: [],
                 lastDecision: null,
-                processingTime: 0
+                processingTime: 0,
+                conversationalResponse: undefined,
+                lastResponse: undefined,
+                responseHistory: [],
+                processingMode: 'action'
+            },
+            metadata: {
+                agentId: this.name,
+                startTime: Date.now(),
+                lastUpdate: Date.now(),
+                version: '1.0.0',
+                performanceMode: 'balanced'
             }
         };
         
@@ -251,9 +331,11 @@ export class LangGraphAgent {
             
             // Update agent state with new message
             this.agentState.context.lastMessage = {
-                username,
+                source: username,
                 message,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                type: this.determineMessageType(message),
+                priority: this.calculateMessagePriority(message)
             };
             
             // Process through state graph
@@ -277,7 +359,14 @@ export class LangGraphAgent {
             // Update context
             this.updateContext();
             
-            // Run through state graph
+            // Check if this is a conversational message that needs immediate processing
+            if (this.agentState.context.lastMessage &&
+                this.determineProcessingMode(this.agentState) === 'conversational') {
+                await this.processConversationalMessage();
+                return;
+            }
+            
+            // Run through state graph for action processing
             const result = await this.compiledGraph.invoke(this.agentState);
             
             // Update agent state with result
@@ -285,6 +374,44 @@ export class LangGraphAgent {
             
         } catch (error) {
             console.error('Error in cognitive cycle:', error);
+        }
+    }
+
+    /**
+     * Process conversational messages using prompter system
+     */
+    async processConversationalMessage() {
+        try {
+            const message = this.agentState.context.lastMessage;
+            if (!message) return;
+            
+            console.log(`${this.name} processing conversational message: "${message.message}"`);
+            
+            // Generate response using prompter
+            const response = await this.generateConversationalResponse(message, this.agentState);
+            
+            // Route response back to user
+            await this.routeResponse(message.source, response);
+            
+            // Update conversation history
+            const responseRecord = {
+                source: message.source,
+                message: message.message,
+                response: response,
+                timestamp: Date.now(),
+                processingMode: 'conversational',
+                responseTime: Date.now() - message.timestamp,
+                success: true
+            };
+            
+            this.agentState.executive.responseHistory.push(responseRecord);
+            this.agentState.executive.lastResponse = responseRecord;
+            
+            // Clear the message from context
+            this.agentState.context.lastMessage = undefined;
+            
+        } catch (error) {
+            console.error('Error processing conversational message:', error);
         }
     }
 
@@ -404,6 +531,155 @@ export class LangGraphAgent {
     
     shouldProcessCognitively(state) {
         return state.reactive.emergencyLevel > 0.6 ? 'reactive_action' : 'cognitive_processing';
+    }
+
+    determineProcessingMode(state) {
+        if (!state.context.lastMessage) {
+            return 'action';
+        }
+        
+        const message = state.context.lastMessage.message.toLowerCase();
+        
+        // Check for action commands
+        const actionCommands = [
+            'go to', 'move to', 'walk to', 'run to',
+            'get', 'take', 'pick up', 'collect',
+            'craft', 'build', 'place', 'break',
+            'attack', 'fight', 'defend',
+            'follow', 'stop', 'wait', '!'
+        ];
+        
+        const isActionCommand = actionCommands.some(cmd => message.includes(cmd));
+        return isActionCommand ? 'action' : 'conversational';
+    }
+
+    determineMessageType(message) {
+        const lowerMessage = message.toLowerCase();
+        
+        // Check for action commands
+        const actionCommands = [
+            'go to', 'move to', 'walk to', 'run to',
+            'get', 'take', 'pick up', 'collect',
+            'craft', 'build', 'place', 'break',
+            'attack', 'fight', 'defend',
+            'follow', 'stop', 'wait'
+        ];
+        
+        const isActionCommand = actionCommands.some(cmd => lowerMessage.includes(cmd));
+        return isActionCommand ? 'command' : 'conversational';
+    }
+
+    calculateMessagePriority(message) {
+        const lowerMessage = message.toLowerCase();
+        const urgencyIndicators = ['help', 'urgent', 'quick', 'fast', 'now', 'emergency', '!'];
+        
+        let priority = 0.5; // Base priority
+        
+        urgencyIndicators.forEach(indicator => {
+            if (lowerMessage.includes(indicator)) {
+                priority += 0.2;
+            }
+        });
+        
+        // Add priority for exclamation marks
+        const exclamationCount = (message.match(/!/g) || []).length;
+        priority += Math.min(0.3, exclamationCount * 0.1);
+        
+        return Math.min(1.0, priority);
+    }
+
+    /**
+     * Generate conversational response using prompter system
+     */
+    async generateConversationalResponse(message, state) {
+        if (!this.prompter) {
+            return 'I apologize, but my conversation system is not initialized.';
+        }
+        
+        try {
+            // Build conversation history for prompter
+            const history = this.buildConversationHistory(state);
+            
+            // Use prompter to generate response
+            const response = await this.prompter.promptConvo(history);
+            
+            console.log(`${this.name} generated response: "${response}"`);
+            
+            return response;
+            
+        } catch (error) {
+            console.error('Error generating conversational response:', error);
+            return 'I apologize, but I\'m having trouble processing that right now.';
+        }
+    }
+
+    /**
+     * Build conversation history for prompter
+     */
+    buildConversationHistory(state) {
+        const history = [];
+        
+        // Add recent conversation history
+        const recentResponses = state.executive.responseHistory.slice(-5);
+        
+        recentResponses.forEach(record => {
+            history.push({
+                role: 'user',
+                content: record.message
+            });
+            history.push({
+                role: 'assistant',
+                content: record.response
+            });
+        });
+        
+        // Add current message
+        if (state.context.lastMessage) {
+            history.push({
+                role: 'user',
+                content: state.context.lastMessage.message
+            });
+        }
+        
+        return history;
+    }
+
+    /**
+     * Route response back to user
+     */
+    async routeResponse(source, response) {
+        try {
+            console.log(`${this.name} full response to ${source}: "${response}"`);
+            
+            if (this.bot && this.bot.chat) {
+                // Send response through Minecraft chat
+                this.bot.chat(response);
+            } else {
+                // Fallback to console for testing
+                console.log(`${this.name} to ${source}: ${response}`);
+            }
+        } catch (error) {
+            console.error('Error routing response:', error);
+        }
+    }
+
+    /**
+     * Test conversation processing
+     */
+    async testConversationProcessing(testMessage, source = 'test_user') {
+        console.log(`\n=== Testing Conversation Processing ===`);
+        console.log(`Message: "${testMessage}" from ${source}`);
+        
+        try {
+            // Simulate receiving a message
+            await this.handleMessage(source, testMessage);
+            
+            console.log(`=== Test Complete ===\n`);
+            
+        } catch (error) {
+            console.error('Test failed:', error);
+            console.log(`=== Test Failed ===\n`);
+        }
     }
 
     updateContext() {

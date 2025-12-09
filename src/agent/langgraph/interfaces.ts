@@ -33,6 +33,7 @@ export interface WorldContext {
   nearbyBlocks: BlockInfo[];
   inventory: InventoryItem[];
   equipment: EquipmentInfo;
+  lastMessage?: MessageInfo;
 }
 
 export interface EntityInfo {
@@ -64,6 +65,15 @@ export interface EquipmentInfo {
   leggings?: InventoryItem;
   boots?: InventoryItem;
   weapon?: InventoryItem;
+}
+
+export interface MessageInfo {
+  source: string;
+  message: string;
+  timestamp: number;
+  type: 'conversational' | 'command' | 'system';
+  priority: number;
+  metadata?: Record<string, any>;
 }
 
 // ============================================================================
@@ -404,6 +414,10 @@ export interface ExecutiveState {
   actionQueue: AgentAction[];
   decisionHistory: DecisionRecord[];
   performanceMetrics: PerformanceMetrics;
+  conversationalResponse?: string;
+  lastResponse?: ResponseRecord;
+  responseHistory: ResponseRecord[];
+  processingMode: 'conversational' | 'action';
 }
 
 export interface AgentAction {
@@ -443,6 +457,64 @@ export interface PerformanceMetrics {
   goalCompletionRate: number;
   survivalEvents: number;
   socialInteractions: number;
+}
+
+export interface ResponseRecord {
+  source: string;
+  message: string;
+  response: string;
+  timestamp: number;
+  processingMode: 'conversational' | 'action';
+  responseTime: number;
+  success: boolean;
+}
+
+// ============================================================================
+// CONVERSATION PROCESSING INTERFACES
+// ============================================================================
+
+export interface MessageAnalysis {
+  message: string;
+  source: string;
+  isConversational: boolean;
+  isActionCommand: boolean;
+  processingMode: 'conversational' | 'action';
+  confidence: number;
+  extractedIntent?: string;
+  entities?: Record<string, any>;
+  emotionalTone?: string;
+  urgency: number;
+}
+
+export interface ConversationContext {
+  isActive: boolean;
+  startTime?: number;
+  lastMessageTime: number;
+  messageCount: number;
+  participants: string[];
+  currentTopic?: string;
+  conversationHistory: ConversationEntry[];
+  contextBuffer: string[];
+  emotionalState: Record<string, number>;
+}
+
+export interface ConversationEntry {
+  id: string;
+  timestamp: number;
+  source: string;
+  message: string;
+  response?: string;
+  type: 'user' | 'agent' | 'system';
+  metadata?: Record<string, any>;
+}
+
+export interface ConversationProcessingResult {
+  response: string;
+  processingTime: number;
+  confidence: number;
+  personalityAlignment: number;
+  contextUpdated: boolean;
+  followUpActions?: string[];
 }
 
 // ============================================================================
