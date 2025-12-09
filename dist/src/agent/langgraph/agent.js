@@ -8,9 +8,9 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import { StateGraph, START, END } from '@langchain/langgraph';
 import { PersonalitySystem } from '../cognitive/personality.js';
 import { PurposeCore } from '../cognitive/purpose_core.js';
-import { ReactiveBehaviorLayer } from './reactive_layer.js';
+import { ReactiveBehaviorLayerImpl } from './reactive_layer.js';
 import { InterruptController } from './interrupt_controller.js';
-import { AgentState, CognitiveInput, CognitiveOutput } from './interfaces.js';
+import { InterruptPriority, ProcessingPhase } from './interfaces.js';
 export class LangGraphAgent {
     constructor() {
         this.profile = null;
@@ -72,8 +72,8 @@ export class LangGraphAgent {
      * Initialize the LangGraph state graph
      */
     async initializeStateGraph() {
-        // Create state graph with AgentState
-        this.stateGraph = new StateGraph(AgentState)
+        // Create state graph with empty schema
+        this.stateGraph = new StateGraph({})
             .addNode('perception', this.handlePerception.bind(this))
             .addNode('reactive_check', this.handleReactiveCheck.bind(this))
             .addNode('cognitive_processing', this.handleCognitiveProcessing.bind(this))
@@ -97,7 +97,7 @@ export class LangGraphAgent {
      */
     async initializeReactiveLayer() {
         const reactiveModes = this.profile.behavior?.reactiveModes || {};
-        this.reactiveLayer = new ReactiveBehaviorLayer({
+        this.reactiveLayer = new ReactiveBehaviorLayerImpl({
             modes: reactiveModes,
             enabled: true
         });

@@ -35,8 +35,10 @@ export class HybridAgentGraph {
     currentState;
     constructor(bot) {
         this.bot = bot;
+        // Use any type to avoid LangGraph type complexities for now
+        // Pass an empty schema object - LangGraph will infer the structure from usage
         this.graph = new StateGraph({});
-        this.interruptController = new InterruptController();
+        this.interruptController = new InterruptController('default-bot');
         this.reactiveLayer = createReactiveBehaviorLayer(this.interruptController, bot);
         this.setupGraph();
         this.setupInterruptHandling();

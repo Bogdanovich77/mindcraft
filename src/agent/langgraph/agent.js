@@ -6,12 +6,12 @@
  */
 
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
-import { StateGraph, START, END } from '@langchain/langgraph';
+import { StateGraph, START, END, Annotation } from '@langchain/langgraph';
 import { PersonalitySystem } from '../cognitive/personality.js';
 import { PurposeCore } from '../cognitive/purpose_core.js';
-import { ReactiveBehaviorLayer } from './reactive_layer.js';
+import { ReactiveBehaviorLayerImpl } from './reactive_layer.js';
 import { InterruptController } from './interrupt_controller.js';
-import { AgentState, CognitiveInput, CognitiveOutput } from './interfaces.js';
+import { InterruptPriority, ProcessingPhase } from './interfaces.js';
 
 export class LangGraphAgent {
     constructor() {
@@ -86,7 +86,41 @@ export class LangGraphAgent {
      * Initialize the LangGraph state graph
      */
     async initializeStateGraph() {
-        // Create state graph with AgentState
+        // Create state graph with proper LangGraph schema
+        const AgentState = Annotation.Root({
+            context: Annotation({
+                position: { x: 0, y: 0, z: 0 },
+                health: 20,
+                food: 20,
+                experience: 0,
+                dimension: 'overworld',
+                timeOfDay: 0,
+                weather: 'clear',
+                nearbyEntities: [],
+                nearbyBlocks: [],
+                inventory: [],
+                equipment: {}
+            }),
+            reactive: Annotation({
+                activeMode: 'none',
+                emergencyConditions: [],
+                lastReactiveAction: undefined,
+                interruptHistory: []
+            }),
+            cognitive: Annotation({
+                purposeCore: {},
+                currentGoal: null,
+                activeGoals: [],
+                decisionHistory: []
+            }),
+            executive: Annotation({
+                currentAction: null,
+                actionQueue: [],
+                lastDecision: null,
+                processingTime: 0
+            })
+        });
+        
         this.stateGraph = new StateGraph(AgentState)
             .addNode('perception', this.handlePerception.bind(this))
             .addNode('reactive_check', this.handleReactiveCheck.bind(this))
@@ -119,7 +153,7 @@ export class LangGraphAgent {
     async initializeReactiveLayer() {
         const reactiveModes = this.profile.behavior?.reactiveModes || {};
         
-        this.reactiveLayer = new ReactiveBehaviorLayer({
+        this.reactiveLayer = new ReactiveBehaviorLayerImpl({
             modes: reactiveModes,
             enabled: true
         });
