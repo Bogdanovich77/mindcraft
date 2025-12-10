@@ -107,67 +107,76 @@ export class IdleDetectionSystem {
    * Record agent activity
    */
   recordActivity(activity: ActivityRecord): void {
-    const now = Date.now();
-    
-    // Update activity record
-    activity.timestamp = now;
-    this.activityHistory.push(activity);
-    
-    // Keep only recent activity history
-    if (this.activityHistory.length > this.config.activityHistorySize) {
-      this.activityHistory = this.activityHistory.slice(-this.config.activityHistorySize);
+    try {
+      const now = Date.now();
+      
+      // Update activity record
+      activity.timestamp = now;
+      this.activityHistory.push(activity);
+      
+      // Keep only recent activity history
+      if (this.activityHistory.length > this.config.activityHistorySize) {
+        this.activityHistory = this.activityHistory.slice(-this.config.activityHistorySize);
+      }
+      
+      // Update last activity time
+      this.lastActivityTime = now;
+      
+      // Reset idle state if activity detected
+      if (this.isIdle) {
+        this.handleActivityResume();
+      }
+      
+      // Update metrics
+      this.updateMetrics();
+      
+      console.log(`[IDLE_DETECTION] Activity recorded: ${activity.type} (${activity.intensity})`);
+    } catch (error) {
+      console.error('[IDLE_DETECTION] Error recording activity:', error);
     }
-    
-    // Update last activity time
-    this.lastActivityTime = now;
-    
-    // Reset idle state if activity detected
-    if (this.isIdle) {
-      this.handleActivityResume();
-    }
-    
-    // Update metrics
-    this.updateMetrics();
-    
-    console.log(`[IDLE_DETECTION] Activity recorded: ${activity.type} (${activity.intensity})`);
   }
 
   /**
    * Check idle status
    */
   checkIdleStatus(agentState: AgentState): boolean {
-    const now = Date.now();
-    
-    // Check if enough time has passed since last check
-    if (now - this.lastCheckTime < this.config.checkInterval) {
+    try {
+      const now = Date.now();
+      
+      // Check if enough time has passed since last check
+      if (now - this.lastCheckTime < this.config.checkInterval) {
+        return this.isIdle;
+      }
+      
+      this.lastCheckTime = now;
+      
+      // Calculate current activity level
+      const activityLevel = this.calculateActivityLevel(agentState);
+      const timeSinceLastActivity = now - this.lastActivityTime;
+      
+      // Determine if agent is idle
+      const wasIdle = this.isIdle;
+      this.isIdle = this.evaluateIdleCondition(activityLevel, timeSinceLastActivity, agentState);
+      
+      // Handle idle state transitions
+      if (!wasIdle && this.isIdle) {
+        this.handleIdleDetection(agentState);
+      } else if (wasIdle && !this.isIdle) {
+        this.handleActivityResume();
+      }
+      
+      // Update metrics
+      this.metrics.activityLevel = activityLevel;
+      this.metrics.isIdle = this.isIdle;
+      this.metrics.idleDuration = this.isIdle ? now - (this.idleStartTime || now) : undefined;
+      this.metrics.lastActivityTime = this.lastActivityTime;
+      this.metrics.timestamp = now;
+      
       return this.isIdle;
+    } catch (error) {
+      console.error('[IDLE_DETECTION] Error checking idle status:', error);
+      return this.isIdle; // Return previous state on error
     }
-    
-    this.lastCheckTime = now;
-    
-    // Calculate current activity level
-    const activityLevel = this.calculateActivityLevel(agentState);
-    const timeSinceLastActivity = now - this.lastActivityTime;
-    
-    // Determine if agent is idle
-    const wasIdle = this.isIdle;
-    this.isIdle = this.evaluateIdleCondition(activityLevel, timeSinceLastActivity, agentState);
-    
-    // Handle idle state transitions
-    if (!wasIdle && this.isIdle) {
-      this.handleIdleDetection(agentState);
-    } else if (wasIdle && !this.isIdle) {
-      this.handleActivityResume();
-    }
-    
-    // Update metrics
-    this.metrics.activityLevel = activityLevel;
-    this.metrics.isIdle = this.isIdle;
-    this.metrics.idleDuration = this.isIdle ? now - (this.idleStartTime || now) : undefined;
-    this.metrics.lastActivityTime = this.lastActivityTime;
-    this.metrics.timestamp = now;
-    
-    return this.isIdle;
   }
 
   /**

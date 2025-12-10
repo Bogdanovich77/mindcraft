@@ -9,6 +9,7 @@ import { AntiIdleGoalConfig } from './anti_idle_goal_generator.js';
 import { IdleDetectionConfig } from './idle_detection_system.js';
 import { ActivityGenerationConfig } from './personality_activity_generator.js';
 import { OpportunityDetectionConfig } from './environmental_opportunity_detector.js';
+import { GoalLevel } from './goal_types.js';
 
 /**
  * Complete anti-idle system configuration
@@ -46,7 +47,7 @@ export interface AntiIdlePreset {
   name: string;
   description: string;
   config: AntiIdleSystemConfig;
- 适用环境: 'development' | 'testing' | 'production' | 'high_performance';
+ environment: 'development' | 'testing' | 'production' | 'high_performance';
 }
 
 /**
@@ -89,7 +90,7 @@ export class AntiIdleConfigManager {
           enabled: true,
           maxAntiIdleGoals: 8,
           goalPriority: 1, // HIGH
-          goalTypes: [2, 3], // TACTICAL, OPERATIONAL
+          goalTypes: [GoalLevel.TACTICAL, GoalLevel.OPERATIONAL], // TACTICAL, OPERATIONAL
           refreshInterval: 30000, // 30 seconds
           minActivityThreshold: 0.2,
           personalityInfluence: 0.8,
@@ -134,7 +135,7 @@ export class AntiIdleConfigManager {
           monitoringEnabled: true
         }
       },
-      适用环境: 'development'
+      environment: 'development'
     });
 
     // Production preset
@@ -148,7 +149,7 @@ export class AntiIdleConfigManager {
           enabled: true,
           maxAntiIdleGoals: 5,
           goalPriority: 2, // MEDIUM
-          goalTypes: [2, 3], // TACTICAL, OPERATIONAL
+          goalTypes: [GoalLevel.TACTICAL, GoalLevel.OPERATIONAL], // TACTICAL, OPERATIONAL
           refreshInterval: 60000, // 1 minute
           minActivityThreshold: 0.1,
           personalityInfluence: 0.7,
@@ -193,7 +194,7 @@ export class AntiIdleConfigManager {
           monitoringEnabled: true
         }
       },
-      适用环境: 'production'
+      environment: 'production'
     });
 
     // High performance preset
@@ -207,7 +208,7 @@ export class AntiIdleConfigManager {
           enabled: true,
           maxAntiIdleGoals: 10,
           goalPriority: 1, // HIGH
-          goalTypes: [1, 2, 3], // All goal types
+          goalTypes: [GoalLevel.STRATEGIC, GoalLevel.TACTICAL, GoalLevel.OPERATIONAL], // All goal types
           refreshInterval: 15000, // 15 seconds
           minActivityThreshold: 0.05,
           personalityInfluence: 0.9,
@@ -252,7 +253,7 @@ export class AntiIdleConfigManager {
           monitoringEnabled: true
         }
       },
-      适用环境: 'high_performance'
+      environment: 'high_performance'
     });
 
     // Conservative preset
@@ -266,7 +267,7 @@ export class AntiIdleConfigManager {
           enabled: true,
           maxAntiIdleGoals: 3,
           goalPriority: 3, // LOW
-          goalTypes: [3], // Only operational goals
+          goalTypes: [GoalLevel.OPERATIONAL], // Only operational goals
           refreshInterval: 120000, // 2 minutes
           minActivityThreshold: 0.3,
           personalityInfluence: 0.5,
@@ -311,7 +312,7 @@ export class AntiIdleConfigManager {
           monitoringEnabled: false
         }
       },
-      适用环境: 'production'
+      environment: 'production'
     });
   }
 
@@ -359,7 +360,7 @@ export class AntiIdleConfigManager {
         enabled: true,
         maxAntiIdleGoals: 5,
         goalPriority: 2, // MEDIUM
-        goalTypes: [1, 2], // OPERATIONAL, TACTICAL
+        goalTypes: [GoalLevel.OPERATIONAL, GoalLevel.TACTICAL], // OPERATIONAL, TACTICAL
         refreshInterval: 60000, // 1 minute
         minActivityThreshold: 0.1,
         personalityInfluence: 0.7,

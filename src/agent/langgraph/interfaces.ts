@@ -876,6 +876,139 @@ export interface WorkingMemoryState {
   attentionLevel: number;
 }
 
+// ============================================================================
+// ANTI-IDLE SYSTEM INTERFACES
+// ============================================================================
+
+export interface AntiIdleConfig {
+  enabled: boolean;
+  idleDetection: {
+    inactivityThreshold: number;    // milliseconds
+    minActivityLevel: number;       // 0-1 scale
+    checkInterval: number;           // milliseconds
+    activityHistorySize: number;     // number of records to keep
+  };
+  goalGeneration: {
+    maxAntiIdleGoals: number;       // maximum concurrent anti-idle goals
+    goalPriority: number;           // priority for anti-idle goals
+    goalTypes: string[];            // allowed goal types
+    refreshInterval: number;         // milliseconds
+  };
+  opportunityDetection: {
+    scanInterval: number;           // milliseconds
+    maxOpportunities: number;        // maximum opportunities to track
+    opportunityTimeout: number;      // milliseconds
+    priorityWeights: {
+      resource: number;
+      structure: number;
+      exploration: number;
+      social: number;
+      skill: number;
+      danger: number;
+    };
+  };
+  personalityActivities: {
+    enabled: boolean;
+    minPersonalityAlignment: number; // 0-1 scale
+    maxActivities: number;            // maximum activities to generate
+    diversityFactor: number;         // 0-1 scale, higher = more diverse
+  };
+  monitoring: {
+    enabled: boolean;
+    alertThreshold: number;          // consecutive idle periods
+    metricsRetention: number;        // days
+    reportInterval: number;          // milliseconds
+  };
+}
+
+export interface ActivityRecord {
+  type: 'action' | 'movement' | 'interaction' | 'communication';
+  timestamp: number;
+  description: string;
+  intensity: number; // 0-1 scale
+}
+
+export interface EnvironmentalOpportunity {
+  id: string;
+  type: 'resource' | 'structure' | 'exploration' | 'social' | 'skill' | 'danger';
+  priority: number;
+  description: string;
+  location: { x: number; y: number; z: number };
+  requirements: { type: string; amount: number }[];
+  estimatedValue: number;
+  timeWindow?: number; // milliseconds
+}
+
+export interface ActivitySuggestion {
+  type: string;
+  description: string;
+  personalityAlignment: number;
+  estimatedDuration: number;
+  requirements: string[];
+  expectedOutcomes: string[];
+}
+
+export interface AntiIdleMetrics {
+  agentId: string;
+  timestamp: number;
+  idlePeriods: IdlePeriod[];
+  activityLevel: number;
+  antiIdleGoalsGenerated: number;
+  antiIdleGoalsCompleted: number;
+  opportunitiesDetected: number;
+  opportunitiesActed: number;
+  personalityActivitiesGenerated: number;
+  systemPerformance: {
+    cpuUsage: number;
+    memoryUsage: number;
+    responseTime: number;
+  };
+}
+
+export interface IdlePeriod {
+  startTime: number;
+  endTime: number;
+  duration: number;
+  triggerType: 'inactivity' | 'low_activity' | 'no_goals';
+  resolutionType: 'auto_goal' | 'manual_intervention' | 'system_restart';
+}
+
+export interface AntiIdleAlert {
+  id: string;
+  agentId: string;
+  type: 'consecutive_idle' | 'low_activity' | 'high_cpu' | 'high_memory' | 'slow_response';
+  timestamp: number;
+  severity: 'info' | 'warning' | 'critical';
+  message: string;
+  data: any;
+  acknowledged: boolean;
+  resolved: boolean;
+}
+
+export interface AntiIdleReport {
+  timestamp: number;
+  agents: AgentReport[];
+  summary: {
+    totalAgents: number;
+    totalIdlePeriods: number;
+    averageActivityLevel: number;
+    totalAlerts: number;
+    activeAlerts: number;
+  };
+}
+
+export interface AgentReport {
+  agentId: string;
+  metrics: AntiIdleMetrics[];
+  alerts: AntiIdleAlert[];
+  summary: {
+    totalIdlePeriods: number;
+    averageActivityLevel: number;
+    totalAntiIdleGoals: number;
+    totalOpportunities: number;
+  };
+}
+
 export interface MemoryStatistics {
   semantic: {
     conceptCount: number;

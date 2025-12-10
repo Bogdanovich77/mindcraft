@@ -13,6 +13,10 @@ import { EnvironmentalOpportunityDetector } from './environmental_opportunity_de
 import { PersonalityActivityGenerator } from './personality_activity_generator.js';
 import { AntiIdleConfigManager } from './anti_idle_config_manager.js';
 import { AntiIdleMonitoringSystem } from './anti_idle_monitoring_system.js';
+import { PurposeCore } from './purpose_core.js';
+import { SkillsSystem } from './skills_system.js';
+import { PersonalitySystem } from './personality.js';
+import { MemorySystem } from '../memory/memory_system.js';
 
 /**
  * Anti-idle system coordinator configuration
@@ -175,7 +179,7 @@ export class AntiIdleSystem {
           this.goalGenerator,
           this.opportunityDetector,
           this.activityGenerator,
-          this.configManager?.getConfig()?.monitoring
+          this.configManager?.getConfig()?.global.monitoringEnabled ? {} : undefined
         );
       }
 
@@ -674,7 +678,7 @@ export class AntiIdleSystem {
         // Reset goal generator
         // Create a PurposeCore instance from the current state
         const purposeCore = agentState.cognitive?.purpose ?
-          new PurposeCore() : new PurposeCore();
+          agentState.cognitive.purpose : new PurposeCore();
         
         // If we have existing purpose state, initialize the PurposeCore with it
         if (agentState.cognitive?.purpose) {
@@ -683,10 +687,10 @@ export class AntiIdleSystem {
         }
         
         this.goalGenerator = new AntiIdleGoalGenerator(
-          purposeCore,
-          agentState.cognitive?.skills,
-          agentState.cognitive?.memory,
-          agentState.context
+          purposeCore instanceof PurposeCore ? purposeCore : new PurposeCore(),
+          new SkillsSystem(new PersonalitySystem()), // Create SkillsSystem instance with PersonalitySystem
+          new MemorySystem(), // Create MemorySystem instance
+          this.configManager?.getConfig()?.goalGeneration
         );
       }
       

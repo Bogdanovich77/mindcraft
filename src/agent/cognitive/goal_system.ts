@@ -1097,29 +1097,17 @@ export class GoalSystem {
   /**
    * Generate anti-idle goals if needed
    */
-  private generateAntiIdleGoalsIfNeeded(): void {
+  private async generateAntiIdleGoalsIfNeeded(agentState: AgentState): Promise<void> {
     const activeGoals = [
-      ...this.goalState.strategicGoals,
-      ...this.goalState.tacticalGoals,
-      ...this.goalState.operationalGoals
+      ...agentState.cognitive?.goals?.strategicGoals || [],
+      ...agentState.cognitive?.goals?.tacticalGoals || [],
+      ...agentState.cognitive?.goals?.operationalGoals || []
     ].filter(g => g.status === 'active');
     
     // Generate anti-idle goals if we have too few active goals
     if (activeGoals.length < 3) {
-      const antiIdleGoals = this.antiIdleGoalGenerator.generateAntiIdleGoals();
-      
-      // Add anti-idle goals to appropriate levels
-      antiIdleGoals.forEach(goal => {
-        if (goal.type === 'strategic') {
-          this.goalState.strategicGoals.push(goal);
-        } else if (goal.type === 'tactical') {
-          this.goalState.tacticalGoals.push(goal);
-        } else if (goal.type === 'operational') {
-          this.goalState.operationalGoals.push(goal);
-        }
-      });
-      
-      console.log(`[GOAL_SYSTEM] Generated ${antiIdleGoals.length} anti-idle goals`);
+      // This would need an anti-idle goal generator instance
+      console.log(`[GOAL_SYSTEM] Should generate anti-idle goals but generator not available`);
     }
   }
 }

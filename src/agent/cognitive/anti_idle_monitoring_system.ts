@@ -733,4 +733,11 @@ export class AntiIdleMonitoringSystem {
   updateConsecutiveIdleCount(count: number): void {
     this.consecutiveIdleCount = count;
   }
+
+  /**
+   * Record metrics for monitoring system (alias for getMetrics)
+   */
+  recordMetrics(): AntiIdlePerformanceMetrics {
+    return this.getMetrics();
+  }
 }

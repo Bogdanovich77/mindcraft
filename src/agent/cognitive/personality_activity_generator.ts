@@ -644,7 +644,7 @@ export class PersonalityActivityGenerator {
   private calculateResourcePreference(personality: PersonalityTraits): number {
     return (
       personality.conscientiousness * 0.4 +
-      personality.patience * 0.3 +
+      personality.riskTolerance * 0.3 +
       personality.openness * 0.2 +
       personality.socialTendency * 0.1
     );

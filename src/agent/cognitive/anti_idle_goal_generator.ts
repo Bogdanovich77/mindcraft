@@ -210,7 +210,7 @@ export class AntiIdleGoalGenerator {
     const goals: GoalCreationRequest[] = [];
 
     // Personality-driven exploration
-    if (personality.openness > 0.7 || personality.explorationDrive > 0.6) {
+    if (personality.openness > 0.7) {
       goals.push(this.createGoalRequest(
         'exploration',
         'Explore new areas and discover resources',
@@ -293,7 +293,7 @@ export class AntiIdleGoalGenerator {
     const skills = this.skillsSystem.getAllSkills?.() || [];
     const underdevelopedSkills = skills.filter((skill: any) => 
       skill.proficiency.overall < 0.5 && 
-      (personality.curiosity > 0.5 || personality.openness > 0.6)
+      (personality.openness > 0.6)
     );
 
     underdevelopedSkills.forEach((skill: any) => {
@@ -448,13 +448,13 @@ export class AntiIdleGoalGenerator {
         alignment += (personality.conscientiousness + personality.buildingCreativity) * 0.3;
         break;
       case 'combat':
-        alignment += (personality.combatAggression + personality.riskTolerance) * 0.3;
+        alignment += personality.riskTolerance * 0.3;
         break;
       case 'crafting':
-        alignment += (personality.buildingCreativity + personality.conscientiousness) * 0.3;
+        alignment += personality.conscientiousness * 0.3;
         break;
       case 'resource_gathering':
-        alignment += (personality.conscientiousness + personality.socialTendency) * 0.3;
+        alignment += personality.conscientiousness * 0.3;
         break;
     }
 

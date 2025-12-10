@@ -708,7 +708,7 @@ export class EnvironmentalOpportunityDetector {
 
   private calculateSkillValue(scenario: any, personality: PersonalityTraits): number {
     const baseValue = 10;
-    const curiosityBonus = personality.curiosity * 5;
+    const curiosityBonus = personality.openness * 5;
     
     return baseValue + curiosityBonus;
   }
@@ -764,7 +764,7 @@ export class EnvironmentalOpportunityDetector {
       [OpportunityType.STRUCTURE]: (personality.buildingCreativity + personality.conscientiousness) * 0.5,
       [OpportunityType.EXPLORATION]: (personality.openness + personality.explorationDrive) * 0.5,
       [OpportunityType.SOCIAL]: personality.extraversion * 0.8,
-      [OpportunityType.SKILL]: (personality.curiosity + personality.openness) * 0.5,
+      [OpportunityType.SKILL]: (personality.openness + personality.explorationDrive) * 0.5,
       [OpportunityType.DANGER]: 1.0 // Always aligned for survival
     };
 

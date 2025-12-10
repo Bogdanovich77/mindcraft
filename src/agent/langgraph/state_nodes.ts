@@ -40,7 +40,7 @@ export async function perceptionNode(state: AgentState): Promise<Partial<AgentSt
         state.cognitive?.purpose,
         state.cognitive?.skills,
         state.cognitive?.memory,
-        state.context
+        undefined // Use default config
       );
       
       // Start anti-idle system
@@ -1687,3 +1687,33 @@ export function cleanupWorkingMemory(buffer: any[], maxEntries: number = 50): an
 
 // Initialize memory tracking on module load
 initializeMemoryTracking();
+/**
+ * Initialize anti-idle system for agent
+ */
+export function initializeAntiIdleSystem(state: AgentState): void {
+  try {
+    // Create anti-idle system if not already initialized
+    if (!state.antiIdleSystem) {
+      const purposeCore = state.cognitive.purpose;
+      const skillsSystem = state.cognitive.skills;
+      const memorySystem = state.cognitive.memory;
+      const context = state.context;
+
+      // Initialize anti-idle system with default configuration
+      state.antiIdleSystem = new AntiIdleSystem(
+        state.metadata?.agentId || 'agent_' + Date.now(),
+        purposeCore,
+        skillsSystem,
+        memorySystem,
+        undefined // Use default config
+      );
+
+      // Start anti-idle system
+      state.antiIdleSystem.start();
+      
+      console.log('[ANTI_IDLE] Anti-idle system initialized for agent');
+    }
+  } catch (error) {
+    console.error('[ANTI_IDLE] Error initializing anti-idle system:', error);
+  }
+}

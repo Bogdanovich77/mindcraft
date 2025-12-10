@@ -42,6 +42,56 @@ export class LegacyNPCDataAdapter {
                     attentionLevel: 0.8,
                     decisionThreshold: 0.7,
                     processingHistory: []
+                },
+                social: {
+                    relationships: {
+                        agentId: this.originalProfile.username || 'legacy_agent',
+                        relationshipCount: 0,
+                        activeRelationships: [],
+                        trustLevels: {},
+                        friendshipLevels: {},
+                        reputationScore: 0.5,
+                        lastUpdate: Date.now()
+                    },
+                    theoryOfMind: {
+                        mentalModels: {},
+                        activePredictions: [],
+                        emotionalUnderstanding: {},
+                        perspectiveTakingHistory: [],
+                        lastUpdate: Date.now()
+                    },
+                    socialContext: {
+                        nearbyAgents: [],
+                        groupDynamics: {
+                            leader: undefined,
+                            cohesion: 0.5,
+                            hierarchy: [],
+                            roles: {},
+                            alliances: []
+                        },
+                        socialNorms: [],
+                        culturalContext: {
+                            culturalBackground: 'default',
+                            values: [],
+                            practices: [],
+                            communicationStyle: 'neutral',
+                            socialHierarchy: []
+                        },
+                        currentSituation: {
+                            type: 'neutral',
+                            participants: [],
+                            goals: [],
+                            resources: [],
+                            powerDynamics: {}
+                        }
+                    },
+                    socialLearning: {
+                        observedBehaviors: [],
+                        learnedPatterns: [],
+                        teachingHistory: [],
+                        socialSkillProgress: {},
+                        lastUpdate: Date.now()
+                    }
                 }
             },
             metadata: {
