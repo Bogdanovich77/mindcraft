@@ -1093,4 +1093,33 @@ export class GoalSystem {
     
     return baseTime;
   }
+  
+  /**
+   * Generate anti-idle goals if needed
+   */
+  private generateAntiIdleGoalsIfNeeded(): void {
+    const activeGoals = [
+      ...this.goalState.strategicGoals,
+      ...this.goalState.tacticalGoals,
+      ...this.goalState.operationalGoals
+    ].filter(g => g.status === 'active');
+    
+    // Generate anti-idle goals if we have too few active goals
+    if (activeGoals.length < 3) {
+      const antiIdleGoals = this.antiIdleGoalGenerator.generateAntiIdleGoals();
+      
+      // Add anti-idle goals to appropriate levels
+      antiIdleGoals.forEach(goal => {
+        if (goal.type === 'strategic') {
+          this.goalState.strategicGoals.push(goal);
+        } else if (goal.type === 'tactical') {
+          this.goalState.tacticalGoals.push(goal);
+        } else if (goal.type === 'operational') {
+          this.goalState.operationalGoals.push(goal);
+        }
+      });
+      
+      console.log(`[GOAL_SYSTEM] Generated ${antiIdleGoals.length} anti-idle goals`);
+    }
+  }
 }

@@ -5,6 +5,7 @@
 
 import { StateGraph, Annotation } from "@langchain/langgraph";
 import { Bot } from "mineflayer";
+import { AntiIdleSystem } from "../cognitive/anti_idle_system.js";
 
 // ============================================================================
 // INTERRUPT PRIORITY SYSTEM
@@ -671,6 +672,9 @@ export interface AgentState {
   
   // Executive control
   executive: ExecutiveState;
+  
+  // Anti-idle system
+  antiIdleSystem?: AntiIdleSystem;
   
   // System metadata
   metadata: {

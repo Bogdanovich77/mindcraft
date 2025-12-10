@@ -5,6 +5,7 @@
 
 import { AgentState, ProcessingPhase, AgentAction, DecisionOption, WorldContext, InterruptPriority, MessageAnalysis, ConversationContext, ConversationProcessingResult, SocialState, DecisionContext } from './interfaces.js';
 import { InterruptController } from './interrupt_controller.js';
+import { AntiIdleSystem } from '../cognitive/anti_idle_system.js';
 
 /**
  * Perception Node - Gather and process sensory information from the world
@@ -30,6 +31,20 @@ export async function perceptionNode(state: AgentState): Promise<Partial<AgentSt
     if (socialContext.nearbyAgents.length > 0) {
       state.cognitive.social.socialContext.nearbyAgents = socialContext.nearbyAgents;
       state.cognitive.social.socialContext.currentSituation = socialContext.currentSituation;
+    }
+    
+    // Initialize anti-idle system if available
+    if (state.metadata && state.metadata.agentId && !state.antiIdleSystem) {
+      state.antiIdleSystem = new AntiIdleSystem(
+        state.metadata.agentId,
+        state.cognitive?.purpose,
+        state.cognitive?.skills,
+        state.cognitive?.memory,
+        state.context
+      );
+      
+      // Start anti-idle system
+      state.antiIdleSystem.start();
     }
     
     // Store processing record
@@ -111,6 +126,11 @@ export async function analysisNode(state: AgentState): Promise<Partial<AgentStat
     
     // Update cognitive processing state
     state.cognitive.processing.currentPhase = ProcessingPhase.ANALYSIS;
+    
+    // Update anti-idle system with current analysis
+    if (state.antiIdleSystem) {
+      await state.antiIdleSystem.update(state);
+    }
     
     // Store processing record
     const processingRecord = {
