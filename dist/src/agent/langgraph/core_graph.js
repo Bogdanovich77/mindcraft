@@ -282,8 +282,8 @@ export class HybridAgentGraph {
             const processingMode = await this.determineProcessingMode(state);
             if (processingMode === "conversational") {
                 // Conversation processing flow
-                state = { ...state, ...(await conversationProcessingNode(state)) };
-                state = { ...state, ...(await responseRoutingNode(state)) };
+                state = { ...state, ...(await conversationProcessingNode(state, agent)) };
+                state = { ...state, ...(await responseRoutingNode(state, agent)) };
             }
             else {
                 // Cognitive processing flow
@@ -296,7 +296,7 @@ export class HybridAgentGraph {
                     state = { ...state, ...(await reflectionNode(state)) };
                 }
                 // Route through response routing for unified flow
-                state = { ...state, ...(await responseRoutingNode(state)) };
+                state = { ...state, ...(await responseRoutingNode(state, agent)) };
             }
             // Update agent state
             Object.assign(agent.state, state);

@@ -30,6 +30,10 @@ export async function perceptionNode(state) {
             }
         };
         state.cognitive.processing.processingHistory.push(processingRecord);
+        // Limit processing history to prevent memory buildup
+        if (state.cognitive.processing.processingHistory.length > 100) {
+            state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+        }
         return {
             context: updatedContext,
             cognitive: {
@@ -82,6 +86,10 @@ export async function analysisNode(state) {
             }
         };
         state.cognitive.processing.processingHistory.push(processingRecord);
+        // Limit processing history to prevent memory buildup
+        if (state.cognitive.processing.processingHistory.length > 100) {
+            state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+        }
         return {
             cognitive: {
                 ...state.cognitive,
@@ -137,6 +145,10 @@ export async function planningNode(state) {
             }
         };
         state.cognitive.processing.processingHistory.push(processingRecord);
+        // Limit processing history to prevent memory buildup
+        if (state.cognitive.processing.processingHistory.length > 100) {
+            state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+        }
         return {
             cognitive: {
                 ...state.cognitive,
@@ -219,6 +231,10 @@ export async function decisionNode(state) {
             }
         };
         state.cognitive.processing.processingHistory.push(processingRecord);
+        // Limit processing history to prevent memory buildup
+        if (state.cognitive.processing.processingHistory.length > 100) {
+            state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+        }
         return {
             executive: {
                 ...state.executive,
@@ -286,6 +302,10 @@ export async function executionNode(state) {
             }
         };
         state.cognitive.processing.processingHistory.push(processingRecord);
+        // Limit processing history to prevent memory buildup
+        if (state.cognitive.processing.processingHistory.length > 100) {
+            state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+        }
         return {
             executive: {
                 ...state.executive,
@@ -328,6 +348,20 @@ export async function reflectionNode(state) {
         await updateSemanticMemory(state, recentExperiences);
         await updateEpisodicMemory(state, recentExperiences);
         await updateProceduralMemory(state, recentExperiences);
+        // Perform memory cleanup
+        if (state.metadata && state.metadata.agentId) {
+            checkMemoryUsage(state.metadata.agentId);
+        }
+        // Clean up episodic memory if needed
+        if (state.cognitive && state.cognitive.memory && state.cognitive.memory.episodic && state.cognitive.memory.episodic.episodes) {
+            state.cognitive.memory.episodic.episodes = cleanupEpisodicMemory(state.cognitive.memory.episodic.episodes, 100 // Keep max 100 episodes
+            );
+        }
+        // Clean up working memory buffer if needed
+        if (state.cognitive && state.cognitive.memory && state.cognitive.memory.working && state.cognitive.memory.working.buffer) {
+            state.cognitive.memory.working.buffer = cleanupWorkingMemory(state.cognitive.memory.working.buffer, 50 // Keep max 50 buffer entries
+            );
+        }
         // Update skills based on experience
         await updateSkillProficiencies(state, recentExperiences);
         // Adjust personality and motivations based on experiences
@@ -348,6 +382,10 @@ export async function reflectionNode(state) {
             }
         };
         state.cognitive.processing.processingHistory.push(processingRecord);
+        // Limit processing history to prevent memory buildup
+        if (state.cognitive.processing.processingHistory.length > 100) {
+            state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+        }
         return {
             cognitive: {
                 ...state.cognitive,
@@ -453,6 +491,10 @@ export async function messageAnalysisNode(state) {
             }
         };
         state.cognitive.processing.processingHistory.push(processingRecord);
+        // Limit processing history to prevent memory buildup
+        if (state.cognitive.processing.processingHistory.length > 100) {
+            state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+        }
         return {
             executive: {
                 ...state.executive,
@@ -484,30 +526,73 @@ export async function messageAnalysisNode(state) {
 /**
  * Conversation Processing Node - Generate conversational responses using prompter system
  */
-export async function conversationProcessingNode(state) {
+export async function conversationProcessingNode(state, agent) {
     const startTime = Date.now();
     try {
         if (!state.context.lastMessage || state.executive.processingMode !== 'conversational') {
             return state;
         }
         const message = state.context.lastMessage;
-        // Generate conversational response
-        const processingResult = await generateConversationalResponse(message, state);
+        // Check for duplicate message to prevent infinite loops
+        const recentMessages = state.executive.responseHistory || [];
+        const isDuplicate = recentMessages.some(record => record.message === message.message &&
+            record.source === message.source &&
+            (Date.now() - record.timestamp) < 5000 // Within 5 seconds
+        );
+        if (isDuplicate) {
+            console.log('[CONVERSATION_PROCESSING] Detected duplicate message, skipping processing');
+            // Clear the message to prevent reprocessing
+            state.context.lastMessage = undefined;
+            return state;
+        }
+        console.log(`[CONVERSATION_PROCESSING] ${agent.name || 'Agent'} processing: "${message.message}"`);
+        // Generate conversational response using agent's prompter
+        let response;
+        if (agent && agent.prompter) {
+            try {
+                // Build conversation history for prompter
+                const history = agent.buildConversationHistory(state);
+                // Use agent's prompter to generate response
+                response = await agent.prompter.promptConvo(history);
+                console.log(`[CONVERSATION_PROCESSING] ${agent.name || 'Agent'} generated response: "${response}"`);
+            }
+            catch (prompterError) {
+                console.error('[CONVERSATION_PROCESSING] Error using prompter:', prompterError);
+                response = 'I apologize, but I\'m having trouble processing that right now.';
+            }
+        }
+        else {
+            // Fallback to simple response generation
+            const processingResult = await generateConversationalResponse(message, state);
+            response = processingResult.response;
+        }
         // Update executive state with response
-        state.executive.conversationalResponse = processingResult.response;
+        state.executive.conversationalResponse = response;
         // Record response in history
         const responseRecord = {
             source: message.source,
             message: message.message,
-            response: processingResult.response,
+            response: response,
             timestamp: Date.now(),
             processingMode: 'conversational',
             responseTime: Date.now() - startTime,
-            success: processingResult.confidence > 0.5
+            success: true
         };
         state.executive.responseHistory.push(responseRecord);
         state.executive.lastResponse = responseRecord;
+        // Limit conversation history to prevent memory buildup
+        if (state.executive.responseHistory.length > 100) {
+            state.executive.responseHistory = state.executive.responseHistory.slice(-100);
+        }
         // Update conversation context in episodic memory
+        const processingResult = {
+            response,
+            processingTime: Date.now() - startTime,
+            confidence: 0.8,
+            personalityAlignment: 0.8,
+            contextUpdated: true,
+            followUpActions: []
+        };
         await updateConversationContext(state, message, processingResult);
         // Update cognitive processing state
         state.cognitive.processing.currentPhase = ProcessingPhase.DECISION;
@@ -526,6 +611,10 @@ export async function conversationProcessingNode(state) {
             }
         };
         state.cognitive.processing.processingHistory.push(processingRecord);
+        // Limit processing history to prevent memory buildup
+        if (state.cognitive.processing.processingHistory.length > 100) {
+            state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+        }
         return {
             executive: {
                 ...state.executive,
@@ -556,13 +645,17 @@ export async function conversationProcessingNode(state) {
 /**
  * Response Routing Node - Route responses back to users or continue with action processing
  */
-export async function responseRoutingNode(state) {
+export async function responseRoutingNode(state, agent) {
     const startTime = Date.now();
     try {
         // Check if we have a conversational response to send
         if (state.executive.conversationalResponse && state.executive.processingMode === 'conversational') {
-            // Send response to user (this would integrate with the chat system)
-            await sendResponseToUser(state);
+            const lastResponse = state.executive.lastResponse;
+            if (lastResponse && agent) {
+                console.log(`[RESPONSE_ROUTING] ${agent.name || 'Agent'} sending response to ${lastResponse.source}: "${lastResponse.response}"`);
+                // Use agent's routeResponse method to send the response
+                await agent.routeResponse(lastResponse.source, lastResponse.response);
+            }
             // Clear the conversational response after sending
             state.executive.conversationalResponse = undefined;
             // Clear the last message from context
@@ -583,6 +676,10 @@ export async function responseRoutingNode(state) {
             }
         };
         state.cognitive.processing.processingHistory.push(processingRecord);
+        // Limit processing history to prevent memory buildup
+        if (state.cognitive.processing.processingHistory.length > 100) {
+            state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+        }
         return {
             context: state.context,
             executive: {
@@ -729,13 +826,11 @@ async function updateConversationContext(state, message, processingResult) {
     }
 }
 async function sendResponseToUser(state) {
-    // This would integrate with the existing chat/routing system
-    // For now, we'll just log the response
+    // This function is now handled directly in responseRoutingNode
+    // Keeping this for backward compatibility but it's no longer used
     const lastResponse = state.executive.lastResponse;
     if (lastResponse) {
-        console.log(`[ROUTING] Sending response to ${lastResponse.source}: "${lastResponse.response}"`);
-        // The actual response routing will be handled by the agent's routeResponse method
-        // This node just signals that routing should occur
+        console.log(`[ROUTING] Response ready for ${lastResponse.source}: "${lastResponse.response}"`);
     }
 }
 // ============================================================================
@@ -747,7 +842,8 @@ function checkIfActionCommand(message) {
         'get', 'take', 'pick up', 'collect',
         'craft', 'build', 'place', 'break',
         'attack', 'fight', 'defend',
-        'follow', 'stop', 'wait'
+        'follow', 'stop', 'wait',
+        '!goal'
     ];
     const lowerMessage = message.toLowerCase();
     return actionCommands.some(cmd => lowerMessage.includes(cmd));
@@ -1021,3 +1117,99 @@ function getEmergencyPriority(emergencyType) {
             return InterruptPriority.COGNITIVE;
     }
 }
+// ============================================================================
+// MEMORY MANAGEMENT UTILITIES
+// ============================================================================
+/**
+ * Check memory usage and perform cleanup if needed
+ */
+export function checkMemoryUsage(agentId = 'unknown') {
+    const now = Date.now();
+    // Check memory usage at regular intervals
+    if (now - global.lastMemoryCheck > 30000) { // Every 30 seconds
+        const currentMemory = process.memoryUsage();
+        global.lastMemoryCheck = now;
+        // Update peak memory if current is higher
+        if (!global.peakMemory || currentMemory.heapUsed > global.peakMemory.heapUsed) {
+            global.peakMemory = currentMemory;
+        }
+        // Log memory usage
+        console.log(`[MEMORY] ${agentId} - Current: ${Math.round(currentMemory.heapUsed / 1024 / 1024)}MB, Peak: ${Math.round(global.peakMemory.heapUsed / 1024 / 1024)}MB`);
+        // Trigger garbage collection if memory usage is high
+        if (currentMemory.heapUsed > 500 * 1024 * 1024) { // 500MB threshold
+            console.log(`[MEMORY] High memory usage detected for ${agentId}, triggering garbage collection`);
+            if (global.gc) {
+                global.gc();
+            }
+        }
+    }
+}
+/**
+ * Perform memory cleanup tasks
+ */
+export function performMemoryCleanup(agentId = 'unknown') {
+    try {
+        console.log(`[MEMORY] Performing cleanup for ${agentId}`);
+        // Trigger garbage collection if available
+        if (global.gc) {
+            global.gc();
+            console.log(`[MEMORY] Garbage collection triggered for ${agentId}`);
+        }
+    }
+    catch (error) {
+        console.error(`[MEMORY] Error during cleanup for ${agentId}:`, error);
+    }
+}
+/**
+ * Get memory usage statistics
+ */
+export function getMemoryStats() {
+    const currentMemory = process.memoryUsage();
+    return {
+        current: {
+            heapUsed: Math.round(currentMemory.heapUsed / 1024 / 1024),
+            heapTotal: Math.round(currentMemory.heapTotal / 1024 / 1024),
+            external: Math.round(currentMemory.external / 1024 / 1024)
+        },
+        peak: {
+            heapUsed: Math.round(global.peakMemory?.heapUsed / 1024 / 1024 || 0),
+            heapTotal: Math.round(global.peakMemory?.heapTotal / 1024 / 1024 || 0)
+        }
+    };
+}
+/**
+ * Initialize memory tracking
+ */
+export function initializeMemoryTracking() {
+    global.lastMemoryCheck = Date.now();
+    global.peakMemory = process.memoryUsage();
+    console.log('[MEMORY] Memory tracking initialized');
+}
+/**
+ * Clean up old episodic memories
+ */
+export function cleanupEpisodicMemory(episodes, maxEntries = 100) {
+    if (episodes.length <= maxEntries) {
+        return episodes;
+    }
+    // Keep the most recent episodes
+    const sortedEpisodes = episodes.sort((a, b) => b.timestamp - a.timestamp);
+    const keptEpisodes = sortedEpisodes.slice(0, maxEntries);
+    console.log(`[MEMORY] Cleaned up episodic memory: ${episodes.length - keptEpisodes.length} old entries removed`);
+    return keptEpisodes;
+}
+/**
+ * Clean up old working memory buffer
+ */
+export function cleanupWorkingMemory(buffer, maxEntries = 50) {
+    if (buffer.length <= maxEntries) {
+        return buffer;
+    }
+    // Keep the most recent buffer entries
+    const sortedBuffer = buffer.sort((a, b) => b.timestamp - a.timestamp);
+    const keptBuffer = sortedBuffer.slice(0, maxEntries);
+    console.log(`[MEMORY] Cleaned up working memory buffer: ${buffer.length - keptBuffer.length} old entries removed`);
+    return keptBuffer;
+}
+// Initialize memory tracking on module load
+initializeMemoryTracking();

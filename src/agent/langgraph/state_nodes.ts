@@ -638,7 +638,7 @@ export async function messageAnalysisNode(state: AgentState): Promise<Partial<Ag
 /**
  * Conversation Processing Node - Generate conversational responses using prompter system
  */
-export async function conversationProcessingNode(state: AgentState): Promise<Partial<AgentState>> {
+export async function conversationProcessingNode(state: AgentState, agent: any): Promise<Partial<AgentState>> {
   const startTime = Date.now();
   
   try {
@@ -663,21 +663,41 @@ export async function conversationProcessingNode(state: AgentState): Promise<Par
       return state;
     }
     
-    // Generate conversational response
-    const processingResult: ConversationProcessingResult = await generateConversationalResponse(message, state);
+    console.log(`[CONVERSATION_PROCESSING] ${agent.name || 'Agent'} processing: "${message.message}"`);
+    
+    // Generate conversational response using agent's prompter
+    let response: string;
+    if (agent && agent.prompter) {
+      try {
+        // Build conversation history for prompter
+        const history = agent.buildConversationHistory(state);
+        
+        // Use agent's prompter to generate response
+        response = await agent.prompter.promptConvo(history);
+        console.log(`[CONVERSATION_PROCESSING] ${agent.name || 'Agent'} generated response: "${response}"`);
+        
+      } catch (prompterError) {
+        console.error('[CONVERSATION_PROCESSING] Error using prompter:', prompterError);
+        response = 'I apologize, but I\'m having trouble processing that right now.';
+      }
+    } else {
+      // Fallback to simple response generation
+      const processingResult: ConversationProcessingResult = await generateConversationalResponse(message, state);
+      response = processingResult.response;
+    }
     
     // Update executive state with response
-    state.executive.conversationalResponse = processingResult.response;
+    state.executive.conversationalResponse = response;
     
     // Record response in history
     const responseRecord = {
       source: message.source,
       message: message.message,
-      response: processingResult.response,
+      response: response,
       timestamp: Date.now(),
       processingMode: 'conversational' as const,
       responseTime: Date.now() - startTime,
-      success: processingResult.confidence > 0.5
+      success: true
     };
     
     state.executive.responseHistory.push(responseRecord);
@@ -689,6 +709,14 @@ export async function conversationProcessingNode(state: AgentState): Promise<Par
     }
     
     // Update conversation context in episodic memory
+    const processingResult: ConversationProcessingResult = {
+      response,
+      processingTime: Date.now() - startTime,
+      confidence: 0.8,
+      personalityAlignment: 0.8,
+      contextUpdated: true,
+      followUpActions: []
+    };
     await updateConversationContext(state, message, processingResult);
     
     // Update cognitive processing state
@@ -749,14 +777,20 @@ export async function conversationProcessingNode(state: AgentState): Promise<Par
 /**
  * Response Routing Node - Route responses back to users or continue with action processing
  */
-export async function responseRoutingNode(state: AgentState): Promise<Partial<AgentState>> {
+export async function responseRoutingNode(state: AgentState, agent: any): Promise<Partial<AgentState>> {
   const startTime = Date.now();
   
   try {
     // Check if we have a conversational response to send
     if (state.executive.conversationalResponse && state.executive.processingMode === 'conversational') {
-      // Send response to user (this would integrate with the chat system)
-      await sendResponseToUser(state);
+      const lastResponse = state.executive.lastResponse;
+      
+      if (lastResponse && agent) {
+        console.log(`[RESPONSE_ROUTING] ${agent.name || 'Agent'} sending response to ${lastResponse.source}: "${lastResponse.response}"`);
+        
+        // Use agent's routeResponse method to send the response
+        await agent.routeResponse(lastResponse.source, lastResponse.response);
+      }
       
       // Clear the conversational response after sending
       state.executive.conversationalResponse = undefined;
@@ -959,14 +993,11 @@ async function updateConversationContext(state: AgentState, message: any, proces
 }
 
 async function sendResponseToUser(state: AgentState): Promise<void> {
-  // This would integrate with the existing chat/routing system
-  // For now, we'll just log the response
+  // This function is now handled directly in responseRoutingNode
+  // Keeping this for backward compatibility but it's no longer used
   const lastResponse = state.executive.lastResponse;
   if (lastResponse) {
-    console.log(`[ROUTING] Sending response to ${lastResponse.source}: "${lastResponse.response}"`);
-    
-    // The actual response routing will be handled by the agent's routeResponse method
-    // This node just signals that routing should occur
+    console.log(`[ROUTING] Response ready for ${lastResponse.source}: "${lastResponse.response}"`);
   }
 }
 

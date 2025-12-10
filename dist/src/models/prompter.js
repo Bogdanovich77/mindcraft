@@ -47,6 +47,15 @@ export class Prompter {
         this.cooldown = this.profile.cooldown ? this.profile.cooldown : 0;
         this.last_prompt_time = 0;
         this.awaiting_coding = false;
+        // Memory management settings
+        this.conversationHistoryLimit = 50;
+        this.memoryCleanupInterval = 60000; // 1 minute
+        this.lastMemoryCleanup = Date.now();
+        this.memoryUsageTracker = {
+            initialMemory: process.memoryUsage(),
+            peakMemory: process.memoryUsage(),
+            lastCheck: Date.now()
+        };
         // for backwards compatibility, move max_tokens to params
         let max_tokens = null;
         if (this.profile.max_tokens)
@@ -135,6 +144,46 @@ export class Prompter {
         if (prompt.includes('$ACTION')) {
             prompt = prompt.replaceAll('$ACTION', this.agent.actions.currentActionLabel);
         }
+        // New action context placeholders for LangGraph agents
+        if (prompt.includes('$CURRENT_GOAL')) {
+            let currentGoal = 'No active goal';
+            if (this.agent.agentState && this.agent.agentState.cognitive && this.agent.agentState.cognitive.goals && this.agent.agentState.cognitive.goals.activeGoals && this.agent.agentState.cognitive.goals.activeGoals.length > 0) {
+                const activeGoal = this.agent.agentState.cognitive.goals.activeGoals[0];
+                currentGoal = `${activeGoal.description} (${Math.round(activeGoal.progress.percentage || 0)}% complete)`;
+            }
+            prompt = prompt.replaceAll('$CURRENT_GOAL', currentGoal);
+        }
+        if (prompt.includes('$CURRENT_ACTION')) {
+            let currentAction = 'No current action';
+            if (this.agent.agentState && this.agent.agentState.executive && this.agent.agentState.executive.currentAction) {
+                const action = this.agent.agentState.executive.currentAction;
+                currentAction = `${action.type}${action.parameters ? ' - ' + JSON.stringify(action.parameters) : ''}`;
+            }
+            prompt = prompt.replaceAll('$CURRENT_ACTION', currentAction);
+        }
+        if (prompt.includes('$ACTION_PROGRESS')) {
+            let actionProgress = 'No action in progress';
+            if (this.agent.agentState && this.agent.agentState.executive && this.agent.agentState.executive.currentAction) {
+                const action = this.agent.agentState.executive.currentAction;
+                actionProgress = `Status: ${action.status || 'unknown'}`;
+                if (action.startTime) {
+                    const elapsed = Date.now() - action.startTime;
+                    actionProgress += `, Time elapsed: ${Math.round(elapsed / 1000)}s`;
+                }
+            }
+            prompt = prompt.replaceAll('$ACTION_PROGRESS', actionProgress);
+        }
+        if (prompt.includes('$RECENT_ACTIONS')) {
+            let recentActions = 'No recent actions';
+            if (this.agent.agentState && this.agent.agentState.executive && this.agent.agentState.executive.decisionHistory && this.agent.agentState.executive.decisionHistory.length > 0) {
+                const recent = this.agent.agentState.executive.decisionHistory.slice(-3).reverse();
+                recentActions = recent.map(decision => {
+                    const time = new Date(decision.timestamp).toLocaleTimeString();
+                    return `${time}: ${decision.action || decision.selected} -> ${decision.outcome || 'unknown'}`;
+                }).join('\n');
+            }
+            prompt = prompt.replaceAll('$RECENT_ACTIONS', recentActions);
+        }
         if (prompt.includes('$COMMAND_DOCS'))
             prompt = prompt.replaceAll('$COMMAND_DOCS', getCommandDocs(this.agent));
         if (prompt.includes('$CODE_DOCS')) {
@@ -190,6 +239,8 @@ export class Prompter {
     async promptConvo(messages) {
         this.most_recent_msg_time = Date.now();
         let current_msg_time = this.most_recent_msg_time;
+        // Check if memory cleanup is needed
+        this.checkMemoryUsage();
         for (let i = 0; i < 3; i++) { // try 3 times to avoid hallucinations
             await this.checkCooldown();
             if (current_msg_time !== this.most_recent_msg_time) {
@@ -221,7 +272,7 @@ export class Prompter {
                 return '';
             }
             if (generation?.includes('</think>')) {
-                const [_, afterThink] = generation.split('</think>');
+                const [_, afterThink] = generation.split('<think>');
                 generation = afterThink;
             }
             return generation;
@@ -320,5 +371,78 @@ export class Prompter {
         await fs.mkdir(logDir, { recursive: true });
         logFile = path.join(logDir, logFile);
         await fs.appendFile(logFile, String(logEntry), 'utf-8');
+    }
+    /**
+     * Check memory usage and perform cleanup if needed
+     */
+    checkMemoryUsage() {
+        const now = Date.now();
+        // Check memory usage at regular intervals
+        if (now - this.memoryUsageTracker.lastCheck > 30000) { // Every 30 seconds
+            const currentMemory = process.memoryUsage();
+            this.memoryUsageTracker.lastCheck = now;
+            // Update peak memory if current is higher
+            if (currentMemory.heapUsed > this.memoryUsageTracker.peakMemory.heapUsed) {
+                this.memoryUsageTracker.peakMemory = currentMemory;
+            }
+            // Log memory usage
+            console.log(`[MEMORY] ${this.agent.name} - Current: ${Math.round(currentMemory.heapUsed / 1024 / 1024)}MB, Peak: ${Math.round(this.memoryUsageTracker.peakMemory.heapUsed / 1024 / 1024)}MB`);
+            // Trigger garbage collection if memory usage is high
+            if (currentMemory.heapUsed > 500 * 1024 * 1024) { // 500MB threshold
+                console.log(`[MEMORY] High memory usage detected for ${this.agent.name}, triggering garbage collection`);
+                if (global.gc) {
+                    global.gc();
+                }
+            }
+        }
+        // Perform periodic cleanup
+        if (now - this.lastMemoryCleanup > this.memoryCleanupInterval) {
+            this.performMemoryCleanup();
+            this.lastMemoryCleanup = now;
+        }
+    }
+    /**
+     * Perform memory cleanup tasks
+     */
+    performMemoryCleanup() {
+        try {
+            console.log(`[MEMORY] Performing cleanup for ${this.agent.name}`);
+            // Clean up conversation examples if they exist
+            if (this.convo_examples && this.convo_examples.cleanup) {
+                this.convo_examples.cleanup();
+            }
+            if (this.coding_examples && this.coding_examples.cleanup) {
+                this.coding_examples.cleanup();
+            }
+            // Trigger garbage collection if available
+            if (global.gc) {
+                global.gc();
+                console.log(`[MEMORY] Garbage collection triggered for ${this.agent.name}`);
+            }
+        }
+        catch (error) {
+            console.error(`[MEMORY] Error during cleanup for ${this.agent.name}:`, error);
+        }
+    }
+    /**
+     * Get memory usage statistics
+     */
+    getMemoryStats() {
+        const currentMemory = process.memoryUsage();
+        return {
+            current: {
+                heapUsed: Math.round(currentMemory.heapUsed / 1024 / 1024),
+                heapTotal: Math.round(currentMemory.heapTotal / 1024 / 1024),
+                external: Math.round(currentMemory.external / 1024 / 1024)
+            },
+            peak: {
+                heapUsed: Math.round(this.memoryUsageTracker.peakMemory.heapUsed / 1024 / 1024),
+                heapTotal: Math.round(this.memoryUsageTracker.peakMemory.heapTotal / 1024 / 1024)
+            },
+            initial: {
+                heapUsed: Math.round(this.memoryUsageTracker.initialMemory.heapUsed / 1024 / 1024),
+                heapTotal: Math.round(this.memoryUsageTracker.initialMemory.heapTotal / 1024 / 1024)
+            }
+        };
     }
 }

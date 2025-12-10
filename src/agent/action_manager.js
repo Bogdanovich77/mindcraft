@@ -25,6 +25,13 @@ export class ActionManager {
 
     async stop() {
         if (!this.executing) return;
+        
+        // Clean up event listeners before stopping
+        if (this.agent.bot && this.agent.bot.removeAllListeners) {
+            this.agent.bot.removeAllListeners('error');
+            this.agent.bot.removeAllListeners('collectBlock_finished');
+        }
+        
         const timeout = setTimeout(() => {
             this.agent.cleanKill('Code execution refused stop after 10 seconds. Killing process.');
         }, 10000);
@@ -86,6 +93,15 @@ export class ActionManager {
             // also tell agent.bot to stop various actions
             if (this.executing) {
                 console.log(`action "${actionLabel}" trying to interrupt current action "${this.currentActionLabel}"`);
+                
+                // Add force timeout for stuck operations
+                const forceTimeout = setTimeout(() => {
+                    console.warn('Force stopping stuck action');
+                    this.agent.requestInterrupt();
+                    this.executing = false;
+                    this.currentActionLabel = '';
+                    this.currentActionFn = null;
+                }, 30000); // 30 second force timeout
             }
             await this.stop();
 

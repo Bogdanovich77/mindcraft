@@ -384,8 +384,8 @@ constructor(bot: Bot) {
       
       if (processingMode === "conversational") {
         // Conversation processing flow
-        state = { ...state, ...(await conversationProcessingNode(state)) };
-        state = { ...state, ...(await responseRoutingNode(state)) };
+        state = { ...state, ...(await conversationProcessingNode(state, agent)) };
+        state = { ...state, ...(await responseRoutingNode(state, agent)) };
       } else {
         // Cognitive processing flow
         state = { ...state, ...(await analysisNode(state)) };
@@ -399,7 +399,7 @@ constructor(bot: Bot) {
         }
         
         // Route through response routing for unified flow
-        state = { ...state, ...(await responseRoutingNode(state)) };
+        state = { ...state, ...(await responseRoutingNode(state, agent)) };
       }
       
       // Update agent state

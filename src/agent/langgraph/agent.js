@@ -111,12 +111,12 @@ export class LangGraphAgent {
         this.stateGraph = new StateGraph(AgentStateAnnotation)
             .addNode('perception', this.handlePerception.bind(this))
             .addNode('message_analysis', messageAnalysisNode)
-            .addNode('conversation_processing', conversationProcessingNode)
+            .addNode('conversation_processing', (state) => conversationProcessingNode(state, this))
             .addNode('reactive_check', this.handleReactiveCheck.bind(this))
             .addNode('cognitive_processing', this.handleCognitiveProcessing.bind(this))
             .addNode('action_execution', this.handleActionExecution.bind(this))
             .addNode('learning_update', this.handleLearningUpdate.bind(this))
-            .addNode('response_routing', responseRoutingNode)
+            .addNode('response_routing', (state) => responseRoutingNode(state, this))
             .addEdge(START, 'perception')
             .addEdge('perception', 'message_analysis')
             .addConditionalEdges(
@@ -343,6 +343,17 @@ export class LangGraphAgent {
             
         } catch (error) {
             console.error('Error handling message:', error);
+            
+            // Handle protocol errors gracefully
+            if (error.message && error.message.includes('PartialReadError')) {
+                console.log('Protocol error in LangGraph agent, ignoring message');
+                return;
+            }
+            
+            // Clear the message to prevent reprocessing
+            if (this.agentState && this.agentState.context) {
+                this.agentState.context.lastMessage = undefined;
+            }
         }
     }
 
@@ -359,14 +370,7 @@ export class LangGraphAgent {
             // Update context with null checks
             this.updateContext();
             
-            // Check if this is a conversational message that needs immediate processing
-            if (this.agentState.context.lastMessage &&
-                this.determineProcessingMode(this.agentState) === 'conversational') {
-                await this.processConversationalMessage();
-                return;
-            }
-            
-            // Run through state graph for action processing
+            // Run through state graph for all processing (conversation and action)
             const result = await this.compiledGraph.invoke(this.agentState);
             
             // Update agent state with result
