@@ -31,6 +31,16 @@ export class LangGraphAgent {
         this.isInitialized = false;
         this.prompter = null;
         this.conversationHistory = [];
+        
+        // Memory management settings
+        this.responseHistoryLimit = 100;
+        this.memoryCleanupInterval = 60000; // 1 minute
+        this.lastMemoryCleanup = Date.now();
+        this.memoryUsageTracker = {
+            initialMemory: process.memoryUsage(),
+            peakMemory: process.memoryUsage(),
+            lastCheck: Date.now()
+        };
     }
 
     /**
@@ -381,6 +391,21 @@ export class LangGraphAgent {
             const message = this.agentState.context.lastMessage;
             if (!message) return;
             
+            // Check for duplicate message to prevent infinite loops
+            const recentMessages = this.agentState.executive.responseHistory || [];
+            const isDuplicate = recentMessages.some(record =>
+                record.message === message.message &&
+                record.source === message.source &&
+                (Date.now() - record.timestamp) < 5000 // Within 5 seconds
+            );
+            
+            if (isDuplicate) {
+                console.log(`${this.name} detected duplicate message, skipping processing`);
+                // Clear the message from context to prevent reprocessing
+                this.agentState.context.lastMessage = undefined;
+                return;
+            }
+            
             console.log(`${this.name} processing conversational message: "${message.message}"`);
             
             // Generate response using prompter
@@ -402,6 +427,14 @@ export class LangGraphAgent {
             
             this.agentState.executive.responseHistory.push(responseRecord);
             this.agentState.executive.lastResponse = responseRecord;
+            
+            // Limit conversation history to prevent memory buildup
+            if (this.agentState.executive.responseHistory.length > this.responseHistoryLimit) {
+                this.agentState.executive.responseHistory = this.agentState.executive.responseHistory.slice(-this.responseHistoryLimit);
+            }
+            
+            // Check if memory cleanup is needed
+            this.checkMemoryUsage();
             
             // Clear the message from context
             this.agentState.context.lastMessage = undefined;
@@ -542,7 +575,8 @@ export class LangGraphAgent {
             'get', 'take', 'pick up', 'collect',
             'craft', 'build', 'place', 'break',
             'attack', 'fight', 'defend',
-            'follow', 'stop', 'wait', '!'
+            'follow', 'stop', 'wait', '!',
+            '!goal'
         ];
         
         const isActionCommand = actionCommands.some(cmd => message.includes(cmd));
@@ -558,7 +592,8 @@ export class LangGraphAgent {
             'get', 'take', 'pick up', 'collect',
             'craft', 'build', 'place', 'break',
             'attack', 'fight', 'defend',
-            'follow', 'stop', 'wait'
+            'follow', 'stop', 'wait',
+            '!goal'
         ];
         
         const isActionCommand = actionCommands.some(cmd => lowerMessage.includes(cmd));
@@ -615,6 +650,15 @@ export class LangGraphAgent {
     buildConversationHistory(state) {
         const history = [];
         
+        // Add action context as system message at the beginning
+        const actionContext = this.buildActionContext(state);
+        if (actionContext) {
+            history.push({
+                role: 'system',
+                content: actionContext
+            });
+        }
+        
         // Add recent conversation history
         const recentResponses = state.executive.responseHistory.slice(-5);
         
@@ -638,6 +682,56 @@ export class LangGraphAgent {
         }
         
         return history;
+    }
+    
+    /**
+     * Build action context information for conversation
+     */
+    buildActionContext(state) {
+        let context = "Current Action Context:\n";
+        
+        // Add current goal information
+        if (state.cognitive && state.cognitive.goals && state.cognitive.goals.activeGoals && state.cognitive.goals.activeGoals.length > 0) {
+            const activeGoal = state.cognitive.goals.activeGoals[0];
+            context += `- Current Goal: ${activeGoal.description} (${Math.round(activeGoal.progress.percentage || 0)}% complete)\n`;
+        } else {
+            context += "- Current Goal: No active goal\n";
+        }
+        
+        // Add current action information
+        if (state.executive && state.executive.currentAction) {
+            const action = state.executive.currentAction;
+            context += `- Current Action: ${action.type}`;
+            if (action.parameters) {
+                context += ` - ${JSON.stringify(action.parameters)}`;
+            }
+            context += `\n`;
+            
+            // Add action progress
+            context += `- Action Progress: Status: ${action.status || 'unknown'}`;
+            if (action.startTime) {
+                const elapsed = Date.now() - action.startTime;
+                context += `, Time elapsed: ${Math.round(elapsed / 1000)}s`;
+            }
+            context += `\n`;
+        } else {
+            context += "- Current Action: No current action\n";
+            context += "- Action Progress: No action in progress\n";
+        }
+        
+        // Add recent actions
+        if (state.executive && state.executive.decisionHistory && state.executive.decisionHistory.length > 0) {
+            const recent = state.executive.decisionHistory.slice(-3).reverse();
+            context += "- Recent Actions:\n";
+            recent.forEach(decision => {
+                const time = new Date(decision.timestamp).toLocaleTimeString();
+                context += `  * ${time}: ${decision.action || decision.selected} -> ${decision.outcome || 'unknown'}\n`;
+            });
+        } else {
+            context += "- Recent Actions: No recent actions\n";
+        }
+        
+        return context;
     }
 
     /**
@@ -858,10 +952,101 @@ export class LangGraphAgent {
      * Check if agent is ready
      */
     isReady() {
-        return this.isInitialized && 
-               this.purposeCore && 
+        return this.isInitialized &&
+               this.purposeCore &&
                this.purposeCore.isReady() &&
                this.agentState !== null;
+    }
+
+    /**
+     * Check memory usage and perform cleanup if needed
+     */
+    checkMemoryUsage() {
+        const now = Date.now();
+        
+        // Check memory usage at regular intervals
+        if (now - this.memoryUsageTracker.lastCheck > 30000) { // Every 30 seconds
+            const currentMemory = process.memoryUsage();
+            this.memoryUsageTracker.lastCheck = now;
+            
+            // Update peak memory if current is higher
+            if (currentMemory.heapUsed > this.memoryUsageTracker.peakMemory.heapUsed) {
+                this.memoryUsageTracker.peakMemory = currentMemory;
+            }
+            
+            // Log memory usage
+            console.log(`[MEMORY] ${this.name} - Current: ${Math.round(currentMemory.heapUsed / 1024 / 1024)}MB, Peak: ${Math.round(this.memoryUsageTracker.peakMemory.heapUsed / 1024 / 1024)}MB`);
+            
+            // Trigger garbage collection if memory usage is high
+            if (currentMemory.heapUsed > 500 * 1024 * 1024) { // 500MB threshold
+                console.log(`[MEMORY] High memory usage detected for ${this.name}, triggering garbage collection`);
+                if (global.gc) {
+                    global.gc();
+                }
+            }
+        }
+        
+        // Perform periodic cleanup
+        if (now - this.lastMemoryCleanup > this.memoryCleanupInterval) {
+            this.performMemoryCleanup();
+            this.lastMemoryCleanup = now;
+        }
+    }
+
+    /**
+     * Perform memory cleanup tasks
+     */
+    performMemoryCleanup() {
+        try {
+            console.log(`[MEMORY] Performing cleanup for ${this.name}`);
+            
+            // Clean up response history if it exceeds limit
+            if (this.agentState && this.agentState.executive && this.agentState.executive.responseHistory) {
+                if (this.agentState.executive.responseHistory.length > this.responseHistoryLimit) {
+                    this.agentState.executive.responseHistory = this.agentState.executive.responseHistory.slice(-this.responseHistoryLimit);
+                    console.log(`[MEMORY] Trimmed response history to ${this.responseHistoryLimit} entries`);
+                }
+            }
+            
+            // Clean up decision history if it exists
+            if (this.agentState && this.agentState.executive && this.agentState.executive.decisionHistory) {
+                if (this.agentState.executive.decisionHistory.length > 100) {
+                    this.agentState.executive.decisionHistory = this.agentState.executive.decisionHistory.slice(-100);
+                    console.log(`[MEMORY] Trimmed decision history to 100 entries`);
+                }
+            }
+            
+            // Trigger garbage collection if available
+            if (global.gc) {
+                global.gc();
+                console.log(`[MEMORY] Garbage collection triggered for ${this.name}`);
+            }
+            
+        } catch (error) {
+            console.error(`[MEMORY] Error during cleanup for ${this.name}:`, error);
+        }
+    }
+
+    /**
+     * Get memory usage statistics
+     */
+    getMemoryStats() {
+        const currentMemory = process.memoryUsage();
+        return {
+            current: {
+                heapUsed: Math.round(currentMemory.heapUsed / 1024 / 1024),
+                heapTotal: Math.round(currentMemory.heapTotal / 1024 / 1024),
+                external: Math.round(currentMemory.external / 1024 / 1024)
+            },
+            peak: {
+                heapUsed: Math.round(this.memoryUsageTracker.peakMemory.heapUsed / 1024 / 1024),
+                heapTotal: Math.round(this.memoryUsageTracker.peakMemory.heapTotal / 1024 / 1024)
+            },
+            initial: {
+                heapUsed: Math.round(this.memoryUsageTracker.initialMemory.heapUsed / 1024 / 1024),
+                heapTotal: Math.round(this.memoryUsageTracker.initialMemory.heapTotal / 1024 / 1024)
+            }
+        };
     }
 }
 

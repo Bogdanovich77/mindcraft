@@ -39,6 +39,11 @@ export async function perceptionNode(state: AgentState): Promise<Partial<AgentSt
     
     state.cognitive.processing.processingHistory.push(processingRecord);
     
+    // Limit processing history to prevent memory buildup
+    if (state.cognitive.processing.processingHistory.length > 100) {
+        state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+    }
+    
     return {
       context: updatedContext,
       cognitive: {
@@ -100,6 +105,11 @@ export async function analysisNode(state: AgentState): Promise<Partial<AgentStat
     };
     
     state.cognitive.processing.processingHistory.push(processingRecord);
+    
+    // Limit processing history to prevent memory buildup
+    if (state.cognitive.processing.processingHistory.length > 100) {
+        state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+    }
     
     return {
       cognitive: {
@@ -166,6 +176,11 @@ export async function planningNode(state: AgentState): Promise<Partial<AgentStat
     };
     
     state.cognitive.processing.processingHistory.push(processingRecord);
+    
+    // Limit processing history to prevent memory buildup
+    if (state.cognitive.processing.processingHistory.length > 100) {
+        state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+    }
     
     return {
       cognitive: {
@@ -267,6 +282,11 @@ export async function decisionNode(state: AgentState): Promise<Partial<AgentStat
     
     state.cognitive.processing.processingHistory.push(processingRecord);
     
+    // Limit processing history to prevent memory buildup
+    if (state.cognitive.processing.processingHistory.length > 100) {
+        state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+    }
+    
     return {
       executive: {
         ...state.executive,
@@ -348,6 +368,11 @@ export async function executionNode(state: AgentState): Promise<Partial<AgentSta
     
     state.cognitive.processing.processingHistory.push(processingRecord);
     
+    // Limit processing history to prevent memory buildup
+    if (state.cognitive.processing.processingHistory.length > 100) {
+        state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+    }
+    
     return {
       executive: {
         ...state.executive,
@@ -397,6 +422,27 @@ export async function reflectionNode(state: AgentState): Promise<Partial<AgentSt
     await updateEpisodicMemory(state, recentExperiences);
     await updateProceduralMemory(state, recentExperiences);
     
+    // Perform memory cleanup
+    if (state.metadata && state.metadata.agentId) {
+      checkMemoryUsage(state.metadata.agentId);
+    }
+    
+    // Clean up episodic memory if needed
+    if (state.cognitive && state.cognitive.memory && state.cognitive.memory.episodic && state.cognitive.memory.episodic.episodes) {
+      state.cognitive.memory.episodic.episodes = cleanupEpisodicMemory(
+        state.cognitive.memory.episodic.episodes,
+        100 // Keep max 100 episodes
+      );
+    }
+    
+    // Clean up working memory buffer if needed
+    if (state.cognitive && state.cognitive.memory && state.cognitive.memory.working && state.cognitive.memory.working.buffer) {
+      state.cognitive.memory.working.buffer = cleanupWorkingMemory(
+        state.cognitive.memory.working.buffer,
+        50 // Keep max 50 buffer entries
+      );
+    }
+    
     // Update skills based on experience
     await updateSkillProficiencies(state, recentExperiences);
     
@@ -421,6 +467,11 @@ export async function reflectionNode(state: AgentState): Promise<Partial<AgentSt
     };
     
     state.cognitive.processing.processingHistory.push(processingRecord);
+    
+    // Limit processing history to prevent memory buildup
+    if (state.cognitive.processing.processingHistory.length > 100) {
+        state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+    }
     
     return {
       cognitive: {
@@ -548,6 +599,11 @@ export async function messageAnalysisNode(state: AgentState): Promise<Partial<Ag
     
     state.cognitive.processing.processingHistory.push(processingRecord);
     
+    // Limit processing history to prevent memory buildup
+    if (state.cognitive.processing.processingHistory.length > 100) {
+        state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+    }
+    
     return {
       executive: {
         ...state.executive,
@@ -592,6 +648,21 @@ export async function conversationProcessingNode(state: AgentState): Promise<Par
     
     const message = state.context.lastMessage;
     
+    // Check for duplicate message to prevent infinite loops
+    const recentMessages = state.executive.responseHistory || [];
+    const isDuplicate = recentMessages.some(record =>
+      record.message === message.message &&
+      record.source === message.source &&
+      (Date.now() - record.timestamp) < 5000 // Within 5 seconds
+    );
+    
+    if (isDuplicate) {
+      console.log('[CONVERSATION_PROCESSING] Detected duplicate message, skipping processing');
+      // Clear the message to prevent reprocessing
+      state.context.lastMessage = undefined;
+      return state;
+    }
+    
     // Generate conversational response
     const processingResult: ConversationProcessingResult = await generateConversationalResponse(message, state);
     
@@ -611,6 +682,11 @@ export async function conversationProcessingNode(state: AgentState): Promise<Par
     
     state.executive.responseHistory.push(responseRecord);
     state.executive.lastResponse = responseRecord;
+    
+    // Limit conversation history to prevent memory buildup
+    if (state.executive.responseHistory.length > 100) {
+        state.executive.responseHistory = state.executive.responseHistory.slice(-100);
+    }
     
     // Update conversation context in episodic memory
     await updateConversationContext(state, message, processingResult);
@@ -634,6 +710,11 @@ export async function conversationProcessingNode(state: AgentState): Promise<Par
     };
     
     state.cognitive.processing.processingHistory.push(processingRecord);
+    
+    // Limit processing history to prevent memory buildup
+    if (state.cognitive.processing.processingHistory.length > 100) {
+        state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+    }
     
     return {
       executive: {
@@ -701,6 +782,11 @@ export async function responseRoutingNode(state: AgentState): Promise<Partial<Ag
     };
     
     state.cognitive.processing.processingHistory.push(processingRecord);
+    
+    // Limit processing history to prevent memory buildup
+    if (state.cognitive.processing.processingHistory.length > 100) {
+        state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+    }
     
     return {
       context: state.context,
@@ -894,7 +980,8 @@ function checkIfActionCommand(message: string): boolean {
     'get', 'take', 'pick up', 'collect',
     'craft', 'build', 'place', 'break',
     'attack', 'fight', 'defend',
-    'follow', 'stop', 'wait'
+    'follow', 'stop', 'wait',
+    '!goal'
   ];
   
   const lowerMessage = message.toLowerCase();
@@ -1216,3 +1303,116 @@ function getEmergencyPriority(emergencyType: string): InterruptPriority {
       return InterruptPriority.COGNITIVE;
   }
 }
+
+// ============================================================================
+// MEMORY MANAGEMENT UTILITIES
+// ============================================================================
+
+/**
+ * Check memory usage and perform cleanup if needed
+ */
+export function checkMemoryUsage(agentId: string = 'unknown'): void {
+  const now = Date.now();
+  
+  // Check memory usage at regular intervals
+  if (now - (global as any).lastMemoryCheck > 30000) { // Every 30 seconds
+    const currentMemory = process.memoryUsage();
+    (global as any).lastMemoryCheck = now;
+    
+    // Update peak memory if current is higher
+    if (!(global as any).peakMemory || currentMemory.heapUsed > (global as any).peakMemory.heapUsed) {
+      (global as any).peakMemory = currentMemory;
+    }
+    
+    // Log memory usage
+    console.log(`[MEMORY] ${agentId} - Current: ${Math.round(currentMemory.heapUsed / 1024 / 1024)}MB, Peak: ${Math.round((global as any).peakMemory.heapUsed / 1024 / 1024)}MB`);
+    
+    // Trigger garbage collection if memory usage is high
+    if (currentMemory.heapUsed > 500 * 1024 * 1024) { // 500MB threshold
+      console.log(`[MEMORY] High memory usage detected for ${agentId}, triggering garbage collection`);
+      if (global.gc) {
+        global.gc();
+      }
+    }
+  }
+}
+
+/**
+ * Perform memory cleanup tasks
+ */
+export function performMemoryCleanup(agentId: string = 'unknown'): void {
+  try {
+    console.log(`[MEMORY] Performing cleanup for ${agentId}`);
+    
+    // Trigger garbage collection if available
+    if (global.gc) {
+      global.gc();
+      console.log(`[MEMORY] Garbage collection triggered for ${agentId}`);
+    }
+    
+  } catch (error) {
+    console.error(`[MEMORY] Error during cleanup for ${agentId}:`, error);
+  }
+}
+
+/**
+ * Get memory usage statistics
+ */
+export function getMemoryStats(): any {
+  const currentMemory = process.memoryUsage();
+  return {
+    current: {
+      heapUsed: Math.round(currentMemory.heapUsed / 1024 / 1024),
+      heapTotal: Math.round(currentMemory.heapTotal / 1024 / 1024),
+      external: Math.round(currentMemory.external / 1024 / 1024)
+    },
+    peak: {
+      heapUsed: Math.round((global as any).peakMemory?.heapUsed / 1024 / 1024 || 0),
+      heapTotal: Math.round((global as any).peakMemory?.heapTotal / 1024 / 1024 || 0)
+    }
+  };
+}
+
+/**
+ * Initialize memory tracking
+ */
+export function initializeMemoryTracking(): void {
+  (global as any).lastMemoryCheck = Date.now();
+  (global as any).peakMemory = process.memoryUsage();
+  console.log('[MEMORY] Memory tracking initialized');
+}
+
+/**
+ * Clean up old episodic memories
+ */
+export function cleanupEpisodicMemory(episodes: any[], maxEntries: number = 100): any[] {
+  if (episodes.length <= maxEntries) {
+    return episodes;
+  }
+  
+  // Keep the most recent episodes
+  const sortedEpisodes = episodes.sort((a, b) => b.timestamp - a.timestamp);
+  const keptEpisodes = sortedEpisodes.slice(0, maxEntries);
+  
+  console.log(`[MEMORY] Cleaned up episodic memory: ${episodes.length - keptEpisodes.length} old entries removed`);
+  return keptEpisodes;
+}
+
+/**
+ * Clean up old working memory buffer
+ */
+export function cleanupWorkingMemory(buffer: any[], maxEntries: number = 50): any[] {
+  if (buffer.length <= maxEntries) {
+    return buffer;
+  }
+  
+  // Keep the most recent buffer entries
+  const sortedBuffer = buffer.sort((a, b) => b.timestamp - a.timestamp);
+  const keptBuffer = sortedBuffer.slice(0, maxEntries);
+  
+  console.log(`[MEMORY] Cleaned up working memory buffer: ${buffer.length - keptBuffer.length} old entries removed`);
+  return keptBuffer;
+}
+
+// Initialize memory tracking on module load
+initializeMemoryTracking();
