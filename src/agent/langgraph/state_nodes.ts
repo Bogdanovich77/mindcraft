@@ -3,7 +3,7 @@
  * Defines the core processing nodes: perception, analysis, planning, decision, execution, and reflection
  */
 
-import { AgentState, ProcessingPhase, AgentAction, DecisionOption, WorldContext, InterruptPriority, MessageAnalysis, ConversationContext, ConversationProcessingResult } from './interfaces.js';
+import { AgentState, ProcessingPhase, AgentAction, DecisionOption, WorldContext, InterruptPriority, MessageAnalysis, ConversationContext, ConversationProcessingResult, SocialState, DecisionContext } from './interfaces.js';
 import { InterruptController } from './interrupt_controller.js';
 
 /**
@@ -19,9 +19,18 @@ export async function perceptionNode(state: AgentState): Promise<Partial<AgentSt
     // Process sensory information
     const sensoryData = await processSensoryInput(updatedContext);
     
+    // Process social context information
+    const socialContext = await processSocialContext(updatedContext, state.cognitive.social);
+    
     // Update cognitive processing state
     state.cognitive.processing.currentPhase = ProcessingPhase.PERCEPTION;
     state.cognitive.processing.cognitiveLoad = calculateCognitiveLoad(sensoryData);
+    
+    // Update social state with new context
+    if (socialContext.nearbyAgents.length > 0) {
+      state.cognitive.social.socialContext.nearbyAgents = socialContext.nearbyAgents;
+      state.cognitive.social.socialContext.currentSituation = socialContext.currentSituation;
+    }
     
     // Store processing record
     const processingRecord = {
@@ -33,7 +42,9 @@ export async function perceptionNode(state: AgentState): Promise<Partial<AgentSt
       details: {
         entitiesProcessed: sensoryData.entities.length,
         blocksProcessed: sensoryData.blocks.length,
-        contextUpdates: sensoryData.updates.length
+        contextUpdates: sensoryData.updates.length,
+        socialAgentsDetected: socialContext.nearbyAgents.length,
+        socialSituation: socialContext.currentSituation.type
       }
     };
     
@@ -48,6 +59,7 @@ export async function perceptionNode(state: AgentState): Promise<Partial<AgentSt
       context: updatedContext,
       cognitive: {
         ...state.cognitive,
+        social: state.cognitive.social,
         processing: state.cognitive.processing
       }
     };
@@ -79,13 +91,23 @@ export async function analysisNode(state: AgentState): Promise<Partial<AgentStat
     // Analyze current situation
     const situationAnalysis = await analyzeSituation(state);
     
+    // Analyze social context and relationships
+    const socialAnalysis = await analyzeSocialContext(state);
+    
     // Identify opportunities and threats
     const opportunities = await identifyOpportunities(state.context, situationAnalysis);
     const threats = await identifyThreats(state.context, situationAnalysis);
     
+    // Identify social opportunities and threats
+    const socialOpportunities = await identifySocialOpportunities(state, socialAnalysis);
+    const socialThreats = await identifySocialThreats(state, socialAnalysis);
+    
     // Update working memory with analysis results
     state.cognitive.memory.working.currentFocus = situationAnalysis.primaryFocus;
-    state.cognitive.memory.working.activeTasks = opportunities.map(opp => opp.id);
+    state.cognitive.memory.working.activeTasks = [
+      ...opportunities.map(opp => opp.id),
+      ...socialOpportunities.map(opp => `social_${opp.id}`)
+    ];
     
     // Update cognitive processing state
     state.cognitive.processing.currentPhase = ProcessingPhase.ANALYSIS;
@@ -100,7 +122,10 @@ export async function analysisNode(state: AgentState): Promise<Partial<AgentStat
       details: {
         opportunitiesFound: opportunities.length,
         threatsIdentified: threats.length,
-        primaryFocus: situationAnalysis.primaryFocus
+        socialOpportunitiesFound: socialOpportunities.length,
+        socialThreatsIdentified: socialThreats.length,
+        primaryFocus: situationAnalysis.primaryFocus,
+        socialSituation: socialAnalysis.currentSituation.type
       }
     };
     
@@ -118,6 +143,7 @@ export async function analysisNode(state: AgentState): Promise<Partial<AgentStat
           ...state.cognitive.memory,
           working: state.cognitive.memory.working
         },
+        social: state.cognitive.social,
         processing: state.cognitive.processing
       }
     };
@@ -220,6 +246,22 @@ export async function decisionNode(state: AgentState): Promise<Partial<AgentStat
     // Get available actions from queue
     const availableActions = state.executive.actionQueue.slice(0, 5); // Consider top 5 actions
     
+    // Create decision context with social information
+    const decisionContext: DecisionContext = {
+      currentTime: Date.now(),
+      availableTime: 2000, // 2 seconds for decision
+      cognitiveLoad: state.cognitive.processing.cognitiveLoad,
+      urgency: 0.5,
+      riskTolerance: state.cognitive.purpose.personality.riskTolerance,
+      nearbyAgents: state.cognitive.social.socialContext.nearbyAgents,
+      socialInfluence: await calculateSocialInfluence(state.cognitive.social),
+      socialContext: {
+        situation: state.cognitive.social.socialContext.currentSituation,
+        relationships: state.cognitive.social.relationships,
+        groupDynamics: state.cognitive.social.socialContext.groupDynamics
+      }
+    };
+    
     // Evaluate each action
     const decisionOptions: DecisionOption[] = await Promise.all(
       availableActions.map(async (action) => {
@@ -227,18 +269,22 @@ export async function decisionNode(state: AgentState): Promise<Partial<AgentStat
         const risk = await assessActionRisk(action, state);
         const outcome = await predictActionOutcome(action, state);
         
+        // Include social utility in decision making
+        const socialUtility = await calculateSocialUtility(action, decisionContext);
+        const totalUtility = utility + socialUtility;
+        
         return {
           action: action.id,
-          utility,
+          utility: totalUtility,
           risk,
           expectedOutcome: outcome,
-          reasoning: `Utility: ${utility.toFixed(2)}, Risk: ${risk.toFixed(2)}`
+          reasoning: `Utility: ${utility.toFixed(2)}, Social: ${socialUtility.toFixed(2)}, Risk: ${risk.toFixed(2)}`
         };
       })
     );
     
     // Select best action
-    const selectedOption = decisionOptions.reduce((best, current) => 
+    const selectedOption = decisionOptions.reduce((best, current) =>
       current.utility > best.utility ? current : best
     );
     
@@ -276,7 +322,9 @@ export async function decisionNode(state: AgentState): Promise<Partial<AgentStat
       details: {
         optionsEvaluated: decisionOptions.length,
         selectedUtility: selectedOption.utility,
-        selectedRisk: selectedOption.risk
+        selectedRisk: selectedOption.risk,
+        socialContext: decisionContext.socialContext.situation.type,
+        socialInfluence: decisionContext.socialInfluence
       }
     };
     
@@ -295,6 +343,7 @@ export async function decisionNode(state: AgentState): Promise<Partial<AgentStat
       },
       cognitive: {
         ...state.cognitive,
+        social: state.cognitive.social,
         processing: state.cognitive.processing
       }
     };
@@ -1236,6 +1285,51 @@ async function processSensoryInput(context: WorldContext): Promise<any> {
   };
 }
 
+async function processSocialContext(context: WorldContext, socialState: SocialState): Promise<any> {
+  // Process social context information from nearby entities
+  const nearbyAgents = context.nearbyEntities
+    .filter(entity => entity.type === 'player')
+    .map(entity => entity.id.toString());
+  
+  // Determine current social situation based on context
+  let currentSituation = {
+    type: 'neutral' as 'cooperation' | 'competition' | 'conflict' | 'neutral' | 'celebration' | 'trading',
+    participants: nearbyAgents,
+    goals: [],
+    resources: [],
+    powerDynamics: {}
+  };
+  
+  if (nearbyAgents.length > 1) {
+    // Multiple agents detected - potential for cooperation or competition
+    if (context.nearbyEntities.some(e => e.hostile)) {
+      currentSituation.type = 'conflict';
+    } else if (Math.random() > 0.5) {
+      currentSituation.type = 'cooperation';
+    } else {
+      currentSituation.type = 'competition';
+    }
+  } else if (nearbyAgents.length === 1) {
+    // Single agent detected - potential for trading or conversation
+    currentSituation.type = 'neutral';
+  }
+  
+  // Update group dynamics based on nearby agents
+  const groupDynamics = {
+    leader: socialState.socialContext.groupDynamics.leader,
+    cohesion: socialState.socialContext.groupDynamics.cohesion,
+    hierarchy: socialState.socialContext.groupDynamics.hierarchy,
+    roles: socialState.socialContext.groupDynamics.roles,
+    alliances: socialState.socialContext.groupDynamics.alliances
+  };
+  
+  return {
+    nearbyAgents,
+    currentSituation,
+    groupDynamics
+  };
+}
+
 function calculateCognitiveLoad(sensoryData: any): number {
   // Calculate cognitive load based on sensory input complexity
   return Math.min(1.0, sensoryData.entities.length * 0.1 + sensoryData.blocks.length * 0.05);
@@ -1250,12 +1344,81 @@ async function analyzeSituation(state: AgentState): Promise<any> {
   };
 }
 
+async function analyzeSocialContext(state: AgentState): Promise<any> {
+  // Analyze social context from state
+  const socialContext = state.cognitive.social;
+  
+  return {
+    currentSituation: socialContext.socialContext.currentSituation,
+    nearbyAgents: socialContext.socialContext.nearbyAgents,
+    groupDynamics: socialContext.socialContext.groupDynamics,
+    relationships: socialContext.relationships,
+    theoryOfMind: socialContext.theoryOfMind
+  };
+}
+
 async function identifyOpportunities(context: WorldContext, analysis: any): Promise<any[]> {
   return [];
 }
 
 async function identifyThreats(context: WorldContext, analysis: any): Promise<any[]> {
   return [];
+}
+
+async function identifySocialOpportunities(state: AgentState, socialAnalysis: any): Promise<any[]> {
+  const opportunities = [];
+  
+  // Identify collaboration opportunities
+  if (socialAnalysis.currentSituation.type === 'cooperation') {
+    opportunities.push({
+      id: 'collaboration_opportunity',
+      type: 'collaboration',
+      description: 'Opportunity to collaborate with nearby agents',
+      priority: 0.7,
+      participants: socialAnalysis.nearbyAgents
+    });
+  }
+  
+  // Identify trading opportunities
+  if (socialAnalysis.currentSituation.type === 'neutral' && socialAnalysis.nearbyAgents.length > 0) {
+    opportunities.push({
+      id: 'trading_opportunity',
+      type: 'trading',
+      description: 'Opportunity to trade with nearby agents',
+      priority: 0.5,
+      participants: socialAnalysis.nearbyAgents
+    });
+  }
+  
+  return opportunities;
+}
+
+async function identifySocialThreats(state: AgentState, socialAnalysis: any): Promise<any[]> {
+  const threats = [];
+  
+  // Identify social conflict threats
+  if (socialAnalysis.currentSituation.type === 'conflict') {
+    threats.push({
+      id: 'social_conflict',
+      type: 'social_conflict',
+      description: 'Social conflict detected with nearby agents',
+      severity: 0.8,
+      participants: socialAnalysis.nearbyAgents
+    });
+  }
+  
+  // Identify reputation threats
+  if (socialAnalysis.relationships && socialAnalysis.relationships.reputationScore < 0.3) {
+    threats.push({
+      id: 'reputation_threat',
+      type: 'reputation',
+      description: 'Low reputation may affect social interactions',
+      severity: 0.6,
+      impact: 'reduced_trust'
+    });
+  }
+  
+  return threats;
 }
 
 async function prioritizeGoals(goals: any, context: WorldContext): Promise<any[]> {
@@ -1279,6 +1442,63 @@ async function assessActionRisk(action: AgentAction, state: AgentState): Promise
 
 async function predictActionOutcome(action: AgentAction, state: AgentState): Promise<string> {
   return 'success'; // Placeholder
+}
+
+async function calculateSocialInfluence(socialState: any): Promise<number> {
+  // Calculate social influence based on relationships and group dynamics
+  let influence = 0.5; // Base influence
+  
+  // Trust levels increase influence
+  if (socialState.relationships && socialState.relationships.trustLevels) {
+    const trustValues = Object.values(socialState.relationships.trustLevels) as number[];
+    const averageTrust = trustValues.reduce((sum: number, trust: number) => sum + trust, 0) / (trustValues.length || 1);
+    influence += averageTrust * 0.3;
+  }
+  
+  // Reputation increases influence
+  if (socialState.relationships && socialState.relationships.reputationScore > 0.7) {
+    influence += 0.2;
+  }
+  
+  // Group leadership increases influence
+  if (socialState.socialContext && socialState.socialContext.groupDynamics.leader) {
+    influence += 0.3;
+  }
+  
+  return Math.min(1.0, influence);
+}
+
+async function calculateSocialUtility(action: AgentAction, decisionContext: DecisionContext): Promise<number> {
+  let socialUtility = 0; // Base social utility
+  
+  // Check if action benefits nearby agents
+  if (decisionContext.nearbyAgents && decisionContext.nearbyAgents.length > 0) {
+    socialUtility += 0.2; // Cooperative actions have social value
+  }
+  
+  // Check if action aligns with current social situation
+  if (decisionContext.socialContext && decisionContext.socialContext.situation) {
+    const situation = decisionContext.socialContext.situation;
+    
+    if (situation.type === 'cooperation' && action.type.includes('help')) {
+      socialUtility += 0.4;
+    }
+    
+    if (situation.type === 'conflict' && action.type.includes('defend')) {
+      socialUtility += 0.3;
+    }
+    
+    if (situation.type === 'trading' && action.type.includes('trade')) {
+      socialUtility += 0.5;
+    }
+  }
+  
+  // Consider social influence
+  if (decisionContext.socialInfluence > 0.7) {
+    socialUtility += 0.1; // High influence actions have more social impact
+  }
+  
+  return Math.min(1.0, socialUtility);
 }
 
 async function executeAction(action: AgentAction, state: AgentState): Promise<any> {

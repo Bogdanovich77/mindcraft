@@ -234,8 +234,14 @@ export class Agent {
                     this.history.add(source, message);
                 }
                 let execute_res = await executeCommand(this, message);
-                if (execute_res)
+                if (execute_res) {
+                    // Check for argument errors
+                    if (execute_res.includes('requires') && execute_res.includes('args')) {
+                        this.routeResponse(source, `Command error: ${execute_res}`);
+                        return false;
+                    }
                     this.routeResponse(source, execute_res);
+                }
                 return true;
             }
         }
@@ -301,8 +307,15 @@ export class Agent {
                 let execute_res = await executeCommand(this, res);
                 console.log('Agent executed:', command_name, 'and got:', execute_res);
                 used_command = true;
-                if (execute_res)
+                if (execute_res) {
+                    // Check for argument errors
+                    if (execute_res.includes('requires') && execute_res.includes('args')) {
+                        this.history.add('system', `Command error: ${execute_res}`);
+                        this.routeResponse(source, `Command error: ${execute_res}`);
+                        break;
+                    }
                     this.history.add('system', execute_res);
+                }
                 else
                     break;
             }
@@ -386,6 +399,23 @@ export class Agent {
         // Logging callbacks
         this.bot.on('error', (err) => {
             console.error('Error event!', err);
+            // Handle protocol parsing errors
+            if (err.message && err.message.includes('PartialReadError')) {
+                console.log('Protocol error detected, attempting reconnection...');
+                // Implement reconnection logic
+                if (!this.reconnectAttempts) {
+                    this.reconnectAttempts = 0;
+                }
+                if (this.reconnectAttempts < 3) {
+                    this.reconnectAttempts++;
+                    setTimeout(() => {
+                        this.bot.reconnect();
+                    }, 5000);
+                }
+                else {
+                    this.cleanKill('Failed to reconnect after protocol errors');
+                }
+            }
         });
         this.bot.on('end', (reason) => {
             console.warn('Bot disconnected! Killing agent process.', reason);

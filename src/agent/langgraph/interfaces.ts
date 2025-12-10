@@ -121,6 +121,7 @@ export interface CognitiveState {
   skills: SkillState;
   memory: MemoryState;
   processing: ProcessingState;
+  social: SocialState;
 }
 
 export interface PurposeState {
@@ -379,6 +380,143 @@ export interface WorkingMemory {
   decayRate: number;
 }
 
+// ============================================================================
+// SOCIAL STATE INTERFACES
+// ============================================================================
+
+export interface SocialState {
+  relationships: RelationshipManagerState;
+  theoryOfMind: TheoryOfMindState;
+  socialContext: SocialContextState;
+  socialLearning: SocialLearningState;
+}
+
+export interface RelationshipManagerState {
+  agentId: string;
+  relationshipCount: number;
+  activeRelationships: string[];
+  trustLevels: Record<string, number>;
+  friendshipLevels: Record<string, number>;
+  reputationScore: number;
+  lastUpdate: number;
+}
+
+export interface TheoryOfMindState {
+  mentalModels: Record<string, MentalModelState>;
+  activePredictions: PredictionState[];
+  emotionalUnderstanding: Record<string, EmotionalState>;
+  perspectiveTakingHistory: PerspectiveTakingRecord[];
+  lastUpdate: number;
+}
+
+export interface MentalModelState {
+  agentId: string;
+  confidence: number;
+  lastUpdated: number;
+  intentions: string[];
+  beliefs: Record<string, number>;
+  emotions: EmotionalState;
+}
+
+export interface EmotionalState {
+  primary: string;
+  intensity: number;
+  valence: number;
+  arousal: number;
+  timestamp: number;
+}
+
+export interface PredictionState {
+  targetAgentId: string;
+  prediction: string;
+  confidence: number;
+  timeHorizon: number;
+  timestamp: number;
+}
+
+export interface PerspectiveTakingRecord {
+  targetAgentId: string;
+  situation: string;
+  perspective: string;
+  confidence: number;
+  timestamp: number;
+}
+
+export interface SocialContextState {
+  nearbyAgents: string[];
+  groupDynamics: GroupDynamicsState;
+  socialNorms: SocialNorm[];
+  culturalContext: CulturalContextState;
+  currentSituation: SocialSituationState;
+}
+
+export interface GroupDynamicsState {
+  leader?: string;
+  cohesion: number;
+  hierarchy: string[];
+  roles: Record<string, string>;
+  alliances: Array<{ agent1: string; agent2: string; strength: number }>;
+}
+
+export interface SocialNorm {
+  name: string;
+  description: string;
+  context: string;
+  strength: number;
+  violations: string[];
+}
+
+export interface CulturalContextState {
+  culturalBackground: string;
+  values: string[];
+  practices: string[];
+  communicationStyle: string;
+  socialHierarchy: string[];
+}
+
+export interface SocialSituationState {
+  type: 'cooperation' | 'competition' | 'conflict' | 'neutral' | 'celebration' | 'trading';
+  participants: string[];
+  goals: string[];
+  resources: string[];
+  powerDynamics: Record<string, number>;
+}
+
+export interface SocialLearningState {
+  observedBehaviors: ObservedBehavior[];
+  learnedPatterns: SocialPattern[];
+  teachingHistory: TeachingRecord[];
+  socialSkillProgress: Record<string, number>;
+  lastUpdate: number;
+}
+
+export interface ObservedBehavior {
+  agentId: string;
+  behavior: string;
+  context: string;
+  outcome: string;
+  timestamp: number;
+  learned: boolean;
+}
+
+export interface SocialPattern {
+  pattern: string;
+  context: string;
+  frequency: number;
+  success: number;
+  agents: string[];
+  lastObserved: number;
+}
+
+export interface TeachingRecord {
+  studentId: string;
+  skill: string;
+  method: string;
+  success: boolean;
+  improvement: number;
+  timestamp: number;
+}
+
 export interface ProcessingState {
   currentPhase: ProcessingPhase;
   cognitiveLoad: number;
@@ -628,6 +766,9 @@ export interface DecisionContext {
   cognitiveLoad: number;
   urgency: number;
   riskTolerance: number;
+  nearbyAgents?: string[];
+  socialInfluence?: any;
+  socialContext?: any;
 }
 
 export interface LearningContext {

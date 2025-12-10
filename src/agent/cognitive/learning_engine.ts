@@ -22,6 +22,7 @@ import {
 } from './skill_types.js';
 
 import { PersonalitySystem } from './personality.js';
+import { SocialState } from '../langgraph/interfaces.js';
 
 export interface LearningEngineConfig {
   // Learning rates and modifiers
@@ -77,6 +78,11 @@ export class LearningEngine {
   private metrics: LearningMetrics;
   private learningHistory: LearningSession[] = [];
   private adaptiveModifiers: Map<SkillType, number> = new Map();
+  private socialState?: SocialState;
+  
+  // Social learning tracking
+  private socialLearningHistory: Map<string, any[]> = new Map(); // agentId -> learning events
+  private culturalNorms: Map<string, number> = new Map(); // norm -> strength
   
   constructor(personality: PersonalitySystem, config?: Partial<LearningEngineConfig>) {
     this.personality = personality;
@@ -822,9 +828,342 @@ export class LearningEngine {
   /**
    * Reset learning engine
    */
+  /**
+   * Set social state for social-aware learning processing
+   */
+  setSocialState(socialState: SocialState): void {
+    this.socialState = socialState;
+  }
+  
+  /**
+   * Process social experience with enhanced learning
+   */
+  processSocialExperience(
+    skill: Skill,
+    event: ExperienceEvent,
+    socialContext: any
+  ): {
+    processedEvent: ExperienceEvent;
+    learningAnalysis: LearningAnalysis;
+    socialInsights: any;
+  } {
+    // Process base experience
+    const baseResult = this.processExperience(skill, event, event.context);
+    
+    // Add social learning enhancements
+    const socialInsights = this.generateSocialInsights(skill, event, socialContext);
+    
+    // Apply social learning bonuses
+    const socialBonus = this.calculateSocialLearningBonus(event, socialContext);
+    const enhancedEvent = {
+      ...baseResult.processedEvent,
+      amount: Math.floor(baseResult.processedEvent.amount * (1 + socialBonus)),
+      contextBonus: baseResult.processedEvent.contextBonus + socialBonus
+    };
+    
+    // Update cultural norms
+    this.updateCulturalNorms(event, socialContext);
+    
+    // Record social learning
+    this.recordSocialLearning(event, socialContext);
+    
+    return {
+      processedEvent: enhancedEvent,
+      learningAnalysis: baseResult.learningAnalysis,
+      socialInsights
+    };
+  }
+  
+  /**
+   * Learn from observed social interactions
+   */
+  learnFromSocialInteraction(
+    observedAgents: string[],
+    interactionType: 'cooperation' | 'competition' | 'teaching' | 'conflict',
+    context: any
+  ): {
+    learningGains: Map<SkillType, number>;
+    socialPatterns: any[];
+    culturalInsights: any[];
+  } {
+    if (!this.socialState) {
+      return { learningGains: new Map(), socialPatterns: [], culturalInsights: [] };
+    }
+    
+    const learningGains = new Map<SkillType, number>();
+    const socialPatterns: any[] = [];
+    const culturalInsights: any[] = [];
+    
+    // Analyze each observed agent
+    observedAgents.forEach(agentId => {
+      const relationship = this.socialState.relationships.activeRelationships.includes(agentId);
+      const trustLevel = this.socialState.relationships.trustLevels[agentId] || 0.5;
+      
+      // Higher trust and relationship = better learning from observation
+      const learningMultiplier = 0.2 + (trustLevel * 0.3) + (relationship ? 0.3 : 0.1);
+      
+      // Interaction-specific learning
+      switch (interactionType) {
+        case 'cooperation':
+          learningGains.set(SkillType.TEAMWORK, (learningGains.get(SkillType.TEAMWORK) || 0) + learningMultiplier);
+          learningGains.set(SkillType.TRADING, (learningGains.get(SkillType.TRADING) || 0) + learningMultiplier * 0.8);
+          socialPatterns.push({
+            type: 'cooperative_behavior',
+            agent: agentId,
+            effectiveness: trustLevel * learningMultiplier,
+            context: context.situation
+          });
+          break;
+          
+        case 'competition':
+          learningGains.set(SkillType.PERSUASION, (learningGains.get(SkillType.PERSUASION) || 0) + learningMultiplier * 0.7);
+          learningGains.set(SkillType.LEADERSHIP, (learningGains.get(SkillType.LEADERSHIP) || 0) + learningMultiplier * 0.5);
+          socialPatterns.push({
+            type: 'competitive_strategy',
+            agent: agentId,
+            effectiveness: trustLevel * learningMultiplier,
+            context: context.situation
+          });
+          break;
+          
+        case 'teaching':
+          learningGains.set(SkillType.TEACHING, (learningGains.get(SkillType.TEACHING) || 0) + learningMultiplier);
+          learningGains.set(SkillType.TRADING, (learningGains.get(SkillType.TRADING) || 0) + learningMultiplier * 0.9);
+          socialPatterns.push({
+            type: 'teaching_method',
+            agent: agentId,
+            effectiveness: trustLevel * learningMultiplier,
+            context: context.situation
+          });
+          break;
+          
+        case 'conflict':
+          learningGains.set(SkillType.DEFENSE, (learningGains.get(SkillType.DEFENSE) || 0) + learningMultiplier * 0.6);
+          learningGains.set(SkillType.NEGOTIATION, (learningGains.get(SkillType.NEGOTIATION) || 0) + learningMultiplier * 0.4);
+          socialPatterns.push({
+            type: 'conflict_resolution',
+            agent: agentId,
+            effectiveness: trustLevel * learningMultiplier,
+            context: context.situation
+          });
+          break;
+      }
+      
+      // Generate cultural insights
+      if (trustLevel > 0.7) {
+        culturalInsights.push({
+          type: 'high_trust_behavior',
+          agent: agentId,
+          insight: `Agent ${agentId} demonstrates high-trust behaviors in ${interactionType}`,
+          confidence: trustLevel
+        });
+      }
+    });
+    
+    return { learningGains, socialPatterns, culturalInsights };
+  }
+  
+  /**
+   * Generate social learning insights
+   */
+  private generateSocialInsights(skill: Skill, event: ExperienceEvent, socialContext: any): any {
+    const insights: any[] = [];
+    
+    // Relationship-based insights
+    if (this.socialState && event.context.participants) {
+      event.context.participants.forEach((participantId: string) => {
+        const trustLevel = this.socialState.relationships.trustLevels[participantId] || 0.5;
+        const relationship = this.socialState.relationships.activeRelationships.includes(participantId);
+        
+        if (trustLevel > 0.7 && relationship) {
+          insights.push({
+            type: 'high_trust_learning',
+            participant: participantId,
+            impact: 'Learning enhanced by high-trust relationship',
+            multiplier: 1.2
+          });
+        }
+      });
+    }
+    
+    // Social context insights
+    if (event.context.socialContext === 'cooperative') {
+      insights.push({
+        type: 'collaborative_learning',
+        impact: 'Cooperative learning provides 30% bonus',
+        multiplier: 1.3
+      });
+    }
+    
+    // Cultural norm insights
+    const relevantNorms = this.getRelevantCulturalNorms(skill, socialContext);
+    relevantNorms.forEach(norm => {
+      insights.push({
+        type: 'cultural_norm_alignment',
+        norm: norm.name,
+        alignment: norm.strength,
+        impact: `Following cultural norm '${norm.name}' provides learning bonus`
+      });
+    });
+    
+    return {
+      insights,
+      socialEffectiveness: this.calculateSocialEffectiveness(insights),
+      culturalAlignment: this.calculateCulturalAlignment(relevantNorms)
+    };
+  }
+  
+  /**
+   * Calculate social learning bonus
+   */
+  private calculateSocialLearningBonus(event: ExperienceEvent, socialContext: any): number {
+    let bonus = 0;
+    
+    // Social context bonus
+    if (event.context.socialContext === 'cooperative') {
+      bonus += 0.3;
+    } else if (event.context.socialContext === 'teaching') {
+      bonus += 0.4;
+    } else if (event.context.socialContext === 'competitive') {
+      bonus += 0.2;
+    }
+    
+    // Group size bonus
+    if (event.context.participants && event.context.participants.length > 1) {
+      bonus += Math.min(0.3, event.context.participants.length * 0.1);
+    }
+    
+    // Relationship bonus
+    if (this.socialState && event.context.participants) {
+      const avgTrust = event.context.participants.reduce((sum: number, participantId: string) => {
+        return sum + (this.socialState.relationships.trustLevels[participantId] || 0.5);
+      }, 0) / event.context.participants.length;
+      
+      bonus += (avgTrust - 0.5) * 0.4;
+    }
+    
+    return Math.max(0, bonus);
+  }
+  
+  /**
+   * Update cultural norms based on experience
+   */
+  private updateCulturalNorms(event: ExperienceEvent, socialContext: any): void {
+    const normKey = `${socialContext.situation}_${event.context.socialContext}`;
+    const currentStrength = this.culturalNorms.get(normKey) || 0.5;
+    
+    // Update norm strength based on success
+    const adjustment = event.success ? 0.01 : -0.005;
+    const newStrength = Math.max(0, Math.min(1, currentStrength + adjustment));
+    
+    this.culturalNorms.set(normKey, newStrength);
+  }
+  
+  /**
+   * Get relevant cultural norms for skill and context
+   */
+  private getRelevantCulturalNorms(skill: Skill, socialContext: any): Array<{ name: string; strength: number }> {
+    const norms: Array<{ name: string; strength: number }> = [];
+    
+    // Add situation-specific norms
+    const situationNorms = Array.from(this.culturalNorms.entries())
+      .filter(([key]) => key.includes(socialContext.situation))
+      .map(([key, strength]) => ({ name: key, strength }));
+    
+    norms.push(...situationNorms);
+    
+    // Add skill-specific norms
+    const skillNormKey = `${skill.type}_general`;
+    const skillNormStrength = this.culturalNorms.get(skillNormKey);
+    if (skillNormStrength) {
+      norms.push({ name: skillNormKey, strength: skillNormStrength });
+    }
+    
+    return norms;
+  }
+  
+  /**
+   * Calculate social effectiveness from insights
+   */
+  private calculateSocialEffectiveness(insights: any[]): number {
+    if (insights.length === 0) return 0.5;
+    
+    const totalEffectiveness = insights.reduce((sum: number, insight: any) => {
+      return sum + (insight.multiplier || 1.0);
+    }, 0);
+    
+    return Math.min(2.0, totalEffectiveness / insights.length);
+  }
+  
+  /**
+   * Calculate cultural alignment
+   */
+  private calculateCulturalAlignment(norms: Array<{ name: string; strength: number }>): number {
+    if (norms.length === 0) return 0.5;
+    
+    const totalAlignment = norms.reduce((sum: number, norm: { name: string; strength: number }) => {
+      return sum + norm.strength;
+    }, 0);
+    
+    return totalAlignment / norms.length;
+  }
+  
+  /**
+   * Record social learning event
+   */
+  private recordSocialLearning(event: ExperienceEvent, socialContext: any): void {
+    const learningKey = `${event.skillType}_${socialContext.situation}`;
+    
+    if (!this.socialLearningHistory.has(learningKey)) {
+      this.socialLearningHistory.set(learningKey, []);
+    }
+    
+    this.socialLearningHistory.get(learningKey)!.push({
+      timestamp: Date.now(),
+      event,
+      socialContext,
+      success: event.success,
+      quality: event.quality
+    });
+    
+    // Keep history manageable
+    const history = this.socialLearningHistory.get(learningKey)!;
+    if (history.length > 50) {
+      this.socialLearningHistory.set(learningKey, history.slice(-25));
+    }
+  }
+  
+  /**
+   * Get social learning history
+   */
+  getSocialLearningHistory(skillType?: SkillType): Map<string, any[]> {
+    if (skillType) {
+      const filteredHistory = new Map<string, any[]>();
+      this.socialLearningHistory.forEach((events, key) => {
+        if (key.includes(skillType)) {
+          filteredHistory.set(key, events);
+        }
+      });
+      return filteredHistory;
+    }
+    return new Map(this.socialLearningHistory);
+  }
+  
+  /**
+   * Get cultural norms
+   */
+  getCulturalNorms(): Map<string, number> {
+    return new Map(this.culturalNorms);
+  }
+  
+  /**
+   * Reset learning engine
+   */
   public reset(): void {
     this.metrics = this.initializeMetrics();
     this.learningHistory = [];
     this.adaptiveModifiers.clear();
+    this.socialLearningHistory.clear();
+    this.culturalNorms.clear();
   }
 }

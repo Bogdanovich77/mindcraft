@@ -289,6 +289,15 @@ export class LangGraphAgent {
         }
         catch (error) {
             console.error('Error handling message:', error);
+            // Handle protocol errors gracefully
+            if (error.message && error.message.includes('PartialReadError')) {
+                console.log('Protocol error in LangGraph agent, ignoring message');
+                return;
+            }
+            // Clear the message to prevent reprocessing
+            if (this.agentState && this.agentState.context) {
+                this.agentState.context.lastMessage = undefined;
+            }
         }
     }
     /**
