@@ -1,0 +1,46 @@
+{
+  "timestamp": "2025-12-11T04:18:36.387Z",
+  "summary": {
+    "totalTests": 7,
+    "passedTests": 7,
+    "failedTests": 0,
+    "successRate": "100%"
+  },
+  "components": {
+    "social": {
+      "total": 9,
+      "found": 9,
+      "components": [
+        "SocialRelationshipVisualization",
+        "SocialNetworkGraph",
+        "TemporalEvolutionViewer",
+        "InfluenceMapping",
+        "TrustFriendshipDisplay",
+        "ReputationVisualization",
+        "CommunityClustering",
+        "CommunicationAnalysis",
+        "SocialInteractionTimeline"
+      ]
+    },
+    "skills": {
+      "total": 9,
+      "found": 9,
+      "components": [
+        "SkillProgressionVisualization",
+        "ProgressionCharts",
+        "LearningCurveAnalysis",
+        "SkillSynergyMapping",
+        "MilestoneTracking",
+        "PerformanceTrends",
+        "SkillComparison",
+        "ExperienceRateAnalysis",
+        "SkillRecommendations"
+      ]
+    }
+  },
+  "integration": {
+    "reduxStore": true,
+    "types": true,
+    "errors": []
+  }
+}

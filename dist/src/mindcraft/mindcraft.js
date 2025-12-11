@@ -70,6 +70,7 @@ export async function createAgent(settings) {
         error: null
     };
 }
+export { registerAgent };
 export function getAgentProcess(agentName) {
     return agent_processes[agentName];
 }

@@ -1,12 +1,18 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { getSocketService, type SocketServiceStatus, type ConnectionMetrics } from '../../services/socketService';
 
-interface ConnectionState {
+export interface ConnectionState {
   status: 'connected' | 'disconnected' | 'connecting' | 'error';
   error: string | null;
   lastConnected: number | null;
   reconnectAttempts: number;
   maxReconnectAttempts: number;
   reconnectDelay: number;
+  metrics: ConnectionMetrics;
+  connectionAttempts: number;
+  isReconnecting: boolean;
+  latency: number;
+  lastPingTime: number | null;
 }
 
 const initialState: ConnectionState = {
@@ -16,6 +22,18 @@ const initialState: ConnectionState = {
   reconnectAttempts: 0,
   maxReconnectAttempts: 5,
   reconnectDelay: 1000, // Start with 1 second
+  metrics: {
+    connectedAt: null,
+    lastDisconnected: null,
+    totalReconnectAttempts: 0,
+    connectionUptime: 0,
+    averageLatency: 0,
+    lastPingTime: null,
+  },
+  connectionAttempts: 0,
+  isReconnecting: false,
+  latency: 0,
+  lastPingTime: null,
 };
 
 const connectionSlice = createSlice({
@@ -30,6 +48,7 @@ const connectionSlice = createSlice({
         state.lastConnected = Date.now();
         state.reconnectAttempts = 0;
         state.reconnectDelay = 1000;
+        state.isReconnecting = false;
       }
     },
     
@@ -37,6 +56,7 @@ const connectionSlice = createSlice({
       state.status = 'error';
       state.error = action.payload;
       state.reconnectAttempts += 1;
+      state.isReconnecting = true;
       
       // Exponential backoff for reconnection delay
       state.reconnectDelay = Math.min(
@@ -56,6 +76,7 @@ const connectionSlice = createSlice({
     resetReconnectAttempts: (state) => {
       state.reconnectAttempts = 0;
       state.reconnectDelay = 1000;
+      state.isReconnecting = false;
     },
     
     setReconnectDelay: (state, action: PayloadAction<number>) => {
@@ -66,6 +87,7 @@ const connectionSlice = createSlice({
       state.status = 'disconnected';
       state.lastConnected = null;
       state.error = null;
+      state.isReconnecting = false;
     },
     
     startConnecting: (state) => {
@@ -76,10 +98,25 @@ const connectionSlice = createSlice({
     connectionLost: (state) => {
       state.status = 'disconnected';
       state.error = 'Connection lost';
+      state.isReconnecting = true;
     },
     
     resetConnectionState: (state) => {
       Object.assign(state, initialState);
+    },
+    
+    updateMetrics: (state, action: PayloadAction<ConnectionMetrics>) => {
+      state.metrics = action.payload;
+      state.latency = action.payload.averageLatency;
+      state.lastPingTime = action.payload.lastPingTime;
+    },
+    
+    updateConnectionAttempts: (state, action: PayloadAction<number>) => {
+      state.connectionAttempts = action.payload;
+    },
+    
+    setReconnecting: (state, action: PayloadAction<boolean>) => {
+      state.isReconnecting = action.payload;
     },
   },
 });
@@ -95,6 +132,9 @@ export const {
   startConnecting,
   connectionLost,
   resetConnectionState,
+  updateMetrics,
+  updateConnectionAttempts,
+  setReconnecting,
 } = connectionSlice.actions;
 
 export default connectionSlice.reducer;
@@ -108,6 +148,11 @@ export const selectReconnectDelay = (state: { connection: ConnectionState }) => 
 export const selectIsConnected = (state: { connection: ConnectionState }) => state.connection.status === 'connected';
 export const selectIsConnecting = (state: { connection: ConnectionState }) => state.connection.status === 'connecting';
 export const selectHasConnectionError = (state: { connection: ConnectionState }) => state.connection.status === 'error';
+export const selectConnectionMetrics = (state: { connection: ConnectionState }) => state.connection.metrics;
+export const selectConnectionAttempts = (state: { connection: ConnectionState }) => state.connection.connectionAttempts;
+export const selectIsReconnecting = (state: { connection: ConnectionState }) => state.connection.isReconnecting;
+export const selectLatency = (state: { connection: ConnectionState }) => state.connection.latency;
+export const selectLastPingTime = (state: { connection: ConnectionState }) => state.connection.lastPingTime;
 
 // Thunks for async connection logic
 export const connectToServer = () => async (dispatch: any, getState: any) => {
@@ -121,9 +166,38 @@ export const connectToServer = () => async (dispatch: any, getState: any) => {
   dispatch(startConnecting());
   
   try {
-    // This will be implemented in the socket service
-    // const socket = await initializeSocket();
-    // dispatch(setConnectionStatus('connected'));
+    // Initialize socket connection
+    const socketService = getSocketService();
+    if (!socketService) {
+      throw new Error('Socket service not available');
+    }
+    
+    // Set up status change listener
+    socketService.onStatusChange((status: SocketServiceStatus) => {
+      dispatch(updateConnectionAttempts(status.connectionAttempts));
+      dispatch(updateMetrics(status.metrics));
+      
+      if (status.isConnected) {
+        dispatch(setConnectionStatus('connected'));
+        dispatch(clearConnectionError());
+        dispatch(setReconnecting(false));
+      } else if (status.isConnecting) {
+        dispatch(setConnectionStatus('connecting'));
+        // Only set reconnecting to true if this is actually a reconnection attempt
+        // (connectionAttempts > 1 means we've been connected before)
+        if (status.connectionAttempts > 1) {
+          dispatch(setReconnecting(true));
+        } else {
+          dispatch(setReconnecting(false));
+        }
+      } else {
+        dispatch(setConnectionError(status.lastError || 'Connection failed'));
+        dispatch(setReconnecting(false));
+      }
+    });
+    
+    await socketService.connect();
+    dispatch(setConnectionStatus('connected'));
   } catch (error) {
     dispatch(setConnectionError(error instanceof Error ? error.message : 'Unknown connection error'));
   }
@@ -131,8 +205,12 @@ export const connectToServer = () => async (dispatch: any, getState: any) => {
 
 export const disconnectFromServer = () => async (dispatch: any) => {
   dispatch(disconnect());
-  // This will be implemented in the socket service
-  // await closeSocket();
+  // Close socket connection
+  const socketService = getSocketService();
+  if (socketService) {
+    socketService.offStatusChange(() => {}); // Remove all status listeners
+    socketService.disconnect();
+  }
 };
 
 export const reconnectToServer = () => async (dispatch: any, getState: any) => {
@@ -145,16 +223,37 @@ export const reconnectToServer = () => async (dispatch: any, getState: any) => {
   }
   
   dispatch(incrementReconnectAttempts());
-  dispatch(startConnecting());
-  
-  // Wait before attempting reconnection
-  await new Promise(resolve => setTimeout(resolve, selectReconnectDelay(state)));
+  dispatch(setReconnecting(true));
   
   try {
-    // This will be implemented in the socket service
-    // const socket = await initializeSocket();
-    // dispatch(setConnectionStatus('connected'));
+    // Force reconnect with socket service
+    const socketService = getSocketService();
+    if (!socketService) {
+      throw new Error('Socket service not available');
+    }
+    await socketService.forceReconnect();
+    dispatch(setConnectionStatus('connected'));
+    dispatch(setReconnecting(false));
   } catch (error) {
     dispatch(setConnectionError(error instanceof Error ? error.message : 'Reconnection failed'));
+    dispatch(setReconnecting(false));
+  }
+};
+
+export const forceReconnect = () => async (dispatch: any) => {
+  dispatch(startConnecting());
+  dispatch(setReconnecting(true));
+  
+  try {
+    const socketService = getSocketService();
+    if (!socketService) {
+      throw new Error('Socket service not available');
+    }
+    await socketService.forceReconnect();
+    dispatch(setConnectionStatus('connected'));
+    dispatch(setReconnecting(false));
+  } catch (error) {
+    dispatch(setConnectionError(error instanceof Error ? error.message : 'Force reconnection failed'));
+    dispatch(setReconnecting(false));
   }
 };

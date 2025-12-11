@@ -65,11 +65,11 @@ export class LangGraphAgent {
             // Initialize state graph
             await this.initializeStateGraph();
             
-            // Initialize reactive layer
-            await this.initializeReactiveLayer();
-            
             // Initialize Minecraft bot connection
             await this.initializeBotConnection();
+            
+            // Initialize reactive layer
+            await this.initializeReactiveLayer();
             
             this.isInitialized = true;
             console.log(`LangGraph agent ${this.name} initialized successfully`);
@@ -151,18 +151,19 @@ export class LangGraphAgent {
      * Initialize reactive behavior layer
      */
     async initializeReactiveLayer() {
-        const reactiveModes = this.profile.behavior?.reactiveModes || {};
-        
-        this.reactiveLayer = new ReactiveBehaviorLayerImpl({
-            modes: reactiveModes,
-            enabled: true
-        });
-        
-        // Initialize interrupt controller
+        // Initialize interrupt controller first
         this.interruptController = new InterruptController({
             emergencyThreshold: 0.8,
             survivalThreshold: 0.6
         });
+        
+        // Initialize reactive layer with correct parameters
+        // The constructor expects: interruptController, bot, botId
+        this.reactiveLayer = new ReactiveBehaviorLayerImpl(
+            this.interruptController,
+            this.bot,
+            this.name
+        );
         
         console.log('Reactive behavior layer initialized');
     }
@@ -1051,6 +1052,30 @@ export class LangGraphAgent {
                 heapTotal: Math.round(this.memoryUsageTracker.initialMemory.heapTotal / 1024 / 1024)
             }
         };
+    }
+
+    /**
+     * Connect to MindServer for UI visibility
+     */
+    async connectToMindServer(port = 8080) {
+        try {
+            const { io } = await import('socket.io-client');
+            const socket = io(`http://localhost:${port}`);
+            
+            socket.on('connect', () => {
+                console.log(`${this.name} connected to MindServer`);
+                socket.emit('login-agent', this.name);
+            });
+            
+            socket.on('disconnect', () => {
+                console.log(`${this.name} disconnected from MindServer`);
+            });
+            
+            this.mindServerSocket = socket;
+            
+        } catch (error) {
+            console.error(`Failed to connect ${this.name} to MindServer:`, error);
+        }
     }
 }
 

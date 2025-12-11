@@ -1,0 +1,22 @@
+{
+  "timestamp": "2025-12-11T01:49:29.473Z",
+  "summary": {
+    "total": 2,
+    "passed": 1,
+    "failed": 1,
+    "successRate": 50
+  },
+  "details": [
+    {
+      "name": "Dashboard loads correctly",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "Agent availability check",
+      "passed": false,
+      "details": "No agents available in Redux store - Memory tab requires agent selection"
+    }
+  ],
+  "note": "Memory tab tests skipped - no agents available. Start agents to test Memory tab functionality."
+}

@@ -79,6 +79,29 @@ async function initializeAgents() {
             const agents = await agentLoader.loadAllAgents();
             console.log(`Successfully loaded ${agents.length} LangGraph agents`);
             
+            // Register each loaded agent with the MindServer
+            let agentIndex = 0;
+            for (const agent of agents) {
+                if (agent.profile) {
+                    const viewer_port = 3000 + agentIndex;
+                    // Register the agent with MindServer
+                    Mindcraft.registerAgent({
+                        profile: agent.profile,
+                        host: settings.host || 'localhost',
+                        port: settings.port || 25565,
+                        minecraft_version: settings.minecraft_version || 'auto',
+                        load_memory: settings.load_memory || false,
+                        init_message: settings.init_message || null
+                    }, viewer_port);
+                    
+                    // Connect the agent to the MindServer
+                    agent.connectToMindServer(settings.mindserver_port || 8080);
+                    
+                    agentIndex++;
+                    console.log(`Registered LangGraph agent: ${agent.profile.name}`);
+                }
+            }
+            
             // Display agent statistics
             const stats = await agentLoader.getAgentStats();
             console.log('Agent Statistics:', stats);

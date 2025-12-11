@@ -1,0 +1,584 @@
+{
+  "timestamp": "2025-12-11T02:15:13.808Z",
+  "testSuite": "Dashboard Real-time Functionality",
+  "summary": {
+    "totalTests": 109,
+    "passedTests": 90,
+    "failedTests": 19,
+    "successRate": "82.6%"
+  },
+  "performance": {
+    "buildTime": "failed",
+    "testDuration": 7970
+  },
+  "errors": [
+    "Dashboard component feature: useDispatch: Feature not found in AgentOverviewDashboard.tsx",
+    "Dashboard component feature: useSelector: Feature not found in AgentOverviewDashboard.tsx",
+    "Dashboard component feature: autoRefresh: Feature not found in AgentOverviewDashboard.tsx",
+    "Dashboard component feature: systemMetrics: Feature not found in AgentOverviewDashboard.tsx",
+    "Responsive design feature: responsive: Responsive feature not found",
+    "Responsive design feature: breakpoints: Responsive feature not found",
+    "Responsive design feature: display: \"grid\": Responsive feature not found",
+    "Metrics component feature: Recharts: Feature not found in PerformanceMetrics.tsx",
+    "Error handling feature: ErrorBoundary: ErrorBoundary not found",
+    "Loading state in CognitiveLoadGauge.tsx: Loading state not found",
+    "Loading state in AgentStatusIndicator.tsx: Loading state not found",
+    "App integration feature: AgentOverviewDashboard: AgentOverviewDashboard not found in App.tsx",
+    "App integration feature: OverviewTab: OverviewTab not found in App.tsx",
+    "TypeScript compilation successful: Command failed: cd frontend && npm run build",
+    "Build compatibility test: Cannot read properties of undefined (reading 'strict')"
+  ],
+  "warnings": [],
+  "details": {
+    "Component exists: AgentOverviewDashboard.tsx": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.839Z"
+    },
+    "Component exists: CognitiveLoadGauge.tsx": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.841Z"
+    },
+    "Component exists: AgentStatusIndicator.tsx": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.842Z"
+    },
+    "Component exists: PerformanceMetrics.tsx": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.842Z"
+    },
+    "Component exists: AgentPositionMap.tsx": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.842Z"
+    },
+    "Component exists: index.ts": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.842Z"
+    },
+    "All dashboard components exist": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.842Z"
+    },
+    "Export exists: AgentOverviewDashboard": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.843Z"
+    },
+    "Export exists: CognitiveLoadGauge": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.843Z"
+    },
+    "Export exists: AgentStatusIndicator": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.843Z"
+    },
+    "Export exists: PerformanceMetrics": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.843Z"
+    },
+    "Export exists: AgentPositionMap": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.843Z"
+    },
+    "All component exports configured": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.843Z"
+    },
+    "Interface exists: AgentRealTimeMetrics": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "Interface exists: CognitiveLoadData": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "Interface exists: PerformanceData": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "Interface exists: PositionData": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "Interface exists: DashboardState": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "Interface exists: DashboardSettings": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "Interface exists: SystemMetrics": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "All required TypeScript interfaces exist": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "Type export exists: AgentStatus": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "Type export exists: ActivityLevel": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "Type export exists: ProcessingPhase": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "Type export exists: ChartType": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "Type export exists: TimeRange": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "Type export exists: ViewMode": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "All required type exports exist": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.844Z"
+    },
+    "Slice component exists: createSlice": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.845Z"
+    },
+    "Slice component exists: createAsyncThunk": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.845Z"
+    },
+    "Slice component exists: createSelector": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.845Z"
+    },
+    "Slice component exists: fetchAgentMetrics": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.845Z"
+    },
+    "Slice component exists: fetchPerformanceData": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.845Z"
+    },
+    "Slice component exists: fetchPositionData": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.845Z"
+    },
+    "Slice component exists: selectDashboardState": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.845Z"
+    },
+    "Slice component exists: selectAllAgents": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.845Z"
+    },
+    "Slice component exists: selectSelectedAgent": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.845Z"
+    },
+    "All required Redux slice components exist": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.845Z"
+    },
+    "Dashboard slice integrated in store": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.845Z"
+    },
+    "Dashboard component feature: useState": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Dashboard component feature: useEffect": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Dashboard component feature: useDispatch": {
+      "passed": false,
+      "details": "Feature not found in AgentOverviewDashboard.tsx",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Dashboard component feature: useSelector": {
+      "passed": false,
+      "details": "Feature not found in AgentOverviewDashboard.tsx",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Dashboard component feature: Grid": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Dashboard component feature: Box": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Dashboard component feature: Paper": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Dashboard component feature: Typography": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Dashboard component feature: autoRefresh": {
+      "passed": false,
+      "details": "Feature not found in AgentOverviewDashboard.tsx",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Dashboard component feature: selectedAgentId": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Dashboard component feature: systemMetrics": {
+      "passed": false,
+      "details": "Feature not found in AgentOverviewDashboard.tsx",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Dashboard component feature: onAgentSelect": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "All required dashboard features implemented": {
+      "passed": false,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Responsive design feature: responsive": {
+      "passed": false,
+      "details": "Responsive feature not found",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Responsive design feature: breakpoints": {
+      "passed": false,
+      "details": "Responsive feature not found",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Responsive design feature: gridTemplateColumns": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Responsive design feature: display: \"grid\"": {
+      "passed": false,
+      "details": "Responsive feature not found",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Responsive design feature: sx={{": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Responsive design implemented": {
+      "passed": false,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.846Z"
+    },
+    "Gauge component feature: useRef": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Gauge component feature: useEffect": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Gauge component feature: d3": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Gauge component feature: svg": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Gauge component feature: arc": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Gauge component feature: scaleLinear": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Gauge component feature: thresholds": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Gauge component feature: animation": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Gauge component feature: transition": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "All required gauge features implemented": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Metrics component feature: Recharts": {
+      "passed": false,
+      "details": "Feature not found in PerformanceMetrics.tsx",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Metrics component feature: LineChart": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Metrics component feature: BarChart": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Metrics component feature: AreaChart": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Metrics component feature: XAxis": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Metrics component feature: YAxis": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Metrics component feature: CartesianGrid": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Metrics component feature: Tooltip": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Metrics component feature: Legend": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "Metrics component feature: ResponsiveContainer": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.847Z"
+    },
+    "All required metrics features implemented": {
+      "passed": false,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.848Z"
+    },
+    "React.memo in AgentOverviewDashboard.tsx": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.848Z"
+    },
+    "React.memo in CognitiveLoadGauge.tsx": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.848Z"
+    },
+    "React.memo in AgentStatusIndicator.tsx": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.849Z"
+    },
+    "React.memo in PerformanceMetrics.tsx": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.849Z"
+    },
+    "React.memo in AgentPositionMap.tsx": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.849Z"
+    },
+    "Performance optimizations with React.memo": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.849Z"
+    },
+    "Performance hook: useMemo": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.850Z"
+    },
+    "Performance hook: useCallback": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.850Z"
+    },
+    "Performance optimization hooks implemented": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.850Z"
+    },
+    "Selector memoization with createSelector": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.850Z"
+    },
+    "Error handling feature: loading": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.850Z"
+    },
+    "Error handling feature: error": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.850Z"
+    },
+    "Error handling feature: try": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.851Z"
+    },
+    "Error handling feature: catch": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.851Z"
+    },
+    "Error handling feature: ErrorBoundary": {
+      "passed": false,
+      "details": "ErrorBoundary not found",
+      "timestamp": "2025-12-11T02:15:05.851Z"
+    },
+    "Error handling feature: useState": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.851Z"
+    },
+    "Error handling feature: useEffect": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.851Z"
+    },
+    "Error handling implemented": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.851Z"
+    },
+    "Loading state in CognitiveLoadGauge.tsx": {
+      "passed": false,
+      "details": "Loading state not found",
+      "timestamp": "2025-12-11T02:15:05.851Z"
+    },
+    "Loading state in AgentStatusIndicator.tsx": {
+      "passed": false,
+      "details": "Loading state not found",
+      "timestamp": "2025-12-11T02:15:05.851Z"
+    },
+    "Loading state in PerformanceMetrics.tsx": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.853Z"
+    },
+    "Loading states implemented": {
+      "passed": false,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.853Z"
+    },
+    "App integration feature: AgentOverviewDashboard": {
+      "passed": false,
+      "details": "AgentOverviewDashboard not found in App.tsx",
+      "timestamp": "2025-12-11T02:15:05.853Z"
+    },
+    "App integration feature: OverviewTab": {
+      "passed": false,
+      "details": "OverviewTab not found in App.tsx",
+      "timestamp": "2025-12-11T02:15:05.853Z"
+    },
+    "App integration feature: dashboard": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.853Z"
+    },
+    "App integration feature: Dashboard": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.853Z"
+    },
+    "App integration feature: Provider": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.853Z"
+    },
+    "Dashboard integrated in App.tsx": {
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-11T02:15:05.853Z"
+    },
+    "TypeScript compilation successful": {
+      "passed": false,
+      "details": "Command failed: cd frontend && npm run build",
+      "timestamp": "2025-12-11T02:15:13.807Z"
+    },
+    "Build compatibility test": {
+      "passed": false,
+      "details": "Cannot read properties of undefined (reading 'strict')",
+      "timestamp": "2025-12-11T02:15:13.808Z"
+    }
+  },
+  "recommendations": [
+    "Review and fix failed tests before production deployment",
+    "Address critical errors in component implementation",
+    "Dashboard implementation requires significant improvements before deployment"
+  ]
+}

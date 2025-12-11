@@ -1,5 +1,9 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { AgentState, AgentSummary } from '../../types/agent';
+import type {
+  AgentStateUpdateEvent,
+  AgentConnectionEvent
+} from '../../types/socketEvents';
 
 export interface AgentsState {
   agents: Map<string, AgentState>;
@@ -7,6 +11,22 @@ export interface AgentsState {
   loading: boolean;
   error: string | null;
   lastUpdate: number | null;
+  // Real-time streaming state
+  streaming: {
+    isConnected: boolean;
+    lastStreamUpdate: number | null;
+    streamErrors: number;
+    reconnectAttempts: number;
+    connectionQuality: 'excellent' | 'good' | 'fair' | 'poor';
+    latency: number;
+  };
+  // Performance metrics for streaming
+  performance: {
+    updateFrequency: number;
+    droppedUpdates: number;
+    totalUpdates: number;
+    averageUpdateSize: number;
+  };
 }
 
 const initialState: AgentsState = {
@@ -15,6 +35,20 @@ const initialState: AgentsState = {
   loading: false,
   error: null,
   lastUpdate: null,
+  streaming: {
+    isConnected: false,
+    lastStreamUpdate: null,
+    streamErrors: 0,
+    reconnectAttempts: 0,
+    connectionQuality: 'good',
+    latency: 0,
+  },
+  performance: {
+    updateFrequency: 0,
+    droppedUpdates: 0,
+    totalUpdates: 0,
+    averageUpdateSize: 0,
+  },
 };
 
 const agentsSlice = createSlice({
@@ -240,6 +274,433 @@ const agentsSlice = createSlice({
         agent.lastUpdate = Date.now();
       }
     },
+
+    // Real-time streaming actions
+    agentStateUpdate: (state, action: PayloadAction<AgentStateUpdateEvent>) => {
+      const { agentId, state: agentState, changes, timestamp } = action.payload;
+      const existingAgent = state.agents.get(agentId);
+      
+      if (existingAgent) {
+        // Merge the incoming state with existing state
+        const updatedAgent = {
+          ...existingAgent,
+          ...agentState,
+          lastUpdate: timestamp,
+          status: agentState.status as any, // Handle status type compatibility
+        };
+        
+        state.agents.set(agentId, updatedAgent);
+        state.streaming.lastStreamUpdate = timestamp;
+        state.performance.totalUpdates++;
+        
+        // Calculate update frequency
+        if (state.streaming.lastStreamUpdate) {
+          const timeDiff = timestamp - state.streaming.lastStreamUpdate;
+          state.performance.updateFrequency = 1000 / timeDiff; // Updates per second
+        }
+      } else {
+        // New agent, create full state with default structure
+        const newAgent: AgentState = {
+          id: agentId,
+          name: agentState.name,
+          profile: {} as any,
+          status: 'online',
+          lastUpdate: timestamp,
+          context: {
+            position: agentState.position,
+            health: agentState.health,
+            food: agentState.food,
+            experience: agentState.experience,
+            level: agentState.level,
+            dimension: agentState.context.dimension,
+            timeOfDay: agentState.context.timeOfDay,
+            weather: agentState.context.weather,
+            nearbyEntities: [],
+            nearbyBlocks: [],
+            inventory: { items: [], slots: 36, usedSlots: 0 },
+            equipment: {},
+          },
+          reactive: {
+            activeMode: 'idle',
+            emergencyConditions: [],
+            lastReactiveAction: {
+              mode: 'idle',
+              priority: 0,
+              timestamp: Date.now(),
+              context: {},
+              outcome: 'none',
+            },
+            interruptHistory: [],
+          },
+          cognitive: {
+            purpose: {
+              identity: {
+                name: agentState.name,
+                role: 'agent',
+                background: 'Unknown',
+                corePurpose: 'Survival and exploration',
+              },
+              personality: {
+                openness: 0.5,
+                conscientiousness: 0.5,
+                extraversion: 0.5,
+                agreeableness: 0.5,
+                neuroticism: 0.5,
+                riskTolerance: 0.5,
+                creativity: 0.5,
+                patience: 0.5,
+                competitiveness: 0.5,
+                curiosity: 0.5,
+              },
+              motivations: [],
+              values: [],
+              ethics: {
+                harmAvoidance: 0.8,
+                fairness: 0.7,
+                loyalty: 0.6,
+                authority: 0.5,
+                purity: 0.4,
+              },
+            },
+            goals: {
+              strategicGoals: [],
+              tacticalGoals: [],
+              operationalGoals: [],
+              activeGoals: [],
+              goalHistory: [],
+            },
+            skills: new Map(),
+            memory: {
+              semantic: {
+                concepts: new Map(),
+                facts: new Map(),
+                relationships: new Map(),
+              },
+              episodic: {
+                events: [],
+                conversations: [],
+                experiences: [],
+              },
+              procedural: {
+                skills: new Map(),
+                procedures: new Map(),
+                habits: new Map(),
+              },
+              working: {
+                currentFocus: 'idle',
+                activeTasks: [],
+                conversationContext: null,
+                buffer: [],
+              },
+            },
+            processing: {
+              currentPhase: 'perception',
+              cognitiveLoad: 0,
+              attentionLevel: 0.5,
+              processingHistory: [],
+            },
+          },
+          executive: {
+            currentAction: {
+              id: '',
+              type: 'idle',
+              description: 'Agent is idle',
+              priority: 0,
+              status: 'pending',
+              createdAt: Date.now(),
+              context: {},
+            },
+            actionQueue: [],
+            decisionHistory: [],
+            performanceMetrics: {
+              reactiveResponseTime: 0,
+              cognitiveProcessingTime: 0,
+              successRate: 1.0,
+              errorRate: 0.0,
+              memoryUsage: 0,
+              cpuUsage: 0,
+            },
+            responseHistory: [],
+            processingMode: 'action',
+          },
+          social: {
+            relationships: new Map(),
+            reputation: {
+              globalScore: 0,
+              factionScores: new Map(),
+              traitScores: new Map(),
+              recentEvents: [],
+            },
+            socialContext: {
+              currentSituation: 'idle',
+              nearbyAgents: [],
+              socialNorms: [],
+              culturalContext: 'default',
+              groupDynamics: null,
+            },
+            mentalModels: new Map(),
+          },
+        };
+        
+        state.agents.set(agentId, newAgent);
+      }
+    },
+
+    agentConnected: (state, action: PayloadAction<AgentConnectionEvent>) => {
+      const { agentId, timestamp, connectionType } = action.payload;
+      const agent = state.agents.get(agentId);
+      
+      if (agent) {
+        agent.status = 'online';
+        agent.lastUpdate = timestamp;
+      }
+      
+      state.streaming.isConnected = true;
+      state.streaming.lastStreamUpdate = timestamp;
+      state.streaming.reconnectAttempts = 0;
+    },
+
+    agentDisconnected: (state, action: PayloadAction<AgentDisconnectionEvent>) => {
+      const { agentId, timestamp, reason } = action.payload;
+      const agent = state.agents.get(agentId);
+      
+      if (agent) {
+        agent.status = 'offline';
+        agent.lastUpdate = timestamp;
+      }
+      
+      state.streaming.isConnected = false;
+      state.streaming.lastStreamUpdate = timestamp;
+    },
+
+    updateStreamingStatus: (state, action: PayloadAction<{
+      isConnected: boolean;
+      latency?: number;
+      connectionQuality?: 'excellent' | 'good' | 'fair' | 'poor';
+    }>) => {
+      const { isConnected, latency, connectionQuality } = action.payload;
+      state.streaming.isConnected = isConnected;
+      
+      if (latency !== undefined) {
+        state.streaming.latency = latency;
+        
+        // Update connection quality based on latency if not provided
+        if (!connectionQuality) {
+          if (latency < 50) state.streaming.connectionQuality = 'excellent';
+          else if (latency < 100) state.streaming.connectionQuality = 'good';
+          else if (latency < 200) state.streaming.connectionQuality = 'fair';
+          else state.streaming.connectionQuality = 'poor';
+        }
+      }
+      
+      if (connectionQuality) {
+        state.streaming.connectionQuality = connectionQuality;
+      }
+    },
+
+    streamingError: (state, action: PayloadAction<{ error: string; timestamp: number }>) => {
+      state.streaming.streamErrors++;
+      state.error = action.payload.error;
+      state.streaming.lastStreamUpdate = action.payload.timestamp;
+    },
+
+    incrementReconnectAttempts: (state) => {
+      state.streaming.reconnectAttempts++;
+    },
+
+    resetStreamingMetrics: (state) => {
+      state.streaming.streamErrors = 0;
+      state.streaming.reconnectAttempts = 0;
+      state.performance.updateFrequency = 0;
+      state.performance.droppedUpdates = 0;
+      state.performance.totalUpdates = 0;
+      state.performance.averageUpdateSize = 0;
+    },
+
+    updatePerformanceMetrics: (state, action: PayloadAction<{
+      updateFrequency?: number;
+      droppedUpdates?: number;
+      averageUpdateSize?: number;
+    }>) => {
+      const { updateFrequency, droppedUpdates, averageUpdateSize } = action.payload;
+      
+      if (updateFrequency !== undefined) {
+        state.performance.updateFrequency = updateFrequency;
+      }
+      
+      if (droppedUpdates !== undefined) {
+        state.performance.droppedUpdates = droppedUpdates;
+      }
+      
+      if (averageUpdateSize !== undefined) {
+        state.performance.averageUpdateSize = averageUpdateSize;
+      }
+    },
+
+    // Batch update for multiple agents (performance optimization)
+    batchAgentUpdates: (state, action: PayloadAction<AgentStateUpdateEvent[]>) => {
+      action.payload.forEach(update => {
+        const { agentId, state: agentState, timestamp } = update;
+        const existingAgent = state.agents.get(agentId);
+        
+        if (existingAgent) {
+          const updatedAgent = {
+            ...existingAgent,
+            ...agentState,
+            lastUpdate: timestamp,
+            status: agentState.status as any, // Handle status type compatibility
+          };
+          state.agents.set(agentId, updatedAgent);
+        } else {
+          // For batch updates, create minimal agent state
+          const newAgent: AgentState = {
+            id: agentId,
+            name: agentState.name,
+            profile: {} as any,
+            status: 'online',
+            lastUpdate: timestamp,
+            context: {
+              position: agentState.position,
+              health: agentState.health,
+              food: agentState.food,
+              experience: agentState.experience,
+              level: agentState.level,
+              dimension: agentState.context.dimension,
+              timeOfDay: agentState.context.timeOfDay,
+              weather: agentState.context.weather,
+              nearbyEntities: [],
+              nearbyBlocks: [],
+              inventory: { items: [], slots: 36, usedSlots: 0 },
+              equipment: {},
+            },
+            reactive: {
+              activeMode: 'idle',
+              emergencyConditions: [],
+              lastReactiveAction: {
+                mode: 'idle',
+                priority: 0,
+                timestamp: Date.now(),
+                context: {},
+                outcome: 'none',
+              },
+              interruptHistory: [],
+            },
+            cognitive: {
+              purpose: {
+                identity: {
+                  name: agentState.name,
+                  role: 'agent',
+                  background: 'Unknown',
+                  corePurpose: 'Survival and exploration',
+                },
+                personality: {
+                  openness: 0.5,
+                  conscientiousness: 0.5,
+                  extraversion: 0.5,
+                  agreeableness: 0.5,
+                  neuroticism: 0.5,
+                  riskTolerance: 0.5,
+                  creativity: 0.5,
+                  patience: 0.5,
+                  competitiveness: 0.5,
+                  curiosity: 0.5,
+                },
+                motivations: [],
+                values: [],
+                ethics: {
+                  harmAvoidance: 0.8,
+                  fairness: 0.7,
+                  loyalty: 0.6,
+                  authority: 0.5,
+                  purity: 0.4,
+                },
+              },
+              goals: {
+                strategicGoals: [],
+                tacticalGoals: [],
+                operationalGoals: [],
+                activeGoals: [],
+                goalHistory: [],
+              },
+              skills: new Map(),
+              memory: {
+                semantic: {
+                  concepts: new Map(),
+                  facts: new Map(),
+                  relationships: new Map(),
+                },
+                episodic: {
+                  events: [],
+                  conversations: [],
+                  experiences: [],
+                },
+                procedural: {
+                  skills: new Map(),
+                  procedures: new Map(),
+                  habits: new Map(),
+                },
+                working: {
+                  currentFocus: 'idle',
+                  activeTasks: [],
+                  conversationContext: null,
+                  buffer: [],
+                },
+              },
+              processing: {
+                currentPhase: 'perception',
+                cognitiveLoad: 0,
+                attentionLevel: 0.5,
+                processingHistory: [],
+              },
+            },
+            executive: {
+              currentAction: {
+                id: '',
+                type: 'idle',
+                description: 'Agent is idle',
+                priority: 0,
+                status: 'pending',
+                createdAt: Date.now(),
+                context: {},
+              },
+              actionQueue: [],
+              decisionHistory: [],
+              performanceMetrics: {
+                reactiveResponseTime: 0,
+                cognitiveProcessingTime: 0,
+                successRate: 1.0,
+                errorRate: 0.0,
+                memoryUsage: 0,
+                cpuUsage: 0,
+              },
+              responseHistory: [],
+              processingMode: 'action',
+            },
+            social: {
+              relationships: new Map(),
+              reputation: {
+                globalScore: 0,
+                factionScores: new Map(),
+                traitScores: new Map(),
+                recentEvents: [],
+              },
+              socialContext: {
+                currentSituation: 'idle',
+                nearbyAgents: [],
+                socialNorms: [],
+                culturalContext: 'default',
+                groupDynamics: null,
+              },
+              mentalModels: new Map(),
+            },
+          };
+          state.agents.set(agentId, newAgent);
+        }
+      });
+      
+      state.streaming.lastStreamUpdate = Date.now();
+      state.performance.totalUpdates += action.payload.length;
+    },
   },
 });
 
@@ -255,6 +716,16 @@ export const {
   updateAgentStatus,
   updateAgentPosition,
   updateAgentHealth,
+  // Real-time streaming actions
+  agentStateUpdate,
+  agentConnected,
+  agentDisconnected,
+  updateStreamingStatus,
+  streamingError,
+  incrementReconnectAttempts,
+  resetStreamingMetrics,
+  updatePerformanceMetrics,
+  batchAgentUpdates,
 } = agentsSlice.actions;
 
 export default agentsSlice.reducer;
@@ -271,5 +742,39 @@ export const selectAgentsLoading = (state: { agents: AgentsState }) => state.age
 export const selectAgentsError = (state: { agents: AgentsState }) => state.agents.error;
 export const selectAgentIds = (state: { agents: AgentsState }) => 
   Array.from(state.agents.agents.keys());
-export const selectOnlineAgents = (state: { agents: AgentsState }) => 
+export const selectOnlineAgents = (state: { agents: AgentsState }) =>
   Array.from(state.agents.agents.values()).filter(agent => agent.status === 'online');
+
+// Streaming selectors
+export const selectStreamingStatus = (state: { agents: AgentsState }) => state.agents.streaming;
+export const selectStreamingPerformance = (state: { agents: AgentsState }) => state.agents.performance;
+export const selectIsStreamingConnected = (state: { agents: AgentsState }) => state.agents.streaming.isConnected;
+export const selectConnectionQuality = (state: { agents: AgentsState }) => state.agents.streaming.connectionQuality;
+export const selectStreamingLatency = (state: { agents: AgentsState }) => state.agents.streaming.latency;
+export const selectStreamingErrors = (state: { agents: AgentsState }) => state.agents.streaming.streamErrors;
+export const selectUpdateFrequency = (state: { agents: AgentsState }) => state.agents.performance.updateFrequency;
+
+// Thunk actions for streaming
+export const handleAgentStateStream = (event: AgentStateUpdateEvent) => (dispatch: any) => {
+  dispatch(agentStateUpdate(event));
+};
+
+export const handleAgentConnectionStream = (event: AgentConnectionEvent) => (dispatch: any) => {
+  dispatch(agentConnected(event));
+};
+
+export const handleAgentDisconnectionStream = (event: AgentConnectionEvent) => (dispatch: any) => {
+  dispatch(agentDisconnected(event));
+};
+
+export const updateConnectionStatus = (status: {
+  isConnected: boolean;
+  latency?: number;
+  connectionQuality?: 'excellent' | 'good' | 'fair' | 'poor';
+}) => (dispatch: any) => {
+  dispatch(updateStreamingStatus(status));
+};
+
+export const handleStreamingError = (error: string) => (dispatch: any) => {
+  dispatch(streamingError({ error, timestamp: Date.now() }));
+};

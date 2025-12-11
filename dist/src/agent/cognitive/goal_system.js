@@ -18,6 +18,7 @@ export class GoalSystem {
     goalHierarchy; // parent -> children mapping
     executionHistory;
     statistics;
+    socialState;
     constructor(config) {
         this.config = {
             maxConcurrentGoals: 10,
@@ -654,6 +655,211 @@ export class GoalSystem {
             case 'allocateResources':
                 this.statistics.performanceMetrics.resourceAllocationTime = duration;
                 break;
+        }
+    }
+    /**
+     * Set social state for social-aware goal processing
+     */
+    setSocialState(socialState) {
+        this.socialState = socialState;
+    }
+    /**
+     * Generate social-aware goals
+     */
+    generateSocialGoals(agentState) {
+        if (!this.socialState) {
+            return [];
+        }
+        const socialGoals = [];
+        const { relationships, theoryOfMind, socialContext, socialLearning } = this.socialState;
+        // Relationship maintenance goals
+        if (relationships.activeRelationships.length > 0) {
+            socialGoals.push('maintain_relationships');
+            // Check for relationships needing attention
+            const neglectedRelationships = relationships.activeRelationships.filter(agentId => {
+                const trustLevel = relationships.trustLevels[agentId] || 0.5;
+                const friendshipLevel = relationships.friendshipLevels[agentId] || 0.5;
+                return trustLevel < 0.3 || friendshipLevel < 0.3;
+            });
+            if (neglectedRelationships.length > 0) {
+                socialGoals.push('repair_relationships');
+            }
+        }
+        // Social learning goals
+        if (socialLearning && socialLearning.observedBehaviors.length > 5) {
+            socialGoals.push('learn_from_social_interactions');
+        }
+        // Group participation goals
+        if (socialContext.groupDynamics && socialContext.groupDynamics.cohesion > 0.6) {
+            socialGoals.push('participate_in_group_activities');
+        }
+        // Reputation management goals
+        if (relationships.reputationScore < 0.4) {
+            socialGoals.push('improve_reputation');
+        }
+        return socialGoals;
+    }
+    /**
+     * Apply social influence to goal prioritization
+     */
+    applySocialInfluenceToGoals(goals, agentState) {
+        if (!this.socialState || goals.length === 0) {
+            return goals;
+        }
+        const { relationships, theoryOfMind, socialContext } = this.socialState;
+        return goals.map(goal => {
+            let socialPriorityModifier = 0;
+            // Relationship-based priority adjustment
+            if (goal.description.includes('social') || goal.description.includes('relationship')) {
+                const avgRelationshipStrength = relationships.activeRelationships.reduce((sum, agentId) => {
+                    const trust = relationships.trustLevels[agentId] || 0.5;
+                    const friendship = relationships.friendshipLevels[agentId] || 0.5;
+                    return sum + (trust + friendship) / 2;
+                }, 0) / Math.max(1, relationships.activeRelationships.length);
+                socialPriorityModifier += avgRelationshipStrength * 0.3;
+            }
+            // Group dynamics influence
+            if (socialContext.groupDynamics && socialContext.groupDynamics.cohesion > 0.7) {
+                if (goal.description.includes('cooperate') || goal.description.includes('help')) {
+                    socialPriorityModifier += 0.2;
+                }
+            }
+            // Theory of mind influence
+            if (theoryOfMind.activePredictions && theoryOfMind.activePredictions.length > 0) {
+                const relevantPredictions = theoryOfMind.activePredictions.filter((pred) => pred.prediction.toLowerCase().includes(goal.description.toLowerCase()));
+                if (relevantPredictions.length > 0) {
+                    const avgConfidence = relevantPredictions.reduce((sum, pred) => sum + pred.confidence, 0) / relevantPredictions.length;
+                    socialPriorityModifier += avgConfidence * 0.15;
+                }
+            }
+            // Apply social modifier to priority
+            const adjustedPriority = Math.max(0, Math.min(10, goal.priority + socialPriorityModifier));
+            return {
+                ...goal,
+                priority: adjustedPriority,
+                socialPriority: socialPriorityModifier
+            };
+        });
+    }
+    /**
+     * Create collaborative goal with other agents
+     */
+    createCollaborativeGoal(goalName, description, collaborators, agentState) {
+        const now = Date.now();
+        return {
+            id: `collab_goal_${now}_${Math.random().toString(36).substr(2, 9)}`,
+            name: goalName,
+            description,
+            level: GoalLevel.TACTICAL, // Collaborative goals are typically tactical
+            status: GoalStatus.PENDING,
+            priority: this.calculateCollaborativePriority(collaborators, agentState),
+            objective: description,
+            successCriteria: [
+                'Collaboration successful',
+                'All participants satisfied',
+                'Goal completed efficiently'
+            ],
+            createdAt: now,
+            dependencies: [],
+            subgoals: [],
+            requirements: [
+                {
+                    type: 'time',
+                    name: 'collaboration_time',
+                    quantity: this.estimateCollaborativeTime(description, collaborators.length),
+                    consumable: true
+                },
+                {
+                    type: 'skill',
+                    name: 'collaboration',
+                    quantity: collaborators.length,
+                    consumable: false
+                }
+            ],
+            allocatedResources: [],
+            progress: {
+                percentage: 0,
+                milestones: [],
+                quality: { efficiency: 0, effectiveness: 0, elegance: 0, learning: 0 },
+                timeSpent: 0,
+                lastUpdate: now
+            },
+            motivationSource: 'social_collaboration',
+            personalityAlignment: this.calculateSocialAlignment(collaborators),
+            ethicalScore: 0.8,
+            expectedLearning: [
+                { type: 'skill', area: 'teamwork', expectedGain: 0.7 },
+                { type: 'skill', area: 'communication', expectedGain: 0.6 },
+                { type: 'skill', area: 'coordination', expectedGain: 0.5 }
+            ],
+            tags: ['collaborative', 'social'],
+            category: 'social',
+            source: 'agent'
+        };
+    }
+    /**
+     * Calculate collaborative goal priority
+     */
+    calculateCollaborativePriority(collaborators, agentState) {
+        if (!this.socialState || collaborators.length === 0) {
+            return 5; // Medium priority
+        }
+        const { relationships } = this.socialState;
+        let totalRelationshipScore = 0;
+        // Calculate relationship strength with all collaborators
+        collaborators.forEach(collaboratorId => {
+            const trustLevel = relationships.trustLevels[collaboratorId] || 0.5;
+            const friendshipLevel = relationships.friendshipLevels[collaboratorId] || 0.5;
+            totalRelationshipScore += (trustLevel + friendshipLevel) / 2;
+        });
+        const avgRelationshipScore = totalRelationshipScore / collaborators.length;
+        // Higher relationship strength = higher priority
+        return Math.max(1, Math.min(10, avgRelationshipScore * 10));
+    }
+    /**
+     * Calculate social alignment for collaborative goals
+     */
+    calculateSocialAlignment(collaborators) {
+        if (!this.socialState || collaborators.length === 0) {
+            return 0.5; // Neutral alignment
+        }
+        const { relationships } = this.socialState;
+        let totalAlignment = 0;
+        collaborators.forEach(collaboratorId => {
+            const trustLevel = relationships.trustLevels[collaboratorId] || 0.5;
+            const friendshipLevel = relationships.friendshipLevels[collaboratorId] || 0.5;
+            totalAlignment += (trustLevel + friendshipLevel) / 2;
+        });
+        return totalAlignment / collaborators.length;
+    }
+    /**
+     * Estimate time needed for collaborative goal
+     */
+    estimateCollaborativeTime(description, collaboratorCount) {
+        // Base time estimation (in milliseconds)
+        let baseTime = 60000; // 1 minute
+        // Adjust for complexity
+        if (description.includes('complex') || description.includes('difficult')) {
+            baseTime *= 2;
+        }
+        // Adjust for collaborator count (more people = faster completion)
+        const collaboratorBonus = Math.min(0.5, collaboratorCount * 0.1);
+        baseTime *= (1 - collaboratorBonus);
+        return baseTime;
+    }
+    /**
+     * Generate anti-idle goals if needed
+     */
+    async generateAntiIdleGoalsIfNeeded(agentState) {
+        const activeGoals = [
+            ...agentState.cognitive?.goals?.strategicGoals || [],
+            ...agentState.cognitive?.goals?.tacticalGoals || [],
+            ...agentState.cognitive?.goals?.operationalGoals || []
+        ].filter(g => g.status === 'active');
+        // Generate anti-idle goals if we have too few active goals
+        if (activeGoals.length < 3) {
+            // This would need an anti-idle goal generator instance
+            console.log(`[GOAL_SYSTEM] Should generate anti-idle goals but generator not available`);
         }
     }
 }

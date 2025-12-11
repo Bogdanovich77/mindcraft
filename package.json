@@ -50,11 +50,13 @@
     },
     "devDependencies": {
         "@eslint/js": "^9.13.0",
+        "@playwright/test": "^1.57.0",
         "eslint": "^9.13.0",
         "eslint-plugin-no-floating-promise": "^2.0.0",
         "globals": "^15.11.0",
+        "nodemon": "^3.0.1",
         "patch-package": "^8.0.0",
-        "ts-node": "^10.9.1",
-        "nodemon": "^3.0.1"
+        "playwright": "^1.57.0",
+        "ts-node": "^10.9.1"
     }
 }

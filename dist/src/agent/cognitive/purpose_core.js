@@ -17,6 +17,7 @@ export class PurposeCore {
     decisionMaker;
     state;
     config;
+    socialState;
     constructor(config) {
         this.config = {
             initialPersonality: {},
@@ -81,10 +82,12 @@ export class PurposeCore {
         }
         // Update internal state
         this.updateInternalState(input);
+        // Apply social influence to decision making
+        const socialInfluence = this.calculateSocialInfluence(input);
         // Generate goals if needed
         const goals = this.generateGoals();
         this.state.activeGoals = goals;
-        // Select best action
+        // Select best action with social context
         const decision = this.decisionMaker.selectBestAction(input.availableActions, input.context);
         // Calculate confidence
         const confidence = this.calculateDecisionConfidence(decision.utility);
@@ -342,6 +345,146 @@ export class PurposeCore {
         return new PurposeCore(config);
     }
     /**
+     * Set social state for social-aware decision making
+     */
+    setSocialState(socialState) {
+        this.socialState = socialState;
+    }
+    /**
+     * Calculate social influence on decision making
+     */
+    calculateSocialInfluence(input) {
+        if (!this.socialState) {
+            return {
+                trustInfluence: 0,
+                reputationInfluence: 0,
+                groupPressure: 0,
+                socialNorms: [],
+                relationshipContext: null
+            };
+        }
+        const { relationships, theoryOfMind, socialContext, socialLearning } = this.socialState;
+        // Calculate trust-based influence
+        let trustInfluence = 0;
+        let relationshipContext = null;
+        // Combine all nearby agents from social context
+        const nearbyAgents = [
+            ...(input.context.socialContext?.allies_nearby || []),
+            ...(input.context.socialContext?.enemies_nearby || []),
+            ...(input.context.socialContext?.neutrals_nearby || [])
+        ];
+        if (nearbyAgents.length > 0) {
+            const agentTrustLevels = nearbyAgents.map(agentId => relationships.trustLevels[agentId] || 0.5);
+            trustInfluence = agentTrustLevels.reduce((sum, trust) => sum + trust, 0) / agentTrustLevels.length;
+            // Find most trusted relationship for context
+            const mostTrustedAgent = nearbyAgents.reduce((best, agentId) => (relationships.trustLevels[agentId] || 0) > (relationships.trustLevels[best] || 0) ? agentId : best, nearbyAgents[0]);
+            relationshipContext = {
+                agentId: mostTrustedAgent,
+                trustLevel: relationships.trustLevels[mostTrustedAgent] || 0.5,
+                friendshipLevel: relationships.friendshipLevels[mostTrustedAgent] || 0.5,
+                status: 'active'
+            };
+        }
+        // Calculate reputation influence
+        const reputationInfluence = relationships.reputationScore || 0.5;
+        // Calculate group pressure from social context
+        let groupPressure = 0;
+        const socialNorms = [];
+        if (socialContext.groupDynamics && socialContext.groupDynamics.cohesion > 0.7) {
+            groupPressure = socialContext.groupDynamics.cohesion * 0.3;
+            socialNorms.push(...socialContext.socialNorms.map(norm => norm.name));
+        }
+        // Apply theory of mind insights
+        let tomInfluence = 0;
+        if (theoryOfMind.activePredictions && theoryOfMind.activePredictions.length > 0) {
+            const avgPredictionConfidence = theoryOfMind.activePredictions.reduce((sum, pred) => sum + pred.confidence, 0) / theoryOfMind.activePredictions.length;
+            tomInfluence = avgPredictionConfidence * 0.2;
+        }
+        return {
+            trustInfluence,
+            reputationInfluence,
+            groupPressure: groupPressure + tomInfluence,
+            socialNorms,
+            relationshipContext,
+            socialLearningInfluence: this.calculateSocialLearningInfluence(socialLearning)
+        };
+    }
+    /**
+     * Calculate social learning influence
+     */
+    calculateSocialLearningInfluence(socialLearning) {
+        if (!socialLearning || !socialLearning.learnedPatterns)
+            return 0;
+        const recentPatterns = socialLearning.learnedPatterns.filter((pattern) => Date.now() - pattern.lastObserved < 24 * 60 * 60 * 1000 // Last 24 hours
+        );
+        if (recentPatterns.length === 0)
+            return 0;
+        const avgSuccess = recentPatterns.reduce((sum, pattern) => sum + pattern.success, 0) / recentPatterns.length;
+        return avgSuccess * 0.15; // 15% maximum influence from social learning
+    }
+    /**
+     * Update personality based on social feedback
+     */
+    updateFromSocialFeedback(feedback) {
+        // Update personality based on social feedback
+        const personalityProfile = this.personality.getProfile();
+        // Adjust agreeableness based on trust changes
+        if (feedback.trustChanges) {
+            const avgTrustChange = Object.values(feedback.trustChanges).reduce((sum, change) => sum + Math.abs(change), 0) / Object.values(feedback.trustChanges).length;
+            if (avgTrustChange > 0.1) {
+                personalityProfile.traits.agreeableness = Math.min(1.0, (personalityProfile.traits.agreeableness || 0.5) + 0.02);
+            }
+            else if (avgTrustChange < -0.1) {
+                personalityProfile.traits.agreeableness = Math.max(0.0, (personalityProfile.traits.agreeableness || 0.5) - 0.02);
+            }
+        }
+        // Adjust extraversion based on group conformity
+        if (feedback.groupConformity > 0.7) {
+            personalityProfile.traits.extraversion = Math.min(1.0, (personalityProfile.traits.extraversion || 0.5) + 0.01);
+        }
+        else if (feedback.groupConformity < 0.3) {
+            personalityProfile.traits.extraversion = Math.max(0.0, (personalityProfile.traits.extraversion || 0.5) - 0.01);
+        }
+        // Update personality system with modified profile
+        this.personality = new PersonalitySystem(personalityProfile.traits);
+    }
+    /**
+     * Generate socially-aware goals
+     */
+    generateSocialGoals() {
+        if (!this.socialState) {
+            return this.generateGoals();
+        }
+        const { relationships, socialContext, socialLearning } = this.socialState;
+        const goals = [];
+        // Relationship maintenance goals
+        if (relationships.activeRelationships.length > 0) {
+            goals.push('maintain_relationships');
+            // Check for relationships needing attention
+            const neglectedRelationships = relationships.activeRelationships.filter(agentId => {
+                const trustLevel = relationships.trustLevels[agentId] || 0.5;
+                const friendshipLevel = relationships.friendshipLevels[agentId] || 0.5;
+                return trustLevel < 0.3 || friendshipLevel < 0.3;
+            });
+            if (neglectedRelationships.length > 0) {
+                goals.push('repair_relationships');
+            }
+        }
+        // Social learning goals
+        if (socialLearning && socialLearning.observedBehaviors.length > 5) {
+            goals.push('learn_from_social_interactions');
+        }
+        // Group participation goals
+        if (socialContext.groupDynamics && socialContext.groupDynamics.cohesion > 0.6) {
+            goals.push('participate_in_group_activities');
+        }
+        // Reputation management goals
+        if (relationships.reputationScore < 0.4) {
+            goals.push('improve_reputation');
+        }
+        return goals;
+    }
+    /**
      * Export to legacy profile format
      */
     toLegacyProfile() {
@@ -355,7 +498,8 @@ export class PurposeCore {
             },
             values: this.values.toLegacyProfile().values,
             ethics: this.ethics.toLegacyProfile().ethics,
-            goals: this.state.activeGoals
+            goals: this.state.activeGoals,
+            socialState: this.socialState
         };
     }
 }

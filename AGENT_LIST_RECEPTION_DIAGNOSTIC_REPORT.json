@@ -1,0 +1,297 @@
+{
+  "timestamp": "2025-12-10T23:40:03.340Z",
+  "results": {
+    "mindServerApi": {
+      "success": false,
+      "error": "Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON"
+    },
+    "socketEventReception": {
+      "success": true,
+      "event": "agents-status",
+      "data": [
+        {
+          "name": "MasterChief",
+          "in_game": true,
+          "viewerPort": 3000,
+          "socket_connected": true
+        },
+        {
+          "name": "Slave1",
+          "in_game": true,
+          "viewerPort": 3001,
+          "socket_connected": true
+        },
+        {
+          "name": "AlphaSurvivor",
+          "in_game": true,
+          "viewerPort": 3002,
+          "socket_connected": true
+        }
+      ]
+    },
+    "socketEventListening": {
+      "success": true,
+      "events": [
+        {
+          "event": "agents-status",
+          "data": [
+            {
+              "name": "MasterChief",
+              "in_game": true,
+              "viewerPort": 3000,
+              "socket_connected": true
+            },
+            {
+              "name": "Slave1",
+              "in_game": true,
+              "viewerPort": 3001,
+              "socket_connected": true
+            },
+            {
+              "name": "AlphaSurvivor",
+              "in_game": true,
+              "viewerPort": 3002,
+              "socket_connected": true
+            }
+          ],
+          "timestamp": 1765409986312
+        }
+      ]
+    },
+    "manualEventTrigger": {
+      "success": true,
+      "event": "agents-status",
+      "data": [
+        {
+          "name": "MasterChief",
+          "in_game": true,
+          "viewerPort": 3000,
+          "socket_connected": true
+        },
+        {
+          "name": "Slave1",
+          "in_game": true,
+          "viewerPort": 3001,
+          "socket_connected": true
+        },
+        {
+          "name": "AlphaSurvivor",
+          "in_game": true,
+          "viewerPort": 3002,
+          "socket_connected": true
+        }
+      ],
+      "trigger": "manual"
+    },
+    "eventLog": [
+      {
+        "timestamp": "2025-12-10T23:39:44.241Z",
+        "level": "INFO",
+        "message": "Starting Agent List Reception Diagnostic...",
+        "data": null
+      },
+      {
+        "timestamp": "2025-12-10T23:39:44.243Z",
+        "level": "INFO",
+        "message": "=== Test 1: MindServer API Check ===",
+        "data": null
+      },
+      {
+        "timestamp": "2025-12-10T23:39:44.243Z",
+        "level": "INFO",
+        "message": "Testing MindServer agent list endpoint...",
+        "data": null
+      },
+      {
+        "timestamp": "2025-12-10T23:39:44.270Z",
+        "level": "ERROR",
+        "message": "Failed to parse agent list from MindServer",
+        "data": "Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON"
+      },
+      {
+        "timestamp": "2025-12-10T23:39:45.285Z",
+        "level": "INFO",
+        "message": "=== Test 2: Socket Event Reception ===",
+        "data": null
+      },
+      {
+        "timestamp": "2025-12-10T23:39:45.285Z",
+        "level": "INFO",
+        "message": "Testing socket event reception for agent list...",
+        "data": null
+      },
+      {
+        "timestamp": "2025-12-10T23:39:45.298Z",
+        "level": "INFO",
+        "message": "Socket connected for agent list test",
+        "data": {
+          "socketId": "dSJLy3L2fFwdX7pGAACj"
+        }
+      },
+      {
+        "timestamp": "2025-12-10T23:39:45.299Z",
+        "level": "SUCCESS",
+        "message": "Received agents-status event",
+        "data": [
+          {
+            "name": "MasterChief",
+            "in_game": true,
+            "viewerPort": 3000,
+            "socket_connected": true
+          },
+          {
+            "name": "Slave1",
+            "in_game": true,
+            "viewerPort": 3001,
+            "socket_connected": true
+          },
+          {
+            "name": "AlphaSurvivor",
+            "in_game": true,
+            "viewerPort": 3002,
+            "socket_connected": true
+          }
+        ]
+      },
+      {
+        "timestamp": "2025-12-10T23:39:46.307Z",
+        "level": "INFO",
+        "message": "=== Test 3: Socket Event Listening ===",
+        "data": null
+      },
+      {
+        "timestamp": "2025-12-10T23:39:46.307Z",
+        "level": "INFO",
+        "message": "Testing socket event listening patterns...",
+        "data": null
+      },
+      {
+        "timestamp": "2025-12-10T23:39:46.311Z",
+        "level": "INFO",
+        "message": "Socket connected for event listening test",
+        "data": {
+          "socketId": "ahbOgLHvM16EMoK2AACl"
+        }
+      },
+      {
+        "timestamp": "2025-12-10T23:39:46.312Z",
+        "level": "INFO",
+        "message": "Received event: agents-status",
+        "data": [
+          {
+            "name": "MasterChief",
+            "in_game": true,
+            "viewerPort": 3000,
+            "socket_connected": true
+          },
+          {
+            "name": "Slave1",
+            "in_game": true,
+            "viewerPort": 3001,
+            "socket_connected": true
+          },
+          {
+            "name": "AlphaSurvivor",
+            "in_game": true,
+            "viewerPort": 3002,
+            "socket_connected": true
+          }
+        ]
+      },
+      {
+        "timestamp": "2025-12-10T23:40:01.318Z",
+        "level": "INFO",
+        "message": "Event listening test completed",
+        "data": {
+          "totalEvents": 1,
+          "events": [
+            {
+              "event": "agents-status",
+              "data": [
+                {
+                  "name": "MasterChief",
+                  "in_game": true,
+                  "viewerPort": 3000,
+                  "socket_connected": true
+                },
+                {
+                  "name": "Slave1",
+                  "in_game": true,
+                  "viewerPort": 3001,
+                  "socket_connected": true
+                },
+                {
+                  "name": "AlphaSurvivor",
+                  "in_game": true,
+                  "viewerPort": 3002,
+                  "socket_connected": true
+                }
+              ],
+              "timestamp": 1765409986312
+            }
+          ]
+        }
+      },
+      {
+        "timestamp": "2025-12-10T23:40:02.333Z",
+        "level": "INFO",
+        "message": "=== Test 4: Manual Event Trigger ===",
+        "data": null
+      },
+      {
+        "timestamp": "2025-12-10T23:40:02.334Z",
+        "level": "INFO",
+        "message": "Testing manual event trigger to MindServer...",
+        "data": null
+      },
+      {
+        "timestamp": "2025-12-10T23:40:02.338Z",
+        "level": "INFO",
+        "message": "Socket connected for manual trigger test",
+        "data": {
+          "socketId": "h6U33Uzpw9pavO4SAACn"
+        }
+      },
+      {
+        "timestamp": "2025-12-10T23:40:02.338Z",
+        "level": "INFO",
+        "message": "Sending get-agents request to MindServer",
+        "data": null
+      },
+      {
+        "timestamp": "2025-12-10T23:40:02.339Z",
+        "level": "SUCCESS",
+        "message": "Received agents-status after manual trigger",
+        "data": [
+          {
+            "name": "MasterChief",
+            "in_game": true,
+            "viewerPort": 3000,
+            "socket_connected": true
+          },
+          {
+            "name": "Slave1",
+            "in_game": true,
+            "viewerPort": 3001,
+            "socket_connected": true
+          },
+          {
+            "name": "AlphaSurvivor",
+            "in_game": true,
+            "viewerPort": 3002,
+            "socket_connected": true
+          }
+        ]
+      }
+    ]
+  },
+  "recommendations": [
+    "MindServer API endpoint is not accessible - check if server is running correctly",
+    "Manual trigger worked - implement automatic agent list request in frontend"
+  ],
+  "summary": {
+    "totalTests": 4,
+    "successfulTests": 3,
+    "failedTests": 2
+  }
+}

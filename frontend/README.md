@@ -282,16 +282,47 @@ CMD ["npm", "run", "preview"]
 
 This project is part of the Mindcraft LangGraph system and follows the same licensing terms as the main project.
 
-## 🔗 Related Documentation
+## 📚 Documentation
 
-- [Mindcraft LangGraph Architecture](../docs/langgraph_architecture_summary.md)
-- [Frontend Design Document](../FRONTEND_REVAMP_DESIGN_DOCUMENT.md)
-- [Agent Type Definitions](./src/types/agent.ts)
-- [Socket.IO Service](./src/services/socketService.ts)
+This project includes comprehensive documentation for different user roles and needs:
 
-## 📞 Support
+### 📖 User Documentation
+- **[User Manual](docs/USER_MANUAL.md)** - Complete guide for end-users covering dashboard navigation, features, and troubleshooting
+- **[Quick Start Guide](docs/USER_MANUAL.md#getting-started)** - Fast track to get started with the dashboard
+- **[Feature Tutorials](docs/USER_MANUAL.md#features)** - Step-by-step guides for specific dashboard features
+
+### 👨‍💻 Developer Documentation
+- **[Developer Guide](docs/DEVELOPER_DOCUMENTATION.md)** - Comprehensive development setup, architecture, and contribution guidelines
+- **[API Reference](docs/API_DOCUMENTATION.md)** - Complete API documentation including REST endpoints and Socket.IO events
+- **[Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md)** - In-depth technical architecture and system design
+- **[Component API](docs/DEVELOPER_DOCUMENTATION.md#component-api-documentation)** - Detailed component props, methods, and examples
+
+### 🛠️ Administrator Documentation
+- **[Administrator Guide](docs/ADMINISTRATOR_DOCUMENTATION.md)** - System deployment, configuration, and maintenance procedures
+- **[Deployment Guide](docs/DEPLOYMENT_DOCUMENTATION.md)** - Step-by-step deployment instructions for various platforms
+- **[Maintenance Guide](docs/MAINTENANCE_GUIDE.md)** - Ongoing system maintenance and operational procedures
+
+### 🔧 Operations & Support
+- **[Troubleshooting Guide](docs/TROUBLESHOOTING_GUIDE.md)** - Common issues, error resolution, and debugging procedures
+- **[Security Guide](docs/ADMINISTRATOR_DOCUMENTATION.md#security-hardening)** - Security best practices and hardening procedures
+- **[Performance Optimization](docs/MAINTENANCE_GUIDE.md#performance-optimization)** - System performance tuning and monitoring
+
+### 📋 Reference Materials
+- **[Mindcraft LangGraph Architecture](../docs/langgraph_architecture_summary.md)** - Overall system architecture documentation
+- **[Frontend Design Document](../FRONTEND_REVAMP_DESIGN_DOCUMENT.md)** - Frontend design specifications and requirements
+- **[Agent Type Definitions](./src/types/agent.ts)** - TypeScript type definitions for agent data structures
+- **[Socket.IO Service](./src/services/socketService.ts)** - Real-time communication service implementation
+
+## 📞 Support & Community
 
 For questions, issues, or contributions:
-- Create an issue in the project repository
-- Join our Discord community for real-time discussions
-- Check existing documentation before asking questions
+- **📋 Create an Issue** - Report bugs or request features in the project repository
+- **💬 Discord Community** - Join our Discord for real-time discussions and help
+- **📖 Check Documentation** - Review relevant documentation before asking questions
+- **🔍 Search Issues** - Check existing issues for similar problems or solutions
+
+### Getting Help
+1. **For End-Users**: Start with the [User Manual](docs/USER_MANUAL.md) and [Troubleshooting Guide](docs/TROUBLESHOOTING_GUIDE.md)
+2. **For Developers**: Review the [Developer Guide](docs/DEVELOPER_DOCUMENTATION.md) and [API Documentation](docs/API_DOCUMENTATION.md)
+3. **For Administrators**: Consult the [Administrator Guide](docs/ADMINISTRATOR_DOCUMENTATION.md) and [Deployment Guide](docs/DEPLOYMENT_DOCUMENTATION.md)
+4. **For Technical Issues**: Check the [Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md) and [Maintenance Guide](docs/MAINTENANCE_GUIDE.md)

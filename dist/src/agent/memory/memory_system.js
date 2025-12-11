@@ -13,8 +13,13 @@ export class MemorySystem {
     working;
     consolidation;
     bridge; // Lazy-loaded to avoid circular import
+    socialState;
     lastConsolidation = 0;
     consolidationInterval = 60000; // 1 minute
+    // Social memory tracking
+    socialMemories = new Map(); // agentId -> social memories
+    relationshipHistory = new Map(); // agentId -> relationship changes
+    socialPatterns = new Map(); // pattern -> occurrences
     constructor() {
         this.semantic = new SemanticMemory();
         this.episodic = new EpisodicMemory();
@@ -233,6 +238,302 @@ export class MemorySystem {
         return results;
     }
     /**
+     * Set social state for social-aware memory processing
+     */
+    setSocialState(socialState) {
+        this.socialState = socialState;
+    }
+    /**
+     * Store social memory about another agent
+     */
+    async storeSocialMemory(targetAgentId, memoryType, content, emotional, context) {
+        const socialMemory = {
+            id: `social_mem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            targetAgentId,
+            memoryType,
+            content,
+            emotional,
+            context: {
+                ...context,
+                location: context.location || { x: 0, y: 0, z: 0 },
+                timestamp: Date.now(),
+                participants: context.participants || [],
+                situation: context.situation || 'unknown'
+            },
+            timestamp: Date.now(),
+            importance: this.calculateSocialMemoryImportance(memoryType, emotional, context),
+            decayRate: this.calculateSocialMemoryDecay(memoryType),
+            retrievalCount: 0,
+            lastAccessed: Date.now()
+        };
+        // Store in agent-specific memories
+        if (!this.socialMemories.has(targetAgentId)) {
+            this.socialMemories.set(targetAgentId, []);
+        }
+        this.socialMemories.get(targetAgentId).push(socialMemory);
+        // Also store as episodic event for cross-referencing
+        await this.episodic.storeEvent({
+            id: socialMemory.id,
+            type: 'social_interaction',
+            timestamp: socialMemory.timestamp,
+            duration: 0, // Social interactions are typically brief
+            location: socialMemory.context.location,
+            participants: [targetAgentId, ...(context.participants || [])],
+            actions: [{
+                    actor: this.socialState?.relationships?.agentId || 'self',
+                    action: memoryType,
+                    target: targetAgentId,
+                    timestamp: socialMemory.timestamp,
+                    result: emotional.valence > 0 ? 'positive' : 'negative'
+                }],
+            outcomes: [`${memoryType} with ${targetAgentId}`],
+            emotionalImpact: emotional.valence,
+            importance: socialMemory.importance,
+            tags: ['social', memoryType, targetAgentId]
+        });
+        // Update relationship history if relationship memory
+        if (memoryType === 'relationship') {
+            await this.updateRelationshipHistory(targetAgentId, content);
+        }
+        // Extract and store social patterns
+        await this.extractSocialPattern(memoryType, content, context);
+    }
+    /**
+     * Query social memories about specific agent
+     */
+    async querySocialMemories(targetAgentId, memoryTypes, timeRange, importance) {
+        const agentMemories = this.socialMemories.get(targetAgentId) || [];
+        let filteredMemories = agentMemories;
+        // Filter by memory types
+        if (memoryTypes && memoryTypes.length > 0) {
+            filteredMemories = filteredMemories.filter(memory => memoryTypes.includes(memory.memoryType));
+        }
+        // Filter by time range
+        if (timeRange) {
+            filteredMemories = filteredMemories.filter(memory => memory.timestamp >= timeRange.start && memory.timestamp <= timeRange.end);
+        }
+        // Filter by importance
+        if (importance) {
+            filteredMemories = filteredMemories.filter(memory => memory.importance >= importance.min && memory.importance <= importance.max);
+        }
+        // Update retrieval count and last accessed
+        filteredMemories.forEach(memory => {
+            memory.retrievalCount++;
+            memory.lastAccessed = Date.now();
+        });
+        // Sort by importance and recency
+        return filteredMemories.sort((a, b) => {
+            const importanceDiff = b.importance - a.importance;
+            const recencyDiff = b.timestamp - a.timestamp;
+            // Weight importance more than recency for social memories
+            return importanceDiff * 0.7 + recencyDiff * 0.3;
+        });
+    }
+    /**
+     * Get relationship history with agent
+     */
+    async getRelationshipHistory(agentId) {
+        return this.relationshipHistory.get(agentId) || [];
+    }
+    /**
+     * Update relationship history
+     */
+    async updateRelationshipHistory(agentId, relationshipData) {
+        if (!this.relationshipHistory.has(agentId)) {
+            this.relationshipHistory.set(agentId, []);
+        }
+        const history = this.relationshipHistory.get(agentId);
+        history.push({
+            timestamp: Date.now(),
+            type: 'relationship_change',
+            data: relationshipData,
+            context: this.socialState?.relationships?.trustLevels[agentId] || 0.5
+        });
+        // Keep history manageable
+        if (history.length > 100) {
+            this.relationshipHistory.set(agentId, history.slice(-50));
+        }
+    }
+    /**
+     * Extract social patterns from memories
+     */
+    async extractSocialPattern(memoryType, content, context) {
+        const patternKey = `${memoryType}_${context.situation || 'general'}`;
+        if (!this.socialPatterns.has(patternKey)) {
+            this.socialPatterns.set(patternKey, []);
+        }
+        const pattern = {
+            content: content,
+            context: context.situation,
+            frequency: 1,
+            lastOccurrence: Date.now(),
+            successRate: content.success ? 1 : 0.5,
+            participants: context.participants || []
+        };
+        const existingPatterns = this.socialPatterns.get(patternKey);
+        // Check if similar pattern exists
+        const similarPattern = existingPatterns.find(p => this.calculatePatternSimilarity(p, pattern) > 0.8);
+        if (similarPattern) {
+            // Update existing pattern
+            similarPattern.frequency++;
+            similarPattern.lastOccurrence = Date.now();
+            similarPattern.successRate = (similarPattern.successRate + pattern.successRate) / 2;
+        }
+        else {
+            // Add new pattern
+            existingPatterns.push(pattern);
+        }
+        // Keep patterns manageable
+        if (existingPatterns.length > 50) {
+            this.socialPatterns.set(patternKey, existingPatterns.slice(-25));
+        }
+    }
+    /**
+     * Calculate pattern similarity
+     */
+    calculatePatternSimilarity(pattern1, pattern2) {
+        let similarity = 0;
+        let factors = 0;
+        // Compare content similarity
+        if (pattern1.content && pattern2.content) {
+            factors++;
+            if (typeof pattern1.content === typeof pattern2.content) {
+                similarity += pattern1.content === pattern2.content ? 1 : 0;
+            }
+            else {
+                // Simple object similarity check
+                const keys1 = Object.keys(pattern1.content);
+                const keys2 = Object.keys(pattern2.content);
+                const commonKeys = keys1.filter(key => keys2.includes(key));
+                similarity += commonKeys.length / Math.max(keys1.length, keys2.length);
+            }
+        }
+        // Compare context
+        if (pattern1.context && pattern2.context) {
+            factors++;
+            similarity += pattern1.context === pattern2.context ? 1 : 0;
+        }
+        // Compare participants
+        if (pattern1.participants && pattern2.participants) {
+            factors++;
+            const participants1 = new Set(pattern1.participants);
+            const participants2 = new Set(pattern2.participants);
+            const intersection = new Set([...participants1].filter(p => participants2.has(p)));
+            similarity += intersection.size / Math.max(participants1.size, participants2.size);
+        }
+        return factors > 0 ? similarity / factors : 0;
+    }
+    /**
+     * Get social patterns
+     */
+    getSocialPatterns(patternType) {
+        if (patternType) {
+            const filteredPatterns = new Map();
+            this.socialPatterns.forEach((patterns, key) => {
+                if (key.includes(patternType)) {
+                    filteredPatterns.set(key, patterns);
+                }
+            });
+            return filteredPatterns;
+        }
+        return new Map(this.socialPatterns);
+    }
+    /**
+     * Calculate social memory importance
+     */
+    calculateSocialMemoryImportance(memoryType, emotional, context) {
+        let importance = 0.5; // Base importance
+        // Memory type importance
+        const typeImportance = {
+            'relationship': 0.9,
+            'collaboration': 0.8,
+            'observation': 0.6,
+            'interaction': 0.5
+        };
+        importance += (typeImportance[memoryType] || 0.5) * 0.3;
+        // Emotional impact
+        const emotionalImpact = Math.abs(emotional.valence) + emotional.arousal + Math.abs(emotional.dominance);
+        importance += (emotionalImpact / 3) * 0.4;
+        // Social context importance
+        if (context.participants && context.participants.length > 1) {
+            importance += 0.2;
+        }
+        // Urgency/situation importance
+        if (context.situation === 'emergency' || context.situation === 'conflict') {
+            importance += 0.3;
+        }
+        return Math.max(0, Math.min(1, importance));
+    }
+    /**
+     * Calculate social memory decay rate
+     */
+    calculateSocialMemoryDecay(memoryType) {
+        // Different memory types decay at different rates
+        const decayRates = {
+            'relationship': 0.001, // Very slow decay
+            'collaboration': 0.005, // Slow decay
+            'observation': 0.01, // Medium decay
+            'interaction': 0.02 // Faster decay
+        };
+        return decayRates[memoryType] || 0.01;
+    }
+    /**
+     * Get social memory statistics
+     */
+    getSocialMemoryStatistics() {
+        const stats = {
+            totalSocialMemories: 0,
+            memoriesByAgent: {},
+            memoryTypes: {},
+            patternCount: 0,
+            relationshipHistories: 0
+        };
+        // Count memories by agent
+        this.socialMemories.forEach((memories, agentId) => {
+            stats.memoriesByAgent[agentId] = memories.length;
+            stats.totalSocialMemories += memories.length;
+        });
+        // Count memories by type
+        this.socialMemories.forEach(memories => {
+            memories.forEach(memory => {
+                stats.memoryTypes[memory.memoryType] = (stats.memoryTypes[memory.memoryType] || 0) + 1;
+            });
+        });
+        // Count patterns
+        this.socialPatterns.forEach(patterns => {
+            stats.patternCount += patterns.length;
+        });
+        // Count relationship histories
+        this.relationshipHistory.forEach(history => {
+            stats.relationshipHistories += history.length;
+        });
+        return stats;
+    }
+    /**
+     * Cleanup old social memories
+     */
+    async cleanupSocialMemories() {
+        const now = Date.now();
+        const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+        // Clean old social memories
+        this.socialMemories.forEach((memories, agentId) => {
+            const filteredMemories = memories.filter(memory => now - memory.timestamp < maxAge);
+            this.socialMemories.set(agentId, filteredMemories);
+        });
+        // Clean old relationship histories
+        this.relationshipHistory.forEach((history, agentId) => {
+            const filteredHistory = history.filter(entry => now - entry.timestamp < maxAge);
+            this.relationshipHistory.set(agentId, filteredHistory);
+        });
+        // Clean old patterns
+        this.socialPatterns.forEach((patterns, key) => {
+            const filteredPatterns = patterns.filter(pattern => now - pattern.lastOccurrence < maxAge);
+            if (filteredPatterns.length > 0) {
+                this.socialPatterns.set(key, filteredPatterns);
+            }
+        });
+    }
+    /**
      * Cleanup old memories to maintain performance
      */
     async cleanup() {
@@ -240,6 +541,8 @@ export class MemorySystem {
         await this.semantic.cleanup();
         await this.procedural.cleanup();
         this.working.cleanup();
+        // Clean social memories
+        await this.cleanupSocialMemories();
     }
 }
 // ExtendedEpisodicEvent is now imported from episodic_memory.ts

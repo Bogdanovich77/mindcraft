@@ -74,6 +74,8 @@ export async function createAgent(settings) {
     };
 }
 
+export { registerAgent };
+
 export function getAgentProcess(agentName) {
     return agent_processes[agentName];
 }

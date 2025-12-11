@@ -5,16 +5,20 @@
  * learning characteristics, and adaptive growth rates. Integrates with personality and
  * goal systems while respecting reactive interrupts.
  */
-import { SkillType, SkillCategory, PlateauType, PlateauSeverity, PlateauCause } from './skill_types.js';
+import { SkillType, SkillCategory, ExperienceSource, PlateauType, PlateauSeverity, PlateauCause } from './skill_types.js';
 export class SkillsSystem {
     skills = new Map();
     config;
     personality;
     plateaus = new Map();
     lastUpdate = Date.now();
+    socialState;
     // Performance tracking
     recentProgress = [];
     recommendations = [];
+    // Social learning tracking
+    socialObservations = new Map(); // agentId -> observations
+    teachingHistory = new Map(); // skillType -> students taught
     constructor(personality, config) {
         this.personality = personality;
         this.config = {
@@ -947,6 +951,303 @@ export class SkillsSystem {
             totalExperience,
             activePlateaus,
             recentProgress
+        };
+    }
+    /**
+     * Set social state for social-aware skill processing
+     */
+    setSocialState(socialState) {
+        this.socialState = socialState;
+    }
+    /**
+     * Learn from observing other agents
+     */
+    learnFromObservation(observedAgentId, observedSkill, context) {
+        if (!this.socialState) {
+            return null;
+        }
+        // Check relationship with observed agent
+        const relationship = this.socialState.relationships.activeRelationships.includes(observedAgentId);
+        const trustLevel = this.socialState.relationships.trustLevels[observedAgentId] || 0.5;
+        // Higher trust and better relationship = better learning from observation
+        const learningMultiplier = 0.3 + (trustLevel * 0.4) + (relationship ? 0.3 : 0);
+        // Create observation event
+        const observationEvent = {
+            id: `observation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            skillType: observedSkill,
+            amount: Math.floor(10 * learningMultiplier),
+            source: ExperienceSource.OBSERVATION,
+            success: true,
+            quality: 0.6 + (trustLevel * 0.3),
+            difficulty: 0.5,
+            impact: 0.7, // Observation has moderate impact
+            context: {
+                ...context,
+                situation: 'observing_agent',
+                location: context.location || { x: 0, y: 0, z: 0 },
+                participants: [observedAgentId],
+                tools: context.tools || [],
+                difficulty: 0.5,
+                timePressure: 0.3,
+                riskLevel: 0.1,
+                socialContext: 'cooperative'
+            },
+            synergyBonus: 0,
+            personalityBonus: 0,
+            contextBonus: learningMultiplier * 0.2,
+            plateauModifier: 0,
+            componentGains: {
+                knowledge: Math.floor(8 * learningMultiplier),
+                practical: Math.floor(6 * learningMultiplier),
+                creative: Math.floor(4 * learningMultiplier)
+            },
+            timestamp: Date.now()
+        };
+        // Record observation
+        if (!this.socialObservations.has(observedAgentId)) {
+            this.socialObservations.set(observedAgentId, []);
+        }
+        this.socialObservations.get(observedAgentId).push({
+            skillType: observedSkill,
+            timestamp: Date.now(),
+            quality: observationEvent.quality,
+            context
+        });
+        // Process the experience
+        return this.updateSkill(observedSkill, observationEvent);
+    }
+    /**
+     * Teach a skill to another agent
+     */
+    teachSkill(skillType, studentAgentId, teachingContext, teachingQuality = 0.7) {
+        const skill = this.getSkill(skillType);
+        if (skill.proficiency.level < 10) {
+            return null; // Need sufficient skill level to teach
+        }
+        if (!this.socialState) {
+            return null;
+        }
+        // Check relationship with student
+        const relationship = this.socialState.relationships.activeRelationships.includes(studentAgentId);
+        const trustLevel = this.socialState.relationships.trustLevels[studentAgentId] || 0.5;
+        // Teaching improves teacher's understanding (learning by teaching)
+        const teachingBonus = 0.2 + (teachingQuality * 0.3);
+        // Create teaching experience event
+        const teachingEvent = {
+            id: `teaching_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            skillType,
+            amount: Math.floor(15 * teachingBonus),
+            source: ExperienceSource.TEACHING,
+            success: true,
+            quality: teachingQuality,
+            difficulty: 0.3, // Teaching is generally easier than performing
+            impact: 0.8, // Teaching has high impact on learning
+            context: {
+                situation: 'teaching_agent',
+                location: teachingContext?.location || { x: 0, y: 0, z: 0 },
+                participants: [studentAgentId],
+                tools: teachingContext?.tools || [],
+                difficulty: 0.3,
+                timePressure: 0.2,
+                riskLevel: 0.1,
+                socialContext: 'teaching'
+            },
+            synergyBonus: 0.1,
+            personalityBonus: this.personality.getProfile().traits?.agreeableness * 0.2 || 0.1,
+            contextBonus: teachingBonus * 0.3,
+            plateauModifier: 0,
+            componentGains: {
+                knowledge: Math.floor(12 * teachingBonus),
+                practical: Math.floor(5 * teachingBonus),
+                creative: Math.floor(8 * teachingBonus)
+            },
+            timestamp: Date.now()
+        };
+        // Record teaching
+        const currentStudents = this.teachingHistory.get(skillType) || 0;
+        this.teachingHistory.set(skillType, currentStudents + 1);
+        // Update skill metadata
+        skill.metadata.taughtTo.push(studentAgentId);
+        // Process the experience
+        return this.updateSkill(skillType, teachingEvent);
+    }
+    /**
+     * Collaboratively execute a skill with other agents
+     */
+    collaborativeSkillExecution(skillType, collaborators, context) {
+        const skill = this.getSkill(skillType);
+        if (!this.socialState) {
+            return null;
+        }
+        // Calculate collaboration effectiveness based on relationships
+        let totalRelationshipStrength = 0;
+        let validCollaborators = 0;
+        collaborators.forEach(collaboratorId => {
+            if (this.socialState.relationships.activeRelationships.includes(collaboratorId)) {
+                const trustLevel = this.socialState.relationships.trustLevels[collaboratorId] || 0.5;
+                const friendshipLevel = this.socialState.relationships.friendshipLevels[collaboratorId] || 0.5;
+                totalRelationshipStrength += (trustLevel + friendshipLevel) / 2;
+                validCollaborators++;
+            }
+        });
+        const avgRelationshipStrength = validCollaborators > 0 ? totalRelationshipStrength / validCollaborators : 0.1;
+        // Collaboration bonus based on relationship strength and team size
+        const collaborationBonus = 0.3 + (avgRelationshipStrength * 0.4) + (validCollaborators * 0.1);
+        // Create collaborative experience event
+        const collaborationEvent = {
+            id: `collaboration_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            skillType,
+            amount: Math.floor(20 * collaborationBonus),
+            source: ExperienceSource.SOCIAL, // Use SOCIAL instead of COLLABORATION
+            success: true,
+            quality: 0.7 + (avgRelationshipStrength * 0.2),
+            difficulty: 0.4, // Collaboration often reduces difficulty
+            impact: 0.9, // Collaboration has high impact
+            context: {
+                ...context,
+                situation: 'collaborative_execution',
+                location: context.location || { x: 0, y: 0, z: 0 },
+                participants: collaborators,
+                tools: context.tools || [],
+                difficulty: 0.4,
+                timePressure: 0.3,
+                riskLevel: 0.2,
+                socialContext: 'cooperative'
+            },
+            synergyBonus: 0.2,
+            personalityBonus: this.personality.getProfile().traits?.agreeableness * 0.3 || 0.15,
+            contextBonus: collaborationBonus * 0.4,
+            plateauModifier: 0,
+            componentGains: {
+                knowledge: Math.floor(10 * collaborationBonus),
+                practical: Math.floor(15 * collaborationBonus),
+                creative: Math.floor(8 * collaborationBonus)
+            },
+            timestamp: Date.now()
+        };
+        // Process the experience
+        return this.updateSkill(skillType, collaborationEvent);
+    }
+    /**
+     * Get social skill reputation
+     */
+    getSocialSkillReputation(skillType) {
+        const skill = this.getSkill(skillType);
+        // Calculate reputation based on skill level, teaching history, and social feedback
+        let reputation = skill.proficiency.level / 100; // Base from skill level
+        const teachings = this.teachingHistory.get(skillType) || 0;
+        reputation += Math.min(0.3, teachings * 0.05); // Teaching improves reputation
+        // Social feedback from relationships
+        if (this.socialState) {
+            const avgTrust = this.socialState.relationships.activeRelationships.reduce((sum, agentId) => {
+                return sum + (this.socialState.relationships.trustLevels[agentId] || 0.5);
+            }, 0) / Math.max(1, this.socialState.relationships.activeRelationships.length);
+            reputation += (avgTrust - 0.5) * 0.4; // Trust affects reputation
+        }
+        // Count observations and endorsements
+        let observations = 0;
+        let endorsements = 0;
+        this.socialObservations.forEach(agentObservations => {
+            agentObservations.forEach(obs => {
+                if (obs.skillType === skillType) {
+                    observations++;
+                    if (obs.quality > 0.8) {
+                        endorsements++;
+                    }
+                }
+            });
+        });
+        return {
+            reputation: Math.max(0, Math.min(1, reputation)),
+            endorsements,
+            teachings,
+            observations
+        };
+    }
+    /**
+     * Identify social skill gaps
+     */
+    identifySocialSkillGaps() {
+        if (!this.socialState) {
+            return [];
+        }
+        const gaps = [];
+        const allSkills = this.getAllSkills();
+        // Analyze social skills importance based on current relationships and activities
+        allSkills.forEach(skill => {
+            let socialImportance = 0.5; // Base importance
+            // Increase importance for social categories
+            if (skill.category === SkillCategory.SOCIAL) {
+                socialImportance = 0.8;
+            }
+            // Adjust based on relationship needs
+            if (this.socialState.relationships.activeRelationships.length > 3) {
+                socialImportance += 0.2; // More relationships = higher social skill importance
+            }
+            // Adjust based on group activities
+            if (this.socialState.socialContext.groupDynamics?.cohesion > 0.6) {
+                socialImportance += 0.1;
+            }
+            // Calculate gap based on skill level vs social importance
+            const gap = Math.max(0, socialImportance - (skill.proficiency.level / 100));
+            if (gap > 0.2) { // Only include significant gaps
+                gaps.push({
+                    skillType: skill.type,
+                    gap,
+                    recommendation: this.generateSocialSkillRecommendation(skill, gap),
+                    priority: gap * socialImportance
+                });
+            }
+        });
+        // Sort by priority
+        return gaps.sort((a, b) => b.priority - a.priority);
+    }
+    /**
+     * Generate social skill recommendation
+     */
+    generateSocialSkillRecommendation(skill, gap) {
+        const recommendations = [
+            `Practice ${skill.name} through group activities`,
+            `Observe skilled agents performing ${skill.name}`,
+            `Find a mentor to improve ${skill.name}`,
+            `Teach ${skill.name} to others to deepen understanding`,
+            `Collaborate on projects requiring ${skill.name}`
+        ];
+        return recommendations[Math.floor(Math.random() * recommendations.length)];
+    }
+    /**
+     * Get social learning insights
+     */
+    getSocialLearningInsights() {
+        const mostObservedAgents = Array.from(this.socialObservations.entries())
+            .sort((a, b) => b[1].length - a[1].length)
+            .slice(0, 5)
+            .map(entry => entry[0]);
+        const mostTaughtSkills = Array.from(this.teachingHistory.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(entry => entry[0]);
+        // Calculate collaboration effectiveness
+        let collaborationEffectiveness = 0.5;
+        let collaborationCount = 0;
+        this.recentProgress.forEach(progress => {
+            if (progress.timeSpent > 0) {
+                // Check if this was from collaboration (simplified check)
+                const socialProgress = this.recentProgress.filter(p => Math.abs(p.timeSpent - progress.timeSpent) < 1000).length;
+                if (socialProgress > 1) {
+                    collaborationEffectiveness += 0.1;
+                    collaborationCount++;
+                }
+            }
+        });
+        collaborationEffectiveness = Math.min(1.0, collaborationEffectiveness);
+        // Calculate social learning rate
+        const socialLearningRate = this.recentProgress.filter(progress => progress.experienceGained > 10).length / Math.max(1, this.recentProgress.length);
+        return {
+            mostObservedAgents,
+            mostTaughtSkills,
+            collaborationEffectiveness,
+            socialLearningRate
         };
     }
 }

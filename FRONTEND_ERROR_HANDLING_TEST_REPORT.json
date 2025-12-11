@@ -1,0 +1,263 @@
+{
+  "timestamp": "2025-12-10T23:34:58.849Z",
+  "summary": {
+    "totalTests": 32,
+    "passedTests": 32,
+    "failedTests": 0,
+    "successRate": 100
+  },
+  "categories": [
+    {
+      "category": "Socket Service",
+      "passed": 1,
+      "total": 1,
+      "rate": 100
+    },
+    {
+      "category": "Connection Slice",
+      "passed": 14,
+      "total": 14,
+      "rate": 100
+    },
+    {
+      "category": "Connection Status",
+      "passed": 6,
+      "total": 6,
+      "rate": 100
+    },
+    {
+      "category": "Debug Panel",
+      "passed": 5,
+      "total": 5,
+      "rate": 100
+    },
+    {
+      "category": "Agent List",
+      "passed": 7,
+      "total": 7,
+      "rate": 100
+    },
+    {
+      "category": "Error Handling",
+      "passed": 8,
+      "total": 8,
+      "rate": 100
+    },
+    {
+      "category": "Retry Logic",
+      "passed": 3,
+      "total": 3,
+      "rate": 100
+    },
+    {
+      "category": "Connection Metrics",
+      "passed": 2,
+      "total": 2,
+      "rate": 100
+    },
+    {
+      "category": "Comprehensive",
+      "passed": 3,
+      "total": 3,
+      "rate": 100
+    }
+  ],
+  "performance": {
+    "totalDuration": 1182.2968999999946,
+    "averageDuration": 36.94677812499983
+  },
+  "results": [
+    {
+      "test": "Socket Service Error Handling",
+      "status": "PASSED",
+      "message": "Error handled correctly",
+      "duration": 0.1395000000000266
+    },
+    {
+      "test": "Enhanced State Management",
+      "status": "PASSED",
+      "message": "Connection state managed correctly",
+      "duration": 0.15909999999894353
+    },
+    {
+      "test": "Connection Thunks",
+      "status": "PASSED",
+      "message": "All thunks executed successfully",
+      "duration": 371.65819999999985
+    },
+    {
+      "test": "Metrics Integration",
+      "status": "PASSED",
+      "message": "Metrics integrated correctly",
+      "duration": 0.09600000000136788
+    },
+    {
+      "test": "Error State Handling",
+      "status": "PASSED",
+      "message": "Error state handled correctly",
+      "duration": 0.0771999999997206
+    },
+    {
+      "test": "Status Indicator Rendering",
+      "status": "PASSED",
+      "message": "Status indicator rendered correctly",
+      "duration": 0.06810000000041327
+    },
+    {
+      "test": "View Modes",
+      "status": "PASSED",
+      "message": "Compact and detailed views work correctly",
+      "duration": 0.11499999999978172
+    },
+    {
+      "test": "Reconnect Button",
+      "status": "PASSED",
+      "message": "Reconnect button works correctly",
+      "duration": 0.05189999999856809
+    },
+    {
+      "test": "Real-time Updates",
+      "status": "PASSED",
+      "message": "Real-time updates work correctly",
+      "duration": 0.07529999999860593
+    },
+    {
+      "test": "Debug Panel Toggle",
+      "status": "PASSED",
+      "message": "Debug panel toggles correctly",
+      "duration": 0.054200000000491855
+    },
+    {
+      "test": "Event Logging",
+      "status": "PASSED",
+      "message": "Events logged correctly",
+      "duration": 0.07239999999910651
+    },
+    {
+      "test": "Raw Data Display",
+      "status": "PASSED",
+      "message": "Raw data displayed correctly",
+      "duration": 0.08439999999973224
+    },
+    {
+      "test": "Performance Metrics",
+      "status": "PASSED",
+      "message": "Performance metrics recorded correctly",
+      "duration": 0.05979999999908614
+    },
+    {
+      "test": "Enhanced Error States",
+      "status": "PASSED",
+      "message": "Error states rendered correctly",
+      "duration": 0.07129999999961001
+    },
+    {
+      "test": "Loading States",
+      "status": "PASSED",
+      "message": "Loading states work correctly",
+      "duration": 0.051199999999880674
+    },
+    {
+      "test": "Manual Refresh",
+      "status": "PASSED",
+      "message": "Manual refresh works correctly",
+      "duration": 105.13120000000163
+    },
+    {
+      "test": "Connection Status Display",
+      "status": "PASSED",
+      "message": "Connection status displayed correctly",
+      "duration": 0.14460000000144646
+    },
+    {
+      "test": "Progress Indicators",
+      "status": "PASSED",
+      "message": "Progress indicators work correctly",
+      "duration": 0.06099999999969441
+    },
+    {
+      "test": "Skeleton Loaders",
+      "status": "PASSED",
+      "message": "Skeleton loaders work correctly",
+      "duration": 0.05130000000099244
+    },
+    {
+      "test": "Loading State Transitions",
+      "status": "PASSED",
+      "message": "Loading state transitions work correctly",
+      "duration": 0.03960000000006403
+    },
+    {
+      "test": "Error Boundary",
+      "status": "PASSED",
+      "message": "Error boundary works correctly",
+      "duration": 0.0864000000001397
+    },
+    {
+      "test": "Network Error Handling",
+      "status": "PASSED",
+      "message": "Network errors handled correctly",
+      "duration": 0.07409999999981665
+    },
+    {
+      "test": "User-Friendly Error Messages",
+      "status": "PASSED",
+      "message": "Error messages are user-friendly",
+      "duration": 0.035799999999653664
+    },
+    {
+      "test": "Error Recovery Mechanisms",
+      "status": "PASSED",
+      "message": "Error recovery works correctly",
+      "duration": 105.71699999999873
+    },
+    {
+      "test": "Exponential Backoff",
+      "status": "PASSED",
+      "message": "Exponential backoff works correctly",
+      "duration": 0.06480000000010477
+    },
+    {
+      "test": "Jitter Addition",
+      "status": "PASSED",
+      "message": "Jitter added correctly",
+      "duration": 0.046399999999266583
+    },
+    {
+      "test": "Retry Limit Enforcement",
+      "status": "PASSED",
+      "message": "Retry limit enforced correctly",
+      "duration": 0.049100000000180444
+    },
+    {
+      "test": "Latency Measurement",
+      "status": "PASSED",
+      "message": "Latency measured correctly",
+      "duration": 0.0768000000007305
+    },
+    {
+      "test": "Connection Statistics",
+      "status": "PASSED",
+      "message": "Connection statistics calculated correctly",
+      "duration": 0.07139999999890279
+    },
+    {
+      "test": "Connection Lifecycle",
+      "status": "PASSED",
+      "message": "Connection lifecycle works correctly",
+      "duration": 489.8582999999999
+    },
+    {
+      "test": "Error Recovery Flow",
+      "status": "PASSED",
+      "message": "Error recovery flow works correctly",
+      "duration": 107.77259999999842
+    },
+    {
+      "test": "Real-time Data Synchronization",
+      "status": "PASSED",
+      "message": "Data synchronization works correctly",
+      "duration": 0.18289999999979045
+    }
+  ]
+}
