@@ -1,4 +1,4 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { getSocketService, type SocketServiceStatus, type ConnectionMetrics } from '../../services/socketService';
 
 export interface ConnectionState {
@@ -154,106 +154,125 @@ export const selectIsReconnecting = (state: { connection: ConnectionState }) => 
 export const selectLatency = (state: { connection: ConnectionState }) => state.connection.latency;
 export const selectLastPingTime = (state: { connection: ConnectionState }) => state.connection.lastPingTime;
 
-// Thunks for async connection logic
-export const connectToServer = () => async (dispatch: any, getState: any) => {
-  const state = getState();
-  
-  // Don't connect if already connected or connecting
-  if (selectIsConnected(state) || selectIsConnecting(state)) {
-    return;
-  }
-  
-  dispatch(startConnecting());
-  
-  try {
-    // Initialize socket connection
-    const socketService = getSocketService();
-    if (!socketService) {
-      throw new Error('Socket service not available');
+// Thunks for async connection logic using createAsyncThunk
+export const connectToServer = createAsyncThunk(
+  'connection/connectToServer',
+  async (_, { dispatch, getState }) => {
+    const state = getState() as { connection: ConnectionState };
+    
+    // Don't connect if already connected or connecting
+    if (selectIsConnected(state) || selectIsConnecting(state)) {
+      return;
     }
     
-    // Set up status change listener
-    socketService.onStatusChange((status: SocketServiceStatus) => {
-      dispatch(updateConnectionAttempts(status.connectionAttempts));
-      dispatch(updateMetrics(status.metrics));
+    dispatch(startConnecting());
+    
+    try {
+      // Initialize socket connection
+      const socketService = getSocketService();
+      if (!socketService) {
+        throw new Error('Socket service not available');
+      }
       
-      if (status.isConnected) {
-        dispatch(setConnectionStatus('connected'));
-        dispatch(clearConnectionError());
-        dispatch(setReconnecting(false));
-      } else if (status.isConnecting) {
-        dispatch(setConnectionStatus('connecting'));
-        // Only set reconnecting to true if this is actually a reconnection attempt
-        // (connectionAttempts > 1 means we've been connected before)
-        if (status.connectionAttempts > 1) {
-          dispatch(setReconnecting(true));
+      // Set up status change listener
+      socketService.onStatusChange((status: SocketServiceStatus) => {
+        dispatch(updateConnectionAttempts(status.connectionAttempts));
+        dispatch(updateMetrics(status.metrics));
+        
+        if (status.isConnected) {
+          dispatch(setConnectionStatus('connected'));
+          dispatch(clearConnectionError());
+          dispatch(setReconnecting(false));
+        } else if (status.isConnecting) {
+          dispatch(setConnectionStatus('connecting'));
+          // Only set reconnecting to true if this is actually a reconnection attempt
+          // (connectionAttempts > 1 means we've been connected before)
+          if (status.connectionAttempts > 1) {
+            dispatch(setReconnecting(true));
+          } else {
+            dispatch(setReconnecting(false));
+          }
         } else {
+          dispatch(setConnectionError(status.lastError || 'Connection failed'));
           dispatch(setReconnecting(false));
         }
-      } else {
-        dispatch(setConnectionError(status.lastError || 'Connection failed'));
-        dispatch(setReconnecting(false));
-      }
-    });
+      });
+      
+      await socketService.connect();
+      dispatch(setConnectionStatus('connected'));
+      return { connected: true };
+    } catch (error) {
+      dispatch(setConnectionError(error instanceof Error ? error.message : 'Unknown connection error'));
+      throw error;
+    }
+  }
+);
+
+export const disconnectFromServer = createAsyncThunk(
+  'connection/disconnectFromServer',
+  async (_, { dispatch }) => {
+    dispatch(disconnect());
+    // Close socket connection
+    const socketService = getSocketService();
+    if (socketService) {
+      socketService.offStatusChange(() => {}); // Remove all status listeners
+      socketService.disconnect();
+    }
+    return { disconnected: true };
+  }
+);
+
+export const reconnectToServer = createAsyncThunk(
+  'connection/reconnectToServer',
+  async (_, { dispatch, getState }) => {
+    const state = getState() as { connection: ConnectionState };
+    const attempts = selectReconnectAttempts(state);
     
-    await socketService.connect();
-    dispatch(setConnectionStatus('connected'));
-  } catch (error) {
-    dispatch(setConnectionError(error instanceof Error ? error.message : 'Unknown connection error'));
-  }
-};
-
-export const disconnectFromServer = () => async (dispatch: any) => {
-  dispatch(disconnect());
-  // Close socket connection
-  const socketService = getSocketService();
-  if (socketService) {
-    socketService.offStatusChange(() => {}); // Remove all status listeners
-    socketService.disconnect();
-  }
-};
-
-export const reconnectToServer = () => async (dispatch: any, getState: any) => {
-  const state = getState();
-  const attempts = selectReconnectAttempts(state);
-  
-  if (attempts >= state.connection.maxReconnectAttempts) {
-    dispatch(setConnectionError('Maximum reconnection attempts reached'));
-    return;
-  }
-  
-  dispatch(incrementReconnectAttempts());
-  dispatch(setReconnecting(true));
-  
-  try {
-    // Force reconnect with socket service
-    const socketService = getSocketService();
-    if (!socketService) {
-      throw new Error('Socket service not available');
+    if (attempts >= state.connection.maxReconnectAttempts) {
+      dispatch(setConnectionError('Maximum reconnection attempts reached'));
+      throw new Error('Maximum reconnection attempts reached');
     }
-    await socketService.forceReconnect();
-    dispatch(setConnectionStatus('connected'));
-    dispatch(setReconnecting(false));
-  } catch (error) {
-    dispatch(setConnectionError(error instanceof Error ? error.message : 'Reconnection failed'));
-    dispatch(setReconnecting(false));
-  }
-};
-
-export const forceReconnect = () => async (dispatch: any) => {
-  dispatch(startConnecting());
-  dispatch(setReconnecting(true));
-  
-  try {
-    const socketService = getSocketService();
-    if (!socketService) {
-      throw new Error('Socket service not available');
+    
+    dispatch(incrementReconnectAttempts());
+    dispatch(setReconnecting(true));
+    
+    try {
+      // Force reconnect with socket service
+      const socketService = getSocketService();
+      if (!socketService) {
+        throw new Error('Socket service not available');
+      }
+      await socketService.forceReconnect();
+      dispatch(setConnectionStatus('connected'));
+      dispatch(setReconnecting(false));
+      return { reconnected: true };
+    } catch (error) {
+      dispatch(setConnectionError(error instanceof Error ? error.message : 'Reconnection failed'));
+      dispatch(setReconnecting(false));
+      throw error;
     }
-    await socketService.forceReconnect();
-    dispatch(setConnectionStatus('connected'));
-    dispatch(setReconnecting(false));
-  } catch (error) {
-    dispatch(setConnectionError(error instanceof Error ? error.message : 'Force reconnection failed'));
-    dispatch(setReconnecting(false));
   }
-};
+);
+
+export const forceReconnect = createAsyncThunk(
+  'connection/forceReconnect',
+  async (_, { dispatch }) => {
+    dispatch(startConnecting());
+    dispatch(setReconnecting(true));
+    
+    try {
+      const socketService = getSocketService();
+      if (!socketService) {
+        throw new Error('Socket service not available');
+      }
+      await socketService.forceReconnect();
+      dispatch(setConnectionStatus('connected'));
+      dispatch(setReconnecting(false));
+      return { reconnected: true };
+    } catch (error) {
+      dispatch(setConnectionError(error instanceof Error ? error.message : 'Force reconnection failed'));
+      dispatch(setReconnecting(false));
+      throw error;
+    }
+  }
+);

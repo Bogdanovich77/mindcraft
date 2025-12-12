@@ -135,9 +135,11 @@ import {
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
-  Radar,
-  TooltipProps
+  Radar
 } from 'recharts';
+
+// Import type separately
+import type { TooltipProps } from 'recharts';
 
 // Import performance selectors and actions
 import {
@@ -318,27 +320,27 @@ const ReportCard: React.FC<ReportCardProps> = ({
           {/* Actions */}
           <Stack direction="row" spacing={1}>
             <Tooltip title="View">
-              <IconButton size="small" onClick={() => onView?.(report)}>
+              <IconButton size="small" onClick={() => onView?.(report)} >
                 <VisibilityIcon />
               </IconButton>
             </Tooltip>
             <Tooltip title="Download">
-              <IconButton size="small" onClick={() => onDownload?.(report)}>
+              <IconButton size="small" onClick={() => onDownload?.(report)} >
                 <DownloadIcon />
               </IconButton>
             </Tooltip>
             <Tooltip title="Share">
-              <IconButton size="small" onClick={() => onShare?.(report)}>
+              <IconButton size="small" onClick={() => onShare?.(report)} >
                 <ShareIcon />
               </IconButton>
             </Tooltip>
             <Tooltip title="Edit">
-              <IconButton size="small" onClick={() => onEdit?.(report)}>
+              <IconButton size="small" onClick={() => onEdit?.(report)} >
                 <EditIcon />
               </IconButton>
             </Tooltip>
             <Tooltip title="Delete">
-              <IconButton size="small" onClick={() => onDelete?.(report)}>
+              <IconButton size="small" onClick={() => onDelete?.(report)} >
                 <DeleteIcon />
               </IconButton>
             </Tooltip>

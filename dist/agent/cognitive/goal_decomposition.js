@@ -1,0 +1,644 @@
+import { GoalLevel, GoalStatus, GoalPriority, DependencyType } from './goal_types.js';
+/**
+ * Goal decomposition strategies
+ */
+export var DecompositionStrategy;
+(function (DecompositionStrategy) {
+    DecompositionStrategy["HIERARCHICAL"] = "hierarchical";
+    DecompositionStrategy["TEMPORAL"] = "temporal";
+    DecompositionStrategy["RESOURCE_BASED"] = "resource_based";
+    DecompositionStrategy["SKILL_BASED"] = "skill_based";
+    DecompositionStrategy["DEPENDENCY_DRIVEN"] = "dependency_driven";
+    DecompositionStrategy["CONTEXT_AWARE"] = "context_aware";
+    DecompositionStrategy["OPPORTUNISTIC"] = "opportunistic"; // Leverage current opportunities
+})(DecompositionStrategy || (DecompositionStrategy = {}));
+/**
+ * Goal decomposition engine
+ */
+export class GoalDecompositionEngine {
+    templates;
+    contextAnalyzer;
+    patternMatcher;
+    constructor() {
+        this.templates = new Map();
+        this.contextAnalyzer = new ContextAnalyzer();
+        this.patternMatcher = new PatternMatcher();
+        this.initializeTemplates();
+    }
+    /**
+     * Decompose a goal into subgoals based on strategy and context
+     */
+    async decomposeGoal(goal, context, strategy) {
+        // Select appropriate strategy
+        const selectedStrategy = strategy || this.selectStrategy(goal, context);
+        // Find matching template
+        const template = this.findTemplate(goal, selectedStrategy);
+        // Generate subgoals
+        const subgoals = template
+            ? await this.decomposeFromTemplate(goal, template, context)
+            : await this.decomposeDynamically(goal, selectedStrategy, context);
+        // Validate decomposition
+        const validation = this.validateDecomposition(goal, subgoals, context);
+        // Create execution plan
+        const executionPlan = this.createExecutionPlan(goal, subgoals, context);
+        return {
+            originalGoal: goal,
+            subgoals,
+            decompositionStrategy: selectedStrategy,
+            confidence: validation.confidence,
+            alternatives: validation.alternatives
+        };
+    }
+    /**
+     * Select best decomposition strategy for a goal
+     */
+    selectStrategy(goal, context) {
+        // Analyze goal characteristics
+        const urgency = this.calculateUrgency(goal, context);
+        const complexity = this.estimateComplexity(goal);
+        const resourceConstraints = this.analyzeResourceConstraints(goal, context);
+        const timePressure = this.analyzeTimePressure(goal, context);
+        // Strategy selection logic
+        if (urgency > 0.8 && timePressure > 0.7) {
+            return DecompositionStrategy.OPPORTUNISTIC;
+        }
+        if (resourceConstraints > 0.6) {
+            return DecompositionStrategy.RESOURCE_BASED;
+        }
+        if (complexity > 0.7) {
+            return DecompositionStrategy.HIERARCHICAL;
+        }
+        if (context.environmentalConditions.length > 0) {
+            return DecompositionStrategy.CONTEXT_AWARE;
+        }
+        return DecompositionStrategy.HIERARCHICAL; // Default strategy
+    }
+    /**
+     * Find matching decomposition template
+     */
+    findTemplate(goal, strategy) {
+        for (const [pattern, template] of this.templates) {
+            if (this.patternMatcher.matches(goal, pattern) &&
+                template.strategy === strategy) {
+                return template;
+            }
+        }
+        return null;
+    }
+    /**
+     * Decompose goal using template
+     */
+    async decomposeFromTemplate(goal, template, context) {
+        const subgoals = [];
+        for (const pattern of template.subgoalPatterns) {
+            const subgoal = this.createGoalFromPattern(goal, pattern, context);
+            subgoals.push(subgoal);
+        }
+        return subgoals;
+    }
+    /**
+     * Decompose goal dynamically without template
+     */
+    async decomposeDynamically(goal, strategy, context) {
+        switch (strategy) {
+            case DecompositionStrategy.HIERARCHICAL:
+                return this.hierarchicalDecomposition(goal, context);
+            case DecompositionStrategy.TEMPORAL:
+                return this.temporalDecomposition(goal, context);
+            case DecompositionStrategy.RESOURCE_BASED:
+                return this.resourceBasedDecomposition(goal, context);
+            case DecompositionStrategy.SKILL_BASED:
+                return this.skillBasedDecomposition(goal, context);
+            case DecompositionStrategy.DEPENDENCY_DRIVEN:
+                return this.dependencyDrivenDecomposition(goal, context);
+            case DecompositionStrategy.CONTEXT_AWARE:
+                return this.contextAwareDecomposition(goal, context);
+            case DecompositionStrategy.OPPORTUNISTIC:
+                return this.opportunisticDecomposition(goal, context);
+            default:
+                return this.hierarchicalDecomposition(goal, context);
+        }
+    }
+    /**
+     * Hierarchical decomposition (strategic -> tactical -> operational)
+     */
+    hierarchicalDecomposition(goal, context) {
+        const subgoals = [];
+        if (goal.level === GoalLevel.STRATEGIC) {
+            // Break strategic goal into tactical objectives
+            const tacticalGoals = this.generateTacticalGoals(goal, context);
+            subgoals.push(...tacticalGoals);
+        }
+        else if (goal.level === GoalLevel.TACTICAL) {
+            // Break tactical goal into operational tasks
+            const operationalGoals = this.generateOperationalGoals(goal, context);
+            subgoals.push(...operationalGoals);
+        }
+        else {
+            // Operational goals may need task breakdown
+            const taskGoals = this.generateTaskBreakdown(goal, context);
+            subgoals.push(...taskGoals);
+        }
+        return subgoals;
+    }
+    /**
+     * Temporal decomposition by phases
+     */
+    temporalDecomposition(goal, context) {
+        const subgoals = [];
+        const phases = this.identifyTemporalPhases(goal, context);
+        for (let i = 0; i < phases.length; i++) {
+            const phase = phases[i];
+            const subgoal = this.createPhaseSubgoal(goal, phase, i, context);
+            subgoals.push(subgoal);
+        }
+        return subgoals;
+    }
+    /**
+     * Resource-based decomposition
+     */
+    resourceBasedDecomposition(goal, context) {
+        const subgoals = [];
+        // Create resource gathering subgoals
+        for (const requirement of goal.requirements) {
+            if (this.needsResourceAcquisition(requirement, context)) {
+                const resourceGoal = this.createResourceAcquisitionGoal(goal, requirement, context);
+                subgoals.push(resourceGoal);
+            }
+        }
+        // Create main execution subgoal
+        const executionGoal = this.createExecutionSubgoal(goal, context);
+        subgoals.push(executionGoal);
+        return subgoals;
+    }
+    /**
+     * Skill-based decomposition
+     */
+    skillBasedDecomposition(goal, context) {
+        const subgoals = [];
+        const requiredSkills = this.identifyRequiredSkills(goal);
+        // Create skill development subgoals if needed
+        for (const skill of requiredSkills) {
+            if (this.needsSkillDevelopment(skill, context)) {
+                const skillGoal = this.createSkillDevelopmentGoal(goal, skill, context);
+                subgoals.push(skillGoal);
+            }
+        }
+        // Create main execution subgoal
+        const executionGoal = this.createExecutionSubgoal(goal, context);
+        subgoals.push(executionGoal);
+        return subgoals;
+    }
+    /**
+     * Dependency-driven decomposition
+     */
+    dependencyDrivenDecomposition(goal, context) {
+        const subgoals = [];
+        const dependencies = this.analyzeDependencies(goal, context);
+        // Create subgoals for each dependency
+        for (const dependency of dependencies) {
+            if (dependency.type === DependencyType.PREREQUISITE) {
+                const depGoal = this.createDependencySubgoal(goal, dependency, context);
+                subgoals.push(depGoal);
+            }
+        }
+        // Create main execution subgoal
+        const executionGoal = this.createExecutionSubgoal(goal, context);
+        subgoals.push(executionGoal);
+        return subgoals;
+    }
+    /**
+     * Context-aware decomposition
+     */
+    contextAwareDecomposition(goal, context) {
+        const subgoals = [];
+        const contextFactors = this.contextAnalyzer.analyzeContext(context);
+        // Adapt decomposition based on context
+        if (contextFactors.hasUrgentOpportunities) {
+            const opportunityGoals = this.createOpportunityGoals(goal, context);
+            subgoals.push(...opportunityGoals);
+        }
+        if (contextFactors.hasThreats) {
+            const mitigationGoals = this.createThreatMitigationGoals(goal, context);
+            subgoals.push(...mitigationGoals);
+        }
+        // Standard decomposition
+        const standardGoals = this.hierarchicalDecomposition(goal, context);
+        subgoals.push(...standardGoals);
+        return subgoals;
+    }
+    /**
+     * Opportunistic decomposition
+     */
+    opportunisticDecomposition(goal, context) {
+        const subgoals = [];
+        const opportunities = this.identifyOpportunities(context);
+        // Create subgoals that leverage opportunities
+        for (const opportunity of opportunities) {
+            const oppGoal = this.createOpportunityBasedGoal(goal, opportunity, context);
+            subgoals.push(oppGoal);
+        }
+        return subgoals;
+    }
+    /**
+     * Generate tactical goals from strategic goal
+     */
+    generateTacticalGoals(strategic, context) {
+        const tacticalGoals = [];
+        // Common strategic goal patterns
+        if (strategic.objective.includes('build') || strategic.objective.includes('construct')) {
+            tacticalGoals.push(this.createConstructionTacticalGoal(strategic, context));
+        }
+        if (strategic.objective.includes('trade') || strategic.objective.includes('economic')) {
+            tacticalGoals.push(this.createEconomicTacticalGoal(strategic, context));
+        }
+        if (strategic.objective.includes('explore') || strategic.objective.includes('discover')) {
+            tacticalGoals.push(this.createExplorationTacticalGoal(strategic, context));
+        }
+        return tacticalGoals;
+    }
+    /**
+     * Generate operational goals from tactical goal
+     */
+    generateOperationalGoals(tactical, context) {
+        const operationalGoals = [];
+        // Resource gathering goals
+        for (const requirement of tactical.requirements) {
+            if (requirement.type === 'item' || requirement.type === 'tool') {
+                const gatherGoal = this.createGatheringGoal(tactical, requirement, context);
+                operationalGoals.push(gatherGoal);
+            }
+        }
+        // Main execution goal
+        const executionGoal = this.createExecutionSubgoal(tactical, context);
+        operationalGoals.push(executionGoal);
+        return operationalGoals;
+    }
+    /**
+     * Create goal from pattern template
+     */
+    createGoalFromPattern(parent, pattern, context) {
+        const now = Date.now();
+        return {
+            id: this.generateGoalId(),
+            name: this.interpolatePattern(pattern.name, parent, context),
+            description: this.interpolatePattern(pattern.name, parent, context),
+            level: pattern.level,
+            status: GoalStatus.PENDING,
+            priority: this.calculateSubgoalPriority(parent, pattern.weight),
+            objective: this.interpolatePattern(pattern.objective, parent, context),
+            successCriteria: pattern.successCriteria.map(criteria => this.interpolatePattern(criteria, parent, context)),
+            createdAt: now,
+            dependencies: pattern.dependencies.map(depId => ({
+                goalId: depId,
+                type: DependencyType.PREREQUISITE,
+                strength: 1.0
+            })),
+            subgoals: [],
+            parentGoal: parent.id,
+            requirements: pattern.requirements,
+            allocatedResources: [],
+            progress: {
+                percentage: 0,
+                milestones: [],
+                quality: {
+                    efficiency: 0,
+                    effectiveness: 0,
+                    elegance: 0,
+                    learning: 0
+                },
+                timeSpent: 0,
+                lastUpdate: now
+            },
+            motivationSource: parent.motivationSource,
+            personalityAlignment: parent.personalityAlignment,
+            ethicalScore: parent.ethicalScore,
+            expectedLearning: [],
+            tags: parent.tags,
+            category: parent.category,
+            source: 'system'
+        };
+    }
+    /**
+     * Initialize decomposition templates
+     */
+    initializeTemplates() {
+        // Construction template
+        this.templates.set('construction', {
+            pattern: 'build|construct|create.*structure',
+            strategy: DecompositionStrategy.HIERARCHICAL,
+            subgoalPatterns: [
+                {
+                    name: 'Gather Materials',
+                    level: GoalLevel.OPERATIONAL,
+                    objective: 'Collect required building materials',
+                    successCriteria: ['All materials gathered', 'Materials accessible at build site'],
+                    requirements: [],
+                    dependencies: [],
+                    weight: 0.3
+                },
+                {
+                    name: 'Prepare Site',
+                    level: GoalLevel.OPERATIONAL,
+                    objective: 'Prepare construction site',
+                    successCriteria: ['Site cleared', 'Foundation prepared', 'Area secured'],
+                    requirements: [],
+                    dependencies: ['Gather Materials'],
+                    weight: 0.2
+                },
+                {
+                    name: 'Build Structure',
+                    level: GoalLevel.OPERATIONAL,
+                    objective: 'Construct the main structure',
+                    successCriteria: ['Structure completed', 'All components placed', 'Structure stable'],
+                    requirements: [],
+                    dependencies: ['Prepare Site'],
+                    weight: 0.5
+                }
+            ]
+        });
+        // Trading template
+        this.templates.set('trading', {
+            pattern: 'trade|economic|market',
+            strategy: DecompositionStrategy.RESOURCE_BASED,
+            subgoalPatterns: [
+                {
+                    name: 'Acquire Trade Goods',
+                    level: GoalLevel.OPERATIONAL,
+                    objective: 'Obtain goods for trading',
+                    successCriteria: ['Trade goods acquired', 'Goods properly stored'],
+                    requirements: [],
+                    dependencies: [],
+                    weight: 0.4
+                },
+                {
+                    name: 'Find Trading Partners',
+                    level: GoalLevel.OPERATIONAL,
+                    objective: 'Identify and establish contact with trading partners',
+                    successCriteria: ['Partners identified', 'Communication established'],
+                    requirements: [],
+                    dependencies: [],
+                    weight: 0.3
+                },
+                {
+                    name: 'Execute Trades',
+                    level: GoalLevel.OPERATIONAL,
+                    objective: 'Complete trading transactions',
+                    successCriteria: ['Trades completed', 'Profits realized', 'Relationships maintained'],
+                    requirements: [],
+                    dependencies: ['Acquire Trade Goods', 'Find Trading Partners'],
+                    weight: 0.3
+                }
+            ]
+        });
+    }
+    /**
+     * Helper methods for decomposition logic
+     */
+    calculateUrgency(goal, context) {
+        if (!goal.deadline)
+            return 0;
+        const timeRemaining = goal.deadline - Date.now();
+        const totalTime = goal.estimatedDuration || timeRemaining;
+        return Math.max(0, 1 - (timeRemaining / totalTime));
+    }
+    estimateComplexity(goal) {
+        // Simple heuristic based on requirements and dependencies
+        const requirementComplexity = goal.requirements.length * 0.1;
+        const dependencyComplexity = goal.dependencies.length * 0.15;
+        return Math.min(1, requirementComplexity + dependencyComplexity);
+    }
+    analyzeResourceConstraints(goal, context) {
+        let constraintScore = 0;
+        for (const requirement of goal.requirements) {
+            const available = context.availableResources.find(r => r.name === requirement.name);
+            if (!available || available.quantity < requirement.quantity) {
+                constraintScore += 0.2;
+            }
+        }
+        return Math.min(1, constraintScore);
+    }
+    analyzeTimePressure(goal, context) {
+        return this.calculateUrgency(goal, context);
+    }
+    needsResourceAcquisition(requirement, context) {
+        const available = context.availableResources.find(r => r.name === requirement.name);
+        return !available || available.quantity < requirement.quantity;
+    }
+    identifyRequiredSkills(goal) {
+        // Extract skill requirements from goal context
+        const skills = [];
+        if (goal.objective.includes('build') || goal.objective.includes('construct')) {
+            skills.push('construction', 'architecture');
+        }
+        if (goal.objective.includes('mine') || goal.objective.includes('dig')) {
+            skills.push('mining', 'excavation');
+        }
+        if (goal.objective.includes('craft') || goal.objective.includes('create')) {
+            skills.push('crafting', 'smithing');
+        }
+        return skills;
+    }
+    needsSkillDevelopment(skill, context) {
+        // Check if agent has sufficient skill level
+        // This would integrate with the skills system
+        return false; // Placeholder
+    }
+    analyzeDependencies(goal, context) {
+        return goal.dependencies;
+    }
+    identifyOpportunities(context) {
+        // Identify opportunities in current context
+        return []; // Placeholder
+    }
+    identifyTemporalPhases(goal, context) {
+        // Break goal into temporal phases
+        return []; // Placeholder
+    }
+    createPhaseSubgoal(goal, phase, index, context) {
+        // Create subgoal for specific phase
+        return this.createExecutionSubgoal(goal, context); // Placeholder
+    }
+    createResourceAcquisitionGoal(goal, requirement, context) {
+        const now = Date.now();
+        return {
+            id: this.generateGoalId(),
+            name: `Acquire ${requirement.name}`,
+            description: `Gather ${requirement.quantity}x ${requirement.name}`,
+            level: GoalLevel.OPERATIONAL,
+            status: GoalStatus.PENDING,
+            priority: GoalPriority.HIGH,
+            objective: `Obtain ${requirement.quantity} ${requirement.name}`,
+            successCriteria: [`Have ${requirement.quantity} ${requirement.name} in inventory`],
+            createdAt: now,
+            dependencies: [{
+                    goalId: goal.id,
+                    type: DependencyType.SUPPORTS,
+                    strength: 1.0
+                }],
+            subgoals: [],
+            parentGoal: goal.id,
+            requirements: [requirement],
+            allocatedResources: [],
+            progress: {
+                percentage: 0,
+                milestones: [],
+                quality: { efficiency: 0, effectiveness: 0, elegance: 0, learning: 0 },
+                timeSpent: 0,
+                lastUpdate: now
+            },
+            motivationSource: goal.motivationSource,
+            personalityAlignment: goal.personalityAlignment,
+            ethicalScore: goal.ethicalScore,
+            expectedLearning: [],
+            tags: ['resource', 'gathering'],
+            category: 'logistics',
+            source: 'system'
+        };
+    }
+    createExecutionSubgoal(goal, context) {
+        const now = Date.now();
+        return {
+            id: this.generateGoalId(),
+            name: `Execute: ${goal.name}`,
+            description: `Main execution of ${goal.name}`,
+            level: goal.level === GoalLevel.STRATEGIC ? GoalLevel.TACTICAL : GoalLevel.OPERATIONAL,
+            status: GoalStatus.PENDING,
+            priority: goal.priority,
+            objective: goal.objective,
+            successCriteria: goal.successCriteria,
+            createdAt: now,
+            dependencies: [],
+            subgoals: [],
+            parentGoal: goal.id,
+            requirements: goal.requirements,
+            allocatedResources: [],
+            progress: {
+                percentage: 0,
+                milestones: [],
+                quality: { efficiency: 0, effectiveness: 0, elegance: 0, learning: 0 },
+                timeSpent: 0,
+                lastUpdate: now
+            },
+            motivationSource: goal.motivationSource,
+            personalityAlignment: goal.personalityAlignment,
+            ethicalScore: goal.ethicalScore,
+            expectedLearning: goal.expectedLearning,
+            tags: goal.tags,
+            category: goal.category,
+            source: 'system'
+        };
+    }
+    createSkillDevelopmentGoal(goal, skill, context) {
+        // Create skill development goal
+        return this.createExecutionSubgoal(goal, context); // Placeholder
+    }
+    createDependencySubgoal(goal, dependency, context) {
+        // Create dependency resolution goal
+        return this.createExecutionSubgoal(goal, context); // Placeholder
+    }
+    createOpportunityGoals(goal, context) {
+        // Create goals based on opportunities
+        return []; // Placeholder
+    }
+    createThreatMitigationGoals(goal, context) {
+        // Create threat mitigation goals
+        return []; // Placeholder
+    }
+    createOpportunityBasedGoal(goal, opportunity, context) {
+        // Create goal based on opportunity
+        return this.createExecutionSubgoal(goal, context); // Placeholder
+    }
+    createConstructionTacticalGoal(strategic, context) {
+        // Create construction tactical goal
+        return this.createExecutionSubgoal(strategic, context); // Placeholder
+    }
+    createEconomicTacticalGoal(strategic, context) {
+        // Create economic tactical goal
+        return this.createExecutionSubgoal(strategic, context); // Placeholder
+    }
+    createExplorationTacticalGoal(strategic, context) {
+        // Create exploration tactical goal
+        return this.createExecutionSubgoal(strategic, context); // Placeholder
+    }
+    createGatheringGoal(tactical, requirement, context) {
+        return this.createResourceAcquisitionGoal(tactical, requirement, context);
+    }
+    generateTaskBreakdown(goal, context) {
+        // Break operational goal into smaller tasks
+        return [this.createExecutionSubgoal(goal, context)];
+    }
+    calculateSubgoalPriority(parent, weight) {
+        // Calculate subgoal priority based on parent and weight
+        if (parent.priority === GoalPriority.CRITICAL && weight > 0.5) {
+            return GoalPriority.CRITICAL;
+        }
+        if (parent.priority === GoalPriority.HIGH && weight > 0.3) {
+            return GoalPriority.HIGH;
+        }
+        return GoalPriority.MEDIUM;
+    }
+    interpolatePattern(pattern, parent, context) {
+        // Replace pattern variables with actual values
+        return pattern.replace(/\{parent\}/g, parent.name)
+            .replace(/\{objective\}/g, parent.objective);
+    }
+    generateGoalId() {
+        return `goal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    validateDecomposition(goal, subgoals, context) {
+        // Validate decomposition quality
+        const confidence = this.calculateDecompositionConfidence(goal, subgoals, context);
+        return {
+            confidence,
+            alternatives: [] // Could generate alternative decompositions
+        };
+    }
+    calculateDecompositionConfidence(goal, subgoals, context) {
+        // Simple heuristic based on coverage and feasibility
+        const coverage = subgoals.length > 0 ? 0.8 : 0.3;
+        const feasibility = subgoals.every(sg => sg.requirements.length <= 3) ? 0.9 : 0.6;
+        return (coverage + feasibility) / 2;
+    }
+    createExecutionPlan(goal, subgoals, context) {
+        const steps = subgoals.map((subgoal, index) => ({
+            id: subgoal.id,
+            name: subgoal.name,
+            description: subgoal.description,
+            estimatedDuration: subgoal.estimatedDuration || 60000, // 1 minute default
+            dependencies: subgoal.dependencies.map(dep => dep.goalId),
+            requiredSkills: [],
+            requiredResources: subgoal.requirements,
+            status: 'pending'
+        }));
+        return {
+            steps,
+            currentStep: 0,
+            estimatedTimeRemaining: steps.reduce((sum, step) => sum + step.estimatedDuration, 0),
+            contingencies: []
+        };
+    }
+}
+/**
+ * Context analyzer for decomposition decisions
+ */
+class ContextAnalyzer {
+    analyzeContext(context) {
+        return {
+            hasUrgentOpportunities: false,
+            hasThreats: false,
+            resourceAbundance: 0.5,
+            socialSupport: 0.5
+        };
+    }
+}
+/**
+ * Pattern matcher for template selection
+ */
+class PatternMatcher {
+    matches(goal, pattern) {
+        const regex = new RegExp(pattern, 'i');
+        return regex.test(goal.objective) || regex.test(goal.description);
+    }
+}
+//# sourceMappingURL=goal_decomposition.js.map

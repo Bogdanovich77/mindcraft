@@ -1,0 +1,94 @@
+{
+  "timestamp": "2025-12-12T13:41:04.870Z",
+  "summary": {
+    "total": 8,
+    "passed": 4,
+    "failed": 4,
+    "successRate": 50
+  },
+  "tests": [
+    {
+      "name": "Basic Startup",
+      "status": "failed",
+      "duration": 71,
+      "error": "Help output not displayed correctly",
+      "timestamp": "2025-12-12T13:41:04.371Z"
+    },
+    {
+      "name": "Error Detection",
+      "status": "failed",
+      "duration": 73,
+      "error": "Not all error types detected. Found: ",
+      "timestamp": "2025-12-12T13:41:04.446Z"
+    },
+    {
+      "name": "WebSocket Monitoring",
+      "status": "failed",
+      "duration": 66,
+      "error": "WebSocket monitoring tests incomplete",
+      "timestamp": "2025-12-12T13:41:04.512Z"
+    },
+    {
+      "name": "Health Checks",
+      "status": "passed",
+      "duration": 80,
+      "result": {
+        "statusReports": 1,
+        "processMonitoring": true,
+        "connectionMonitoring": true
+      },
+      "timestamp": "2025-12-12T13:41:04.592Z"
+    },
+    {
+      "name": "Alert Thresholds",
+      "status": "passed",
+      "duration": 67,
+      "result": {
+        "totalAlerts": 5,
+        "thresholdExceeded": true,
+        "criticalAlerts": 2
+      },
+      "timestamp": "2025-12-12T13:41:04.659Z"
+    },
+    {
+      "name": "Log Management",
+      "status": "failed",
+      "duration": 67,
+      "error": "Log management test failed - no log files created",
+      "timestamp": "2025-12-12T13:41:04.727Z"
+    },
+    {
+      "name": "Process Recovery",
+      "status": "passed",
+      "duration": 72,
+      "result": {
+        "recoveryAttempts": 2,
+        "processFailureDetected": false,
+        "restartAttempted": true
+      },
+      "timestamp": "2025-12-12T13:41:04.799Z"
+    },
+    {
+      "name": "Performance Load",
+      "status": "passed",
+      "duration": 71,
+      "result": {
+        "metricsCollected": 4,
+        "memoryMonitoring": true,
+        "loadTesting": true
+      },
+      "timestamp": "2025-12-12T13:41:04.870Z"
+    }
+  ],
+  "environment": {
+    "nodeVersion": "v24.11.1",
+    "platform": "win32",
+    "memory": {
+      "rss": 52289536,
+      "heapTotal": 8183808,
+      "heapUsed": 5391968,
+      "external": 2009079,
+      "arrayBuffers": 10937
+    }
+  }
+}

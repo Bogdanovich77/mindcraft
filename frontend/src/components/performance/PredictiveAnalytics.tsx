@@ -84,9 +84,10 @@ import {
   Legend,
   ComposedChart,
   ScatterChart,
-  Scatter,
-  TooltipProps
+  Scatter
 } from 'recharts';
+
+import type { TooltipProps } from 'recharts';
 
 // Import performance selectors and actions
 import {
@@ -133,7 +134,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
       id={`prediction-tabpanel-${index}`}
       aria-labelledby={`prediction-tab-${index}`}
     >
-      {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
+      {value === index && <Box sx={{ pt: 3 }} />}
     </div>
   );
 };

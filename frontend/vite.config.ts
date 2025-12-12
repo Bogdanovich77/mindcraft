@@ -103,13 +103,13 @@ export default defineConfig(({ mode }) => {
       // Enhanced proxy configuration for development
       proxy: {
         '/api': {
-          target: env.VITE_API_URL || 'http://localhost:3000',
+          target: env.VITE_API_URL || 'http://localhost:8080',
           changeOrigin: true,
           secure: false,
           timeout: 10000,
         },
         '/socket.io': {
-          target: env.VITE_SOCKET_URL || 'http://localhost:3000',
+          target: env.VITE_SOCKET_URL || 'http://localhost:8080',
           changeOrigin: true,
           ws: true,
           timeout: 10000,
@@ -127,8 +127,8 @@ export default defineConfig(({ mode }) => {
     // Enhanced environment-specific configurations
     define: {
       __APP_ENV__: JSON.stringify(mode),
-      __API_URL__: JSON.stringify(env.VITE_API_URL || 'http://localhost:3000'),
-      __SOCKET_URL__: JSON.stringify(env.VITE_SOCKET_URL || 'http://localhost:3000'),
+      __API_URL__: JSON.stringify(env.VITE_API_URL || 'http://localhost:8080'),
+      __SOCKET_URL__: JSON.stringify(env.VITE_SOCKET_URL || 'http://localhost:8080'),
       __CDN_URL__: JSON.stringify(env.VITE_CDN_URL || ''),
       __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
       __SENTRY_DSN__: JSON.stringify(env.VITE_SENTRY_DSN || ''),

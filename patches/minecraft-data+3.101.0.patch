@@ -1,0 +1,33 @@
+diff --git a/node_modules/minecraft-data/minecraft-data/data/pc/1.21.6/protocol.json b/node_modules/minecraft-data/minecraft-data/data/pc/1.21.6/protocol.json
+index ee96ff7..8c65248 100644
+--- a/node_modules/minecraft-data/minecraft-data/data/pc/1.21.6/protocol.json
++++ b/node_modules/minecraft-data/minecraft-data/data/pc/1.21.6/protocol.json
+@@ -2639,13 +2639,6 @@
+         }
+       ]
+     ],
+-    "entityMetadata": [
+-      "entityMetadataLoop",
+-      {
+-        "endVal": 255,
+-        "type": "entityMetadataEntry"
+-      }
+-    ],
+     "tags": [
+       "array",
+       {
+@@ -7217,7 +7210,13 @@
+             },
+             {
+               "name": "metadata",
+-              "type": "entityMetadata"
++              "type": [
++                "entityMetadataLoop",
++                {
++                  "endVal": 255,
++                  "type": "entityMetadataEntry"
++                }
++              ]
+             }
+           ]
+         ],

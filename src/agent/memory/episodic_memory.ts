@@ -1,9 +1,18 @@
 import type { 
   EpisodicEvent, 
-  MemoryQuery, 
   WorldContext,
   ActionRecord 
 } from '../langgraph/interfaces.js';
+
+// Define MemoryQuery interface locally since it's not exported
+interface MemoryQuery {
+  query: string;
+  types?: string[];
+  filters?: any;
+  importance?: number;
+  timeRange?: { start: number; end: number };
+  limit?: number;
+}
 
 /**
  * Episodic memory system for storing events with forgetting curves and consolidation
@@ -19,9 +28,17 @@ export class EpisodicMemory {
   private consolidationThreshold: number = 0.7; // Importance threshold for consolidation
   
   private eventStoredCallbacks: Array<(event: ExtendedEpisodicEvent) => void> = [];
+  private semanticMemoryRef: any = null; // Reference to semantic memory for consolidation
   
   constructor() {
     this.forgettingCurve = new ForgettingCurve();
+  }
+  
+  /**
+   * Set reference to semantic memory for consolidation
+   */
+  setSemanticMemory(semanticMemory: any): void {
+    this.semanticMemoryRef = semanticMemory;
   }
   
   /**
@@ -61,6 +78,56 @@ export class EpisodicMemory {
     this.eventStoredCallbacks.forEach(callback => callback(extendedEvent));
   }
   
+  /**
+   * Consolidate a specific episode to semantic memory
+   */
+  async consolidateEpisode(episode: ExtendedEpisodicEvent): Promise<void> {
+    // Reduce activation level of the episodic event
+    const event = this.events.get(episode.id);
+    if (!event) return;
+    
+    // Call semantic memory to extract and store semantic facts and procedural patterns
+    if (this.semanticMemoryRef && typeof this.semanticMemoryRef.generalizeExperience === 'function') {
+      await this.semanticMemoryRef.generalizeExperience(event);
+    }
+    
+    // Extract patterns locally as well
+    const patterns = await this.extractPatterns(event);
+    
+    // Store extracted patterns in working memory for immediate access
+    await this.storePatternsInWorkingMemory(patterns, event);
+    
+    // Reduce episodic memory activation (forgetting)
+    event.importance *= 0.7; // Reduce importance after consolidation
+    
+    // Mark as consolidated
+    if (!event.tags.includes('consolidated')) {
+      event.tags.push('consolidated');
+    }
+    
+    // Remove from consolidation queue
+    const index = this.consolidationQueue.indexOf(episode.id);
+    if (index >= 0) {
+      this.consolidationQueue.splice(index, 1);
+    }
+    
+    // Trigger consolidation callbacks if any
+    this.eventStoredCallbacks.forEach(callback => callback(event));
+  }
+  
+  /**
+   * Store extracted patterns in working memory for immediate access
+   */
+  private async storePatternsInWorkingMemory(patterns: ExtractedPattern[], event: ExtendedEpisodicEvent): Promise<void> {
+    // This would integrate with working memory system
+    // For now, we'll just store them as metadata
+    if (!event.metadata) {
+      event.metadata = {};
+    }
+    event.metadata.extractedPatterns = patterns;
+    event.metadata.consolidationTimestamp = Date.now();
+  }
+
   /**
    * Query episodic memory
    */
@@ -467,7 +534,7 @@ export interface EmotionalTag {
 }
 
 export interface ExtractedPattern {
-  type: 'action_outcome' | 'emergency_response' | 'social_pattern' | 'location_pattern';
+  type: 'action_outcome' | 'emergency_response' | 'social_pattern' | 'location_pattern' | 'resource_pattern';
   action?: string;
   outcome?: string;
   context?: any;

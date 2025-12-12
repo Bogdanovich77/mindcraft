@@ -186,14 +186,11 @@ export interface AgentPositionMapProps {
 }
 
 export interface AgentOverviewDashboardProps {
-  agentId: string;
-  agent: AgentState;
-  metrics: AgentRealTimeMetrics;
-  performanceData: PerformanceData;
-  positionData: AgentPositionData;
+  agent?: AgentState;
+  performanceData?: PerformanceData;
+  positionData?: AgentPositionData;
   settings: DashboardUISettings;
-  onSettingsChange: (settings: Partial<DashboardUISettings>) => void;
-  onAgentSelect: (agentId: string) => void;
+  onAgentSelect?: (agentId: string) => void;
   className?: string;
 }
 
@@ -202,9 +199,9 @@ export interface AgentOverviewDashboardProps {
  */
 export interface DashboardState {
   selectedAgentId: string | null;
-  metrics: Map<string, AgentRealTimeMetrics>;
-  performanceData: Map<string, PerformanceData>;
-  positionData: Map<string, AgentPositionData>;
+  metrics: Record<string, AgentRealTimeMetrics>;
+  performanceData: Record<string, PerformanceData>;
+  positionData: Record<string, AgentPositionData>;
   settings: DashboardUISettings;
   loading: boolean;
   error: string | null;

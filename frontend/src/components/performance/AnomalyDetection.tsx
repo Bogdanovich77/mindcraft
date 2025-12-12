@@ -1,12 +1,3 @@
-/**
- * Anomaly Detection Component
- * 
- * This component provides advanced anomaly detection and alerting capabilities,
- * including real-time anomaly monitoring, alert management, pattern recognition,
- * and automated incident response. It includes statistical anomaly detection,
- * machine learning-based pattern recognition, and comprehensive alert workflows.
- */
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
@@ -110,8 +101,7 @@ import {
   Scatter,
   ComposedChart,
   BarChart,
-  Bar,
-  TooltipProps
+  Bar
 } from 'recharts';
 
 // Import performance selectors and actions
@@ -137,6 +127,8 @@ import type {
   AnomalyPattern,
   AlertNotification
 } from '../../types/performance';
+// Import types separately to avoid Vite bundling issues
+import type { TooltipProps } from 'recharts';
 
 interface AnomalyDetectionProps {
   agentId?: string;

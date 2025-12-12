@@ -139,9 +139,10 @@ import {
   Radar,
   ScatterChart,
   Scatter,
-  TooltipProps,
   ReferenceLine
 } from 'recharts';
+
+import type { TooltipProps } from 'recharts';
 
 // Import performance selectors and actions
 import {

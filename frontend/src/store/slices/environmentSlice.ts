@@ -1,11 +1,4 @@
-/**
- * Environment Redux Slice
- * 
- * Redux slice for managing environment data, agent positions,
- * spatial regions, and environmental context.
- */
-
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import type { 
   AgentPosition, 
   EnvironmentData, 
@@ -75,7 +68,7 @@ export const fetchSpatialRegions = createAsyncThunk(
 
 // Initial state
 const initialState: EnvironmentState = {
-  agentPositions: new Map(),
+  agentPositions: {}, // Changed from new Map() to plain object
   environmentData: null,
   spatialRegions: [],
   selectedAgents: [],
@@ -116,12 +109,12 @@ const environmentSlice = createSlice({
   reducers: {
     // Update agent position
     updateAgentPosition: (state, action: PayloadAction<{ agentId: string; position: AgentPosition['position'] }>) => {
-      const existingAgent = state.agentPositions.get(action.payload.agentId);
+      const existingAgent = state.agentPositions[action.payload.agentId];
       if (existingAgent) {
         existingAgent.position = action.payload.position;
         existingAgent.lastUpdate = Date.now();
       } else {
-        state.agentPositions.set(action.payload.agentId, {
+        state.agentPositions[action.payload.agentId] = {
           id: action.payload.agentId,
           name: action.payload.agentId, // Default name
           position: action.payload.position,
@@ -129,7 +122,7 @@ const environmentSlice = createSlice({
           status: 'active',
           lastUpdate: Date.now(),
           velocity: { x: 0, y: 0 }
-        });
+        };
       }
       state.lastUpdated = Date.now();
     },
@@ -137,10 +130,10 @@ const environmentSlice = createSlice({
     // Update multiple agent positions
     updateAgentPositions: (state, action: PayloadAction<AgentPosition[]>) => {
       action.payload.forEach(agent => {
-        state.agentPositions.set(agent.id, {
+        state.agentPositions[agent.id] = {
           ...agent,
           lastUpdate: Date.now()
-        });
+        };
       });
       state.lastUpdated = Date.now();
     },
@@ -183,7 +176,7 @@ const environmentSlice = createSlice({
     },
 
     // Update visualization config
-    updateVisualizationConfig: (state, action: PayloadAction<Partial<EnvironmentState['visualizationConfig']>) => {
+    updateVisualizationConfig: (state, action: PayloadAction<Partial<EnvironmentState['visualizationConfig']>>) => {
       state.visualizationConfig = {
         ...state.visualizationConfig,
         ...action.payload
@@ -191,7 +184,7 @@ const environmentSlice = createSlice({
     },
 
     // Update zoom and pan
-    updateZoom: (state, action: PayloadAction<{ scale: number; offset: { x: number; y: number }>) => {
+    updateZoom: (state, action: PayloadAction<{ scale: number; offset: { x: number; y: number } }>) => {
       state.currentScale = action.payload.scale;
       state.currentOffset = action.payload.offset;
     },
@@ -221,7 +214,11 @@ const environmentSlice = createSlice({
       })
       .addCase(fetchAgentPositions.fulfilled, (state, action) => {
         state.loading = false;
-        state.agentPositions = new Map(action.payload.map((agent: AgentPosition) => [agent.id, agent]));
+        // Convert array to plain object with agentId as key
+        state.agentPositions = action.payload.reduce((acc: Record<string, AgentPosition>, agent: AgentPosition) => {
+          acc[agent.id] = agent;
+          return acc;
+        }, {});
         state.lastUpdated = Date.now();
       })
       .addCase(fetchAgentPositions.rejected, (state, action) => {

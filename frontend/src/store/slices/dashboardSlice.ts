@@ -1,509 +1,409 @@
-import { createSlice, createAsyncThunk, type PayloadAction, createSelector } from '@reduxjs/toolkit';
-import type {
-  AgentRealTimeMetrics,
-  PerformanceData,
-  AgentPositionData,
-  DashboardUISettings,
-  DashboardState,
-  DashboardError,
-  TimeRange,
-  ChartType
-} from '../../types/dashboard';
+/**
+ * Dashboard slice for agent overview dashboard
+ * 
+ * This slice manages the state for the agent overview dashboard, including
+ * real-time metrics, performance data, position data, and UI settings.
+ */
 
-// Initial state for the dashboard
-const initialDashboardState: DashboardState = {
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
+import type { 
+  AgentRealTimeMetrics, 
+  PerformanceData, 
+  AgentPositionData, 
+  DashboardState, 
+  DashboardUISettings,
+  AgentStatus
+} from '../../types/dashboard';
+import type { AgentState } from '../../types/agent';
+
+// Initial state
+const initialState: DashboardState = {
   selectedAgentId: null,
-  metrics: new Map(),
-  performanceData: new Map(),
-  positionData: new Map(),
+  metrics: {},
+  performanceData: {},
+  positionData: {},
   settings: {
     layout: 'grid',
-    refreshRate: 1000,
+    refreshRate: 5000,
     animations: true,
     soundEnabled: false,
-    theme: 'light',
+    theme: 'auto',
     notifications: {
       enabled: true,
       threshold: {
-        cognitiveLoad: 80,
-        responseTime: 2000,
-        successRate: 0.8
-      }
+        cognitiveLoad: 0.8,
+        responseTime: 1000,
+        successRate: 0.9,
+      },
     },
     visualization: {
       gaugeStyle: 'radial',
       chartType: 'line',
-      mapStyle: '2d'
-    }
+      mapStyle: '2d',
+    },
   },
   loading: false,
   error: null,
-  lastUpdate: Date.now()
+  lastUpdate: Date.now(),
 };
 
-// Async thunks for dashboard operations
-export const fetchAgentMetrics = createAsyncThunk(
-  'dashboard/fetchAgentMetrics',
+// Async thunks
+export const fetchDashboardData = createAsyncThunk(
+  'dashboard/fetchDashboardData',
   async (agentId: string, { rejectWithValue }) => {
     try {
-      // This would typically make an API call to fetch metrics
-      // For now, we'll simulate with mock data
-      const metrics: AgentRealTimeMetrics = {
+      // In a real implementation, this would fetch from the backend
+      // For now, return mock data
+      const mockMetrics: AgentRealTimeMetrics = {
         agentId,
         timestamp: Date.now(),
         cognitiveLoad: {
-          current: Math.random(),
-          trend: ['increasing', 'decreasing', 'stable'][Math.floor(Math.random() * 3)] as 'increasing' | 'decreasing' | 'stable',
+          current: 0.65,
+          trend: 'stable',
           threshold: 0.8,
-          history: Array.from({ length: 10 }, () => Math.random())
+          history: [0.6, 0.65, 0.7, 0.65, 0.6, 0.65, 0.7, 0.65, 0.6, 0.65],
         },
         performance: {
-          responseTime: Math.random() * 1000,
-          successRate: Math.random(),
-          memoryUsage: Math.random() * 2048,
-          cpuUsage: Math.random() * 100
+          responseTime: 250,
+          successRate: 0.95,
+          memoryUsage: 512,
+          cpuUsage: 45,
         },
         activity: {
-          currentAction: ['mining', 'building', 'exploring', 'idle'][Math.floor(Math.random() * 4)],
-          actionDuration: Math.random() * 5000,
-          actionProgress: Math.random(),
-          goalProgress: Math.random()
+          currentAction: 'mining',
+          actionDuration: 3000,
+          actionProgress: 0.75,
+          goalProgress: 0.6,
         },
         health: {
-          healthStatus: ['critical', 'warning', 'normal', 'optimal'][Math.floor(Math.random() * 4)] as 'critical' | 'warning' | 'normal' | 'optimal',
-          healthScore: Math.random() * 100,
-          energyLevel: Math.random(),
-          resourceLevel: Math.random()
-        }
+          healthStatus: 'normal',
+          healthScore: 85,
+          energyLevel: 0.8,
+          resourceLevel: 0.7,
+        },
       };
 
-      return metrics;
-    } catch (error) {
-      return rejectWithValue({
-        code: 'FETCH_METRICS_ERROR',
-        message: 'Failed to fetch agent metrics',
-        timestamp: Date.now(),
-        retryable: true
-      } as DashboardError);
-    }
-  }
-);
-
-export const fetchPerformanceData = createAsyncThunk(
-  'dashboard/fetchPerformanceData',
-  async ({ agentId, timeRange }: { agentId: string; timeRange: TimeRange }, { rejectWithValue }) => {
-    try {
-      // This would typically make an API call to fetch performance data
-      const performanceData: PerformanceData = {
+      const mockPerformanceData: PerformanceData = {
         agentId,
-        timeRange,
+        timeRange: '1h',
         metrics: {
           responseTime: {
-            timestamps: Array.from({ length: 50 }, (_, i) => Date.now() - (49 - i) * 60000),
-            values: Array.from({ length: 50 }, () => Math.random() * 1000),
-            average: Math.random() * 1000,
-            min: Math.random() * 500,
-            max: Math.random() * 1500
+            timestamps: Array.from({ length: 60 }, (_, i) => Date.now() - (59 - i) * 60000),
+            values: Array.from({ length: 60 }, () => Math.random() * 500 + 200),
+            average: 350,
+            min: 180,
+            max: 680,
           },
           cognitiveLoad: {
-            timestamps: Array.from({ length: 50 }, (_, i) => Date.now() - (49 - i) * 60000),
-            values: Array.from({ length: 50 }, () => Math.random()),
-            average: Math.random() * 0.8,
-            peaks: Array.from({ length: 5 }, () => Math.random())
+            timestamps: Array.from({ length: 60 }, (_, i) => Date.now() - (59 - i) * 60000),
+            values: Array.from({ length: 60 }, () => Math.random() * 0.8 + 0.2),
+            average: 0.65,
+            peaks: [0.9, 0.85, 0.88],
           },
           successRate: {
-            timestamps: Array.from({ length: 50 }, (_, i) => Date.now() - (49 - i) * 60000),
-            values: Array.from({ length: 50 }, () => Math.random()),
-            average: Math.random(),
-            trend: ['improving', 'declining', 'stable'][Math.floor(Math.random() * 3)] as 'improving' | 'declining' | 'stable'
+            timestamps: Array.from({ length: 60 }, (_, i) => Date.now() - (59 - i) * 60000),
+            values: Array.from({ length: 60 }, () => Math.random() * 0.2 + 0.8),
+            average: 0.92,
+            trend: 'stable',
           },
           memoryUsage: {
-            timestamps: Array.from({ length: 50 }, (_, i) => Date.now() - (49 - i) * 60000),
-            values: Array.from({ length: 50 }, () => Math.random() * 2048),
-            average: Math.random() * 1024,
-            peak: Math.random() * 2048
+            timestamps: Array.from({ length: 60 }, (_, i) => Date.now() - (59 - i) * 60000),
+            values: Array.from({ length: 60 }, () => Math.random() * 200 + 400),
+            average: 512,
+            peak: 720,
           },
           cpuUsage: {
-            timestamps: Array.from({ length: 50 }, (_, i) => Date.now() - (49 - i) * 60000),
-            values: Array.from({ length: 50 }, () => Math.random() * 100),
-            average: Math.random() * 80,
-            peak: Math.random() * 100
-          }
-        }
+            timestamps: Array.from({ length: 60 }, (_, i) => Date.now() - (59 - i) * 60000),
+            values: Array.from({ length: 60 }, () => Math.random() * 60 + 20),
+            average: 45,
+            peak: 85,
+          },
+        },
       };
 
-      return performanceData;
-    } catch (error) {
-      return rejectWithValue({
-        code: 'FETCH_PERFORMANCE_ERROR',
-        message: 'Failed to fetch performance data',
-        timestamp: Date.now(),
-        retryable: true
-      } as DashboardError);
-    }
-  }
-);
-
-export const fetchPositionData = createAsyncThunk(
-  'dashboard/fetchPositionData',
-  async (agentId: string, { rejectWithValue }) => {
-    try {
-      // This would typically make an API call to fetch position data
-      const positionData: AgentPositionData = {
+      const mockPositionData: AgentPositionData = {
         agentId,
         currentPosition: {
-          x: Math.random() * 1000,
-          y: Math.random() * 100,
-          z: Math.random() * 1000,
-          dimension: 'overworld'
+          x: 128,
+          y: 64,
+          z: 256,
+          dimension: 'overworld',
         },
-        positionHistory: Array.from({ length: 20 }, (_, i) => ({
-          timestamp: Date.now() - (19 - i) * 30000,
-          x: Math.random() * 1000,
-          y: Math.random() * 100,
-          z: Math.random() * 1000,
-          dimension: 'overworld'
+        positionHistory: Array.from({ length: 100 }, (_, i) => ({
+          timestamp: Date.now() - (99 - i) * 10000,
+          x: 128 + Math.sin(i * 0.1) * 50,
+          y: 64,
+          z: 256 + Math.cos(i * 0.1) * 50,
+          dimension: 'overworld',
         })),
         movement: {
-          speed: Math.random() * 10,
-          direction: Math.random() * 360,
-          distance: Math.random() * 1000
+          speed: 2.5,
+          direction: 45,
+          distance: 1250,
         },
-        nearbyEntities: Array.from({ length: Math.floor(Math.random() * 5) }, () => ({
-          type: ['mob', 'player', 'item'][Math.floor(Math.random() * 3)],
-          name: `Entity_${Math.floor(Math.random() * 100)}`,
-          position: {
-            x: Math.random() * 1000,
-            y: Math.random() * 100,
-            z: Math.random() * 1000
+        nearbyEntities: [
+          {
+            type: 'mob',
+            name: 'Zombie',
+            position: { x: 135, y: 64, z: 260 },
+            distance: 8.6,
+            hostility: 'hostile',
           },
-          distance: Math.random() * 50,
-          hostility: ['friendly', 'neutral', 'hostile'][Math.floor(Math.random() * 3)] as 'friendly' | 'neutral' | 'hostile'
-        }))
+          {
+            type: 'player',
+            name: 'Steve',
+            position: { x: 120, y: 64, z: 250 },
+            distance: 11.2,
+            hostility: 'friendly',
+          },
+        ],
       };
 
-      return positionData;
+      return {
+        metrics: mockMetrics,
+        performanceData: mockPerformanceData,
+        positionData: mockPositionData,
+      };
     } catch (error) {
-      return rejectWithValue({
-        code: 'FETCH_POSITION_ERROR',
-        message: 'Failed to fetch position data',
-        timestamp: Date.now(),
-        retryable: true
-      } as DashboardError);
+      return rejectWithValue(error instanceof Error ? error.message : 'Failed to fetch dashboard data');
     }
   }
 );
 
-// Dashboard slice
+// Slice
 const dashboardSlice = createSlice({
   name: 'dashboard',
-  initialState: initialDashboardState,
+  initialState,
   reducers: {
     // Agent selection
     selectAgent: (state, action: PayloadAction<string>) => {
       state.selectedAgentId = action.payload;
     },
-    deselectAgent: (state) => {
+
+    clearAgentSelection: (state) => {
       state.selectedAgentId = null;
     },
 
     // Real-time metrics updates
     updateAgentMetrics: (state, action: PayloadAction<AgentRealTimeMetrics>) => {
       const metrics = action.payload;
-      state.metrics.set(metrics.agentId, metrics);
+      state.metrics[metrics.agentId] = metrics;
       state.lastUpdate = Date.now();
     },
 
     // Performance data management
     updatePerformanceData: (state, action: PayloadAction<PerformanceData>) => {
       const data = action.payload;
-      state.performanceData.set(data.agentId, data);
+      state.performanceData[data.agentId] = data;
       state.lastUpdate = Date.now();
     },
 
     // Position data updates
     updatePositionData: (state, action: PayloadAction<AgentPositionData>) => {
       const data = action.payload;
-      state.positionData.set(data.agentId, data);
+      state.positionData[data.agentId] = data;
       state.lastUpdate = Date.now();
     },
 
-    // UI settings
+    // Settings management
     updateSettings: (state, action: PayloadAction<Partial<DashboardUISettings>>) => {
       state.settings = { ...state.settings, ...action.payload };
-    },
-    setLayout: (state, action: PayloadAction<'grid' | 'list' | 'compact'>) => {
-      state.settings.layout = action.payload;
-    },
-    setTheme: (state, action: PayloadAction<'light' | 'dark' | 'auto'>) => {
-      state.settings.theme = action.payload;
-    },
-    setRefreshRate: (state, action: PayloadAction<number>) => {
-      state.settings.refreshRate = action.payload;
-    },
-    setChartType: (state, action: PayloadAction<ChartType>) => {
-      state.settings.visualization.chartType = action.payload;
-    },
-    setGaugeStyle: (state, action: PayloadAction<'radial' | 'linear' | 'arc'>) => {
-      state.settings.visualization.gaugeStyle = action.payload;
-    },
-    setMapStyle: (state, action: PayloadAction<'2d' | '3d' | 'hybrid'>) => {
-      state.settings.visualization.mapStyle = action.payload;
-    },
-    toggleAnimations: (state) => {
-      state.settings.animations = !state.settings.animations;
-    },
-    toggleSoundEnabled: (state) => {
-      state.settings.soundEnabled = !state.settings.soundEnabled;
-    },
-    toggleNotifications: (state) => {
-      state.settings.notifications.enabled = !state.settings.notifications.enabled;
-    },
-    setNotificationThreshold: (state, action: PayloadAction<Partial<DashboardUISettings['notifications']['threshold']>>) => {
-      state.settings.notifications.threshold = { 
-        ...state.settings.notifications.threshold, 
-        ...action.payload 
-      };
     },
 
     // Loading and error states
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
     },
+
     setError: (state, action: PayloadAction<string | null>) => {
       state.error = action.payload;
     },
+
     clearError: (state) => {
       state.error = null;
     },
 
-    // Data cleanup
+    // Data management
+    clearData: (state) => {
+      state.metrics = {};
+      state.performanceData = {};
+      state.positionData = {};
+      state.selectedAgentId = null;
+    },
+
     clearAgentData: (state, action: PayloadAction<string>) => {
       const agentId = action.payload;
-      state.metrics.delete(agentId);
-      state.performanceData.delete(agentId);
-      state.positionData.delete(agentId);
+      delete state.metrics[agentId];
+      delete state.performanceData[agentId];
+      delete state.positionData[agentId];
       if (state.selectedAgentId === agentId) {
         state.selectedAgentId = null;
       }
     },
-    clearAllData: (state) => {
-      state.metrics.clear();
-      state.performanceData.clear();
-      state.positionData.clear();
-      state.selectedAgentId = null;
+
+    // Batch updates
+    batchUpdateMetrics: (state, action: PayloadAction<AgentRealTimeMetrics[]>) => {
+      action.payload.forEach((metrics) => {
+        state.metrics[metrics.agentId] = metrics;
+      });
+      state.lastUpdate = Date.now();
     },
 
-    // Reset dashboard
-    resetDashboard: () => {
-      return initialDashboardState;
-    }
+    batchUpdatePerformanceData: (state, action: PayloadAction<PerformanceData[]>) => {
+      action.payload.forEach((data) => {
+        state.performanceData[data.agentId] = data;
+      });
+      state.lastUpdate = Date.now();
+    },
+
+    batchUpdatePositionData: (state, action: PayloadAction<AgentPositionData[]>) => {
+      action.payload.forEach((data) => {
+        state.positionData[data.agentId] = data;
+      });
+      state.lastUpdate = Date.now();
+    },
   },
   extraReducers: (builder) => {
-    // Fetch agent metrics
     builder
-      .addCase(fetchAgentMetrics.pending, (state) => {
+      .addCase(fetchDashboardData.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchAgentMetrics.fulfilled, (state, action) => {
+      .addCase(fetchDashboardData.fulfilled, (state, action) => {
         state.loading = false;
-        const metrics = action.payload;
-        state.metrics.set(metrics.agentId, metrics);
+        state.metrics[action.meta.arg] = action.payload.metrics;
+        state.performanceData[action.meta.arg] = action.payload.performanceData;
+        state.positionData[action.meta.arg] = action.payload.positionData;
         state.lastUpdate = Date.now();
       })
-      .addCase(fetchAgentMetrics.rejected, (state, action) => {
+      .addCase(fetchDashboardData.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       });
-
-    // Fetch performance data
-    builder
-      .addCase(fetchPerformanceData.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchPerformanceData.fulfilled, (state, action) => {
-        state.loading = false;
-        const data = action.payload;
-        state.performanceData.set(data.agentId, data);
-        state.lastUpdate = Date.now();
-      })
-      .addCase(fetchPerformanceData.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      });
-
-    // Fetch position data
-    builder
-      .addCase(fetchPositionData.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchPositionData.fulfilled, (state, action) => {
-        state.loading = false;
-        const data = action.payload;
-        state.positionData.set(data.agentId, data);
-        state.lastUpdate = Date.now();
-      })
-      .addCase(fetchPositionData.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      });
-  }
+  },
 });
-
-// Selectors
-export const selectDashboardState = (state: { dashboard: DashboardState }) => state.dashboard;
-export const selectSelectedAgentId = (state: { dashboard: DashboardState }) => state.dashboard.selectedAgentId;
-export const selectAllAgents = (state: { dashboard: DashboardState }) => Array.from(state.dashboard.metrics.values());
-export const selectSelectedAgent = (state: { dashboard: DashboardState }) => {
-  const selectedId = state.dashboard.selectedAgentId;
-  return selectedId ? state.dashboard.metrics.get(selectedId) : null;
-};
-export const selectMetrics = (state: { dashboard: DashboardState }) => state.dashboard.metrics;
-export const selectPerformanceData = (state: { dashboard: DashboardState }) => state.dashboard.performanceData;
-export const selectPositionData = (state: { dashboard: DashboardState }) => state.dashboard.positionData;
-export const selectSettings = (state: { dashboard: DashboardState }) => state.dashboard.settings;
-export const selectLoading = (state: { dashboard: DashboardState }) => state.dashboard.loading;
-export const selectError = (state: { dashboard: DashboardState }) => state.dashboard.error;
-export const selectLastUpdate = (state: { dashboard: DashboardState }) => state.dashboard.lastUpdate;
-
-// Memoized selectors for performance
-export const selectSelectedAgentMetrics = (state: { dashboard: DashboardState }) => {
-  const { selectedAgentId, metrics } = state.dashboard;
-  return selectedAgentId ? metrics.get(selectedAgentId) : null;
-};
-
-export const selectSelectedAgentPerformanceData = (state: { dashboard: DashboardState }) => {
-  const { selectedAgentId, performanceData } = state.dashboard;
-  return selectedAgentId ? performanceData.get(selectedAgentId) : null;
-};
-
-export const selectSelectedAgentPositionData = (state: { dashboard: DashboardState }) => {
-  const { selectedAgentId, positionData } = state.dashboard;
-  return selectedAgentId ? positionData.get(selectedAgentId) : null;
-};
-
-export const selectAllAgentIds = (state: { dashboard: DashboardState }) => {
-  return Array.from(state.dashboard.metrics.keys());
-};
-
-export const selectOnlineAgents = (state: { dashboard: DashboardState }) => {
-  return Array.from(state.dashboard.metrics.values()).filter(
-    metrics => metrics.health.healthStatus !== 'critical'
-  );
-};
-
-export const selectAgentsByHealthStatus = (state: { dashboard: DashboardState }, status: 'critical' | 'warning' | 'normal' | 'optimal') => {
-  return Array.from(state.dashboard.metrics.values()).filter(
-    metrics => metrics.health.healthStatus === status
-  );
-};
-
-export const selectHighCognitiveLoadAgents = (state: { dashboard: DashboardState }, threshold: number = 0.8) => {
-  return Array.from(state.dashboard.metrics.entries())
-    .filter(([, metrics]) => metrics.cognitiveLoad.current > threshold)
-    .map(([agentId, metrics]) => ({ agentId, metrics }));
-};
-
-export const selectAverageResponseTime = (state: { dashboard: DashboardState }) => {
-  const metrics = Array.from(state.dashboard.metrics.values());
-  if (metrics.length === 0) return 0;
-  
-  const totalResponseTime = metrics.reduce((sum, metric) => sum + metric.performance.responseTime, 0);
-  return totalResponseTime / metrics.length;
-};
-
-export const selectAverageCognitiveLoad = (state: { dashboard: DashboardState }) => {
-  const metrics = Array.from(state.dashboard.metrics.values());
-  if (metrics.length === 0) return 0;
-  
-  const totalLoad = metrics.reduce((sum, metric) => sum + metric.cognitiveLoad.current, 0);
-  return totalLoad / metrics.length;
-};
-
-export const selectAverageSuccessRate = (state: { dashboard: DashboardState }) => {
-  const metrics = Array.from(state.dashboard.metrics.values());
-  if (metrics.length === 0) return 0;
-  
-  const totalSuccessRate = metrics.reduce((sum, metric) => sum + metric.performance.successRate, 0);
-  return totalSuccessRate / metrics.length;
-};
-
-// Additional selectors for better state management
-export const selectAgentMetrics = (agentId: string) => (state: { dashboard: DashboardState }) =>
-  state.dashboard.metrics.get(agentId);
-
-export const selectPerformanceDataForAgent = (agentId: string) => (state: { dashboard: DashboardState }) =>
-  state.dashboard.performanceData.get(agentId);
-
-export const selectPositionDataForAgent = (agentId: string) => (state: { dashboard: DashboardState }) =>
-  state.dashboard.positionData.get(agentId);
-
-export const selectDashboardSettings = (state: { dashboard: DashboardState }) =>
-  state.dashboard.settings;
-
-export const selectDashboardLoading = (state: { dashboard: DashboardState }) =>
-  state.dashboard.loading;
-
-export const selectDashboardError = (state: { dashboard: DashboardState }) =>
-  state.dashboard.error;
-
-export const selectDashboardLastUpdate = (state: { dashboard: DashboardState }) =>
-  state.dashboard.lastUpdate;
-
-// Memoized selectors for performance
-export const selectSystemMetrics = createSelector(
-  [selectAllAgentIds, selectOnlineAgents, selectAverageResponseTime, selectAverageCognitiveLoad, selectAverageSuccessRate],
-  (allAgentIds: string[], onlineAgents: AgentRealTimeMetrics[], avgResponseTime: number, avgCognitiveLoad: number, avgSuccessRate: number) => ({
-    totalAgents: allAgentIds.length,
-    onlineAgents: onlineAgents.length,
-    averageResponseTime: avgResponseTime,
-    averageCognitiveLoad: avgCognitiveLoad,
-    averageSuccessRate: avgSuccessRate,
-  })
-);
-
-export const selectDashboardMetrics = createSelector(
-  [selectDashboardState],
-  (dashboard: DashboardState) => ({
-    selectedAgentId: dashboard.selectedAgentId,
-    totalAgents: dashboard.metrics.size,
-    loading: dashboard.loading,
-    error: dashboard.error,
-    lastUpdate: dashboard.lastUpdate,
-  })
-);
 
 // Actions
 export const {
   selectAgent,
-  deselectAgent,
+  clearAgentSelection,
   updateAgentMetrics,
   updatePerformanceData,
   updatePositionData,
   updateSettings,
-  setLayout,
-  setTheme,
-  setRefreshRate,
-  setChartType,
-  setGaugeStyle,
-  setMapStyle,
-  toggleAnimations,
-  toggleSoundEnabled,
-  toggleNotifications,
-  setNotificationThreshold,
   setLoading,
   setError,
   clearError,
+  clearData,
   clearAgentData,
-  clearAllData,
-  resetDashboard
+  batchUpdateMetrics,
+  batchUpdatePerformanceData,
+  batchUpdatePositionData,
 } = dashboardSlice.actions;
 
-// Reducer
-// Export the state type
-export type { DashboardState };
+// Selectors
+export const selectDashboardState = (state: { dashboard: DashboardState }) => state.dashboard;
+
+export const selectSelectedAgentId = (state: { dashboard: DashboardState }) => state.dashboard.selectedAgentId;
+
+export const selectAgentMetrics = (agentId: string) => (state: { dashboard: DashboardState }) => 
+  state.dashboard.metrics[agentId];
+
+export const selectAllMetrics = (state: { dashboard: DashboardState }) => state.dashboard.metrics;
+
+export const selectPerformanceData = (agentId: string) => (state: { dashboard: DashboardState }) => 
+  state.dashboard.performanceData[agentId];
+
+export const selectAllPerformanceData = (state: { dashboard: DashboardState }) => state.dashboard.performanceData;
+
+export const selectPositionData = (agentId: string) => (state: { dashboard: DashboardState }) => 
+  state.dashboard.positionData[agentId];
+
+export const selectAllPositionData = (state: { dashboard: DashboardState }) => state.dashboard.positionData;
+
+export const selectDashboardLoading = (state: { dashboard: DashboardState }) => state.dashboard.loading;
+
+export const selectDashboardError = (state: { dashboard: DashboardState }) => state.dashboard.error;
+
+export const selectLastUpdate = (state: { dashboard: DashboardState }) => state.dashboard.lastUpdate;
+
+export const selectAgentIds = (state: { dashboard: DashboardState }) => Object.keys(state.dashboard.metrics);
+
+export const selectAgentCount = (state: { dashboard: DashboardState }) => Object.keys(state.dashboard.metrics).length;
+
+// Memoized selectors for derived data
+export const selectConnectedAgents = (state: { dashboard: DashboardState }) => 
+  Object.values(state.dashboard.metrics).filter(metrics => metrics.health.healthStatus !== 'critical');
+
+export const selectDisconnectedAgents = (state: { dashboard: DashboardState }) => 
+  Object.values(state.dashboard.metrics).filter(metrics => metrics.health.healthStatus === 'critical');
+
+export const selectAgentsByHealthStatus = (status: string) => (state: { dashboard: DashboardState }) => 
+  Object.values(state.dashboard.metrics).filter(metrics => metrics.health.healthStatus === status);
+
+export const selectDashboardSummary = (state: { dashboard: DashboardState }) => ({
+  totalAgents: Object.keys(state.dashboard.metrics).length,
+  connectedAgents: Object.values(state.dashboard.metrics).filter(metrics => metrics.health.healthStatus !== 'critical').length,
+  disconnectedAgents: Object.values(state.dashboard.metrics).filter(metrics => metrics.health.healthStatus === 'critical').length,
+  lastUpdate: state.dashboard.lastUpdate,
+});
+
+// Performance selectors
+export const selectAverageResponseTime = (state: { dashboard: DashboardState }) => {
+  const metrics = Object.values(state.dashboard.performanceData);
+  if (metrics.length === 0) return 0;
+  const total = metrics.reduce((sum, data) => sum + data.metrics.responseTime.average, 0);
+  return total / metrics.length;
+};
+
+export const selectAverageCognitiveLoad = (state: { dashboard: DashboardState }) => {
+  const metrics = Object.values(state.dashboard.metrics);
+  if (metrics.length === 0) return 0;
+  const total = metrics.reduce((sum, data) => sum + data.cognitiveLoad.current, 0);
+  return total / metrics.length;
+};
+
+export const selectAverageSuccessRate = (state: { dashboard: DashboardState }) => {
+  const metrics = Object.values(state.dashboard.performanceData);
+  if (metrics.length === 0) return 0;
+  const total = metrics.reduce((sum, data) => sum + data.metrics.successRate.average, 0);
+  return total / metrics.length;
+};
+
+export const selectAgentsWithHighCognitiveLoad = (threshold: number = 0.8) => (state: { dashboard: DashboardState }) =>
+  Object.entries(state.dashboard.metrics)
+    .filter(([, metrics]) => metrics.cognitiveLoad.current > threshold)
+    .map(([agentId]) => agentId);
+
+export const selectAgentsWithLowSuccessRate = (threshold: number = 0.7) => (state: { dashboard: DashboardState }) =>
+  Object.entries(state.dashboard.performanceData)
+    .filter(([, data]) => data.metrics.successRate.average < threshold)
+    .map(([agentId]) => agentId);
+
+// Complex selectors for dashboard optimization
+export const selectDashboardDataForAgent = (agentId: string) => (state: { dashboard: DashboardState }) => ({
+  metrics: state.dashboard.metrics[agentId],
+  performanceData: state.dashboard.performanceData[agentId],
+  positionData: state.dashboard.positionData[agentId],
+  settings: state.dashboard.settings,
+  loading: state.dashboard.loading,
+  error: state.dashboard.error,
+});
+
+export const selectDashboardAnalytics = (state: { dashboard: DashboardState }) => {
+  const agentIds = Object.keys(state.dashboard.metrics);
+  const metrics = Object.values(state.dashboard.metrics);
+  const performanceData = Object.values(state.dashboard.performanceData);
+
+  return {
+    totalAgents: agentIds.length,
+    averageCognitiveLoad: metrics.reduce((sum, m) => sum + m.cognitiveLoad.current, 0) / (metrics.length || 1),
+    averageResponseTime: performanceData.reduce((sum, p) => sum + p.metrics.responseTime.average, 0) / (performanceData.length || 1),
+    averageSuccessRate: performanceData.reduce((sum, p) => sum + p.metrics.successRate.average, 0) / (performanceData.length || 1),
+    agentsWithHighLoad: metrics.filter(m => m.cognitiveLoad.current > 0.8).length,
+    agentsWithLowSuccessRate: performanceData.filter(p => p.metrics.successRate.average < 0.7).length,
+    lastUpdate: state.dashboard.lastUpdate,
+  };
+};
 
 export default dashboardSlice.reducer;

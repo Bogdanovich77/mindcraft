@@ -1,4 +1,69 @@
 /**
+ * Pattern extraction utility for identifying recurring patterns in episodic events
+ */
+class PatternExtractor {
+    /**
+     * Extract patterns from an episodic event
+     */
+    async extractPatterns(event) {
+        const patterns = [];
+        // Extract action-outcome patterns
+        if (event.action && event.outcome) {
+            patterns.push({
+                type: 'action_outcome',
+                action: event.action,
+                outcome: event.outcome,
+                confidence: event.importance
+            });
+        }
+        // Extract emergency response patterns
+        if (event.emotional?.urgency && event.emotional.urgency >= 0.7) {
+            patterns.push({
+                type: 'emergency_response',
+                trigger: event.type,
+                response: event.action || 'no_action',
+                emotional: event.emotional,
+                confidence: event.importance
+            });
+        }
+        // Extract social patterns
+        if (event.participants && event.participants.length > 1) {
+            patterns.push({
+                type: 'social_pattern',
+                context: {
+                    participantCount: event.participants.length,
+                    interactionType: event.type
+                },
+                confidence: event.importance * 0.8
+            });
+        }
+        // Extract location patterns
+        patterns.push({
+            type: 'location_pattern',
+            context: {
+                location: event.location,
+                eventType: event.type,
+                success: event.success
+            },
+            confidence: event.importance * 0.6
+        });
+        // Extract resource patterns if applicable
+        if (event.action && (event.action.includes('collect') || event.action.includes('craft') || event.action.includes('use'))) {
+            patterns.push({
+                type: 'resource_pattern', // Type cast to handle the enum limitation
+                action: event.action,
+                outcome: event.outcome,
+                context: {
+                    availability: event.success ? 'available' : 'unavailable',
+                    efficiency: event.success ? event.importance : event.importance * 0.5
+                },
+                confidence: event.importance
+            });
+        }
+        return patterns;
+    }
+}
+/**
  * Semantic memory system for storing concepts, relationships, schemas, and prototypes
  */
 export class SemanticMemory {
@@ -9,7 +74,9 @@ export class SemanticMemory {
     activationDecayRate = 0.1; // Per hour
     maxConcepts = 1000;
     maxRelationships = 5000;
+    patternExtractor;
     constructor() {
+        this.patternExtractor = new PatternExtractor();
         this.initializeBasicConcepts();
     }
     /**
@@ -81,6 +148,274 @@ export class SemanticMemory {
             strength: 0.8,
             confidence: 0.9
         }, 'player');
+    }
+    /**
+     * Generalize experience from episodic event to create semantic knowledge
+     */
+    async generalizeExperience(experience) {
+        // Extract patterns from the episodic event
+        const patterns = await this.patternExtractor.extractPatterns(experience);
+        // Process each pattern to create or update semantic concepts
+        for (const pattern of patterns) {
+            await this.processPattern(pattern, experience);
+        }
+        // Extract and store action-outcome relationships
+        if (experience.action && experience.outcome) {
+            await this.generalizeActionOutcome(experience);
+        }
+        // Extract environmental correlations
+        await this.generalizeEnvironmentalPatterns(experience);
+        // Extract temporal patterns
+        await this.generalizeTemporalPatterns(experience);
+    }
+    /**
+     * Process extracted pattern to create semantic knowledge
+     */
+    async processPattern(pattern, experience) {
+        switch (pattern.type) {
+            case 'action_outcome':
+                await this.createActionOutcomeConcept(pattern, experience);
+                break;
+            case 'emergency_response':
+                await this.createEmergencyConcept(pattern, experience);
+                break;
+            case 'social_pattern':
+                await this.createSocialConcept(pattern, experience);
+                break;
+            case 'location_pattern':
+                await this.createLocationConcept(pattern, experience);
+                break;
+            case 'resource_pattern':
+                await this.createResourceConcept(pattern, experience);
+                break;
+        }
+    }
+    /**
+     * Create concept from action-outcome pattern
+     */
+    async createActionOutcomeConcept(pattern, experience) {
+        const actionName = pattern.action || 'unknown_action';
+        const conceptId = `action_${actionName}`;
+        const existingConcept = this.concepts.get(conceptId);
+        const effectiveness = experience.success ? pattern.confidence : pattern.confidence * 0.3;
+        const concept = {
+            id: conceptId,
+            name: `${actionName} Action`,
+            type: 'procedure',
+            activation: Math.min(1.0, (existingConcept?.activation || 0.5) + effectiveness * 0.2),
+            attributes: {
+                action: actionName,
+                typicalOutcome: pattern.outcome || experience.outcome,
+                effectiveness: effectiveness,
+                context: experience.type,
+                frequency: (existingConcept?.attributes?.frequency || 0) + 1
+            },
+            importance: Math.min(1.0, (existingConcept?.importance || 0.5) + effectiveness * 0.1),
+            relationships: existingConcept?.relationships || [],
+            lastAccessed: Date.now()
+        };
+        await this.storeConcept(concept);
+        // Create relationship to outcome
+        if (pattern.outcome) {
+            await this.storeRelationship({
+                type: 'causal',
+                target: pattern.outcome,
+                strength: effectiveness,
+                confidence: pattern.confidence
+            }, conceptId);
+        }
+    }
+    /**
+     * Create concept from emergency response pattern
+     */
+    async createEmergencyConcept(pattern, experience) {
+        const conceptId = `emergency_${pattern.trigger || 'unknown'}`;
+        const concept = {
+            id: conceptId,
+            name: `Emergency ${pattern.trigger} Response`,
+            type: 'schema',
+            activation: 0.8,
+            attributes: {
+                trigger: pattern.trigger,
+                response: pattern.response,
+                urgency: pattern.emotional?.urgency || 0.8,
+                effectiveness: experience.success ? 0.9 : 0.4,
+                lastUsed: experience.timestamp
+            },
+            importance: 0.9,
+            relationships: [],
+            lastAccessed: Date.now()
+        };
+        await this.storeConcept(concept);
+        // Link to danger concept
+        await this.storeRelationship({
+            type: 'mitigates',
+            target: 'danger',
+            strength: 0.8,
+            confidence: pattern.confidence
+        }, conceptId);
+    }
+    /**
+     * Create concept from social pattern
+     */
+    async createSocialConcept(pattern, experience) {
+        const conceptId = `social_${experience.type}`;
+        const concept = {
+            id: conceptId,
+            name: `Social ${experience.type} Pattern`,
+            type: 'schema',
+            activation: 0.6,
+            attributes: {
+                interactionType: experience.type,
+                participants: experience.participants,
+                context: pattern.context,
+                frequency: 1,
+                successRate: experience.success ? 1.0 : 0.5
+            },
+            importance: 0.7,
+            relationships: [],
+            lastAccessed: Date.now()
+        };
+        await this.storeConcept(concept);
+    }
+    /**
+     * Create concept from location pattern
+     */
+    async createLocationConcept(pattern, experience) {
+        const locationKey = `${Math.floor(experience.location.x / 10)}_${Math.floor(experience.location.z / 10)}`;
+        const conceptId = `location_${locationKey}`;
+        const existingConcept = this.concepts.get(conceptId);
+        const commonEvents = pattern.context?.commonEvents || [experience.type];
+        const concept = {
+            id: conceptId,
+            name: `Location Area ${locationKey}`,
+            type: 'location',
+            activation: Math.min(1.0, (existingConcept?.activation || 0.5) + 0.1),
+            attributes: {
+                location: experience.location,
+                areaKey: locationKey,
+                commonEvents: commonEvents,
+                visitCount: (existingConcept?.attributes?.visitCount || 0) + 1,
+                lastVisit: experience.timestamp,
+                danger: pattern.context?.danger || 0.1,
+                resources: pattern.context?.resources || []
+            },
+            importance: Math.min(1.0, (existingConcept?.importance || 0.5) + 0.05),
+            relationships: existingConcept?.relationships || [],
+            lastAccessed: Date.now()
+        };
+        await this.storeConcept(concept);
+    }
+    /**
+     * Create concept from resource pattern
+     */
+    async createResourceConcept(pattern, experience) {
+        const resourceId = pattern.action || 'unknown_resource';
+        const conceptId = `resource_${resourceId}`;
+        const concept = {
+            id: conceptId,
+            name: `Resource ${resourceId}`,
+            type: 'entity',
+            activation: 0.7,
+            attributes: {
+                resourceType: resourceId,
+                availability: pattern.context?.availability || 'unknown',
+                location: experience.location,
+                usage: pattern.outcome,
+                value: pattern.confidence
+            },
+            importance: 0.6,
+            relationships: [],
+            lastAccessed: Date.now()
+        };
+        await this.storeConcept(concept);
+    }
+    /**
+     * Generalize action-outcome relationships
+     */
+    async generalizeActionOutcome(experience) {
+        const actionConceptId = `action_${experience.action}`;
+        const outcomeConceptId = `outcome_${experience.outcome}`;
+        // Create outcome concept if it doesn't exist
+        if (!this.concepts.has(outcomeConceptId)) {
+            const outcomeConcept = {
+                id: outcomeConceptId,
+                name: experience.outcome || 'unknown_outcome',
+                type: 'property',
+                activation: 0.5,
+                attributes: {
+                    type: 'outcome',
+                    valence: experience.success ? 'positive' : 'negative',
+                    frequency: 1
+                },
+                importance: experience.success ? 0.6 : 0.4,
+                relationships: [],
+                lastAccessed: Date.now()
+            };
+            await this.storeConcept(outcomeConcept);
+        }
+        // Strengthen the relationship
+        const strength = experience.success ? 0.8 : 0.3;
+        await this.storeRelationship({
+            type: 'produces',
+            target: outcomeConceptId,
+            strength: strength,
+            confidence: experience.importance
+        }, actionConceptId);
+    }
+    /**
+     * Generalize environmental patterns
+     */
+    async generalizeEnvironmentalPatterns(experience) {
+        // Extract environmental context patterns
+        const envContext = `${experience.location.x}_${experience.location.y}_${experience.location.z}`;
+        const contextConceptId = `context_${envContext}`;
+        const existingConcept = this.concepts.get(contextConceptId);
+        const contextConcept = {
+            id: contextConceptId,
+            name: `Environmental Context ${envContext}`,
+            type: 'context',
+            activation: 0.4,
+            attributes: {
+                location: experience.location,
+                typicalActions: existingConcept?.attributes?.typicalActions ?
+                    [...existingConcept.attributes.typicalActions, experience.action].filter((v, i, a) => a.indexOf(v) === i) :
+                    [experience.action],
+                outcomes: existingConcept?.attributes?.outcomes ?
+                    [...existingConcept.attributes.outcomes, experience.outcome].filter((v, i, a) => a.indexOf(v) === i) :
+                    [experience.outcome],
+                visitCount: (existingConcept?.attributes?.visitCount || 0) + 1
+            },
+            importance: 0.3,
+            relationships: existingConcept?.relationships || [],
+            lastAccessed: Date.now()
+        };
+        await this.storeConcept(contextConcept);
+    }
+    /**
+     * Generalize temporal patterns
+     */
+    async generalizeTemporalPatterns(experience) {
+        const hour = new Date(experience.timestamp).getHours();
+        const timeConceptId = `time_${hour}`;
+        const existingConcept = this.concepts.get(timeConceptId);
+        const timeConcept = {
+            id: timeConceptId,
+            name: `Time Period ${hour}:00`,
+            type: 'temporal',
+            activation: 0.3,
+            attributes: {
+                hour: hour,
+                typicalActivities: existingConcept?.attributes?.typicalActivities ?
+                    [...existingConcept.attributes.typicalActivities, experience.action].filter((v, i, a) => a.indexOf(v) === i) :
+                    [experience.action],
+                frequency: (existingConcept?.attributes?.frequency || 0) + 1
+            },
+            importance: 0.2,
+            relationships: existingConcept?.relationships || [],
+            lastAccessed: Date.now()
+        };
+        await this.storeConcept(timeConcept);
     }
     /**
      * Store a new semantic concept
@@ -180,7 +515,7 @@ export class SemanticMemory {
             }
         }
         // Sort by relevance and limit results
-        results.sort((a, b) => (b.activation * b.importance) - (a.activation * a.importance));
+        results.sort((a, b) => (b.activation * b.importance) - (a.activation * b.importance));
         if (query.limit) {
             return results.slice(0, query.limit);
         }

@@ -277,9 +277,9 @@ export interface PersonalityUIState {
 
 // Redux action types
 export interface PersonalityState {
-  agents: Map<string, PersonalityEvolution>;
-  behavioralPatterns: Map<string, BehavioralPattern[]>;
-  comparisons: Map<string, PersonalityComparison>;
+  agents: Record<string, PersonalityEvolution>;
+  behavioralPatterns: Record<string, BehavioralPattern[]>;
+  comparisons: Record<string, PersonalityComparison>;
   correlations: CorrelationMatrix;
   ui: PersonalityUIState;
 }

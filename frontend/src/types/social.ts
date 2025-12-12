@@ -6,9 +6,9 @@
  * and all social interaction data structures.
  */
 
-// ============================================================================
+// ================================================================================================================
 // Core Social Data Types
-// ============================================================================
+// ================================================================================================================
 
 export const RelationshipType = {
   FRIENDSHIP: 'friendship',
@@ -65,9 +65,9 @@ export const CommunityType = {
 
 export type CommunityType = typeof CommunityType[keyof typeof CommunityType];
 
-// ============================================================================
+// ================================================================================================================
 // Basic Social Interfaces
-// ============================================================================
+// ================================================================================================================
 
 export interface SocialAgent {
   id: string;
@@ -144,9 +144,9 @@ export interface SocialRelationship {
   collaborations: SocialCollaboration[];
 }
 
-// ============================================================================
+// ================================================================================================================
 // Network and Community Types
-// ============================================================================
+// ================================================================================================================
 
 export interface SocialNetwork {
   id: string;
@@ -208,9 +208,9 @@ export interface GroupHierarchy {
   demotionRules: string[];
 }
 
-// ============================================================================
+// ================================================================================================================
 // Influence and Communication Types
-// ============================================================================
+// ================================================================================================================
 
 export interface InfluenceNetwork {
   nodes: InfluenceNode[];
@@ -246,10 +246,10 @@ export interface InfluenceMetrics {
   clusteringCoefficient: number;
   averagePathLength: number;
   centralityMeasures: {
-    degree: Map<string, number>;
-    betweenness: Map<string, number>;
-    closeness: Map<string, number>;
-    eigenvector: Map<string, number>;
+    degree: Record<string, number>;
+    betweenness: Record<string, number>;
+    closeness: Record<string, number>;
+    eigenvector: Record<string, number>;
   };
   influenceDistribution: {
     mean: number;
@@ -282,9 +282,9 @@ export interface CommunicationPattern {
   effectiveness: number;     // 0-1 scale
 }
 
-// ============================================================================
+// ================================================================================================================
 // Conflict and Collaboration Types
-// ============================================================================
+// ================================================================================================================
 
 export interface SocialConflict {
   id: string;
@@ -317,7 +317,7 @@ export interface SocialCollaboration {
   startTime: number;
   endTime?: number;
   status: 'active' | 'completed' | 'failed' | 'paused';
-  contributions: Map<string, number>;
+  contributions: Record<string, number>;
   outcome: CollaborationOutcome;
 }
 
@@ -329,9 +329,9 @@ export interface CollaborationOutcome {
   relationshipImpact: number; // -1 to 1
 }
 
-// ============================================================================
+// ================================================================================================================
 // Temporal and Evolution Types
-// ============================================================================
+// ================================================================================================================
 
 export interface TemporalEvolution {
   timeline: TimePoint[];
@@ -408,18 +408,18 @@ export interface EventImpact {
   };
   socialChanges: {
     trustLevelChange: number;
-    influenceRedistribution: Map<string, number>;
-    reputationChanges: Map<string, number>;
+    influenceRedistribution: Record<string, number>;
+    reputationChanges: Record<string, number>;
   };
 }
 
-// ============================================================================
+// ================================================================================================================
 // Community and Clustering Types
-// ============================================================================
+// ================================================================================================================
 
 export interface CommunityInfluenceNetwork {
-  internalInfluence: Map<string, number>;
-  externalInfluence: Map<string, number>;
+  internalInfluence: Record<string, number>;
+  externalInfluence: Record<string, number>;
   crossCommunityEdges: CrossCommunityEdge[];
   influenceFlow: InfluenceFlow[];
 }
@@ -454,9 +454,9 @@ export interface CommunityEvolution {
   };
 }
 
-// ============================================================================
+// ================================================================================================================
 // Network Metrics Types
-// ============================================================================
+// ================================================================================================================
 
 export interface NetworkMetrics {
   basic: {
@@ -488,9 +488,9 @@ export interface NetworkMetrics {
   };
 }
 
-// ============================================================================
+// ================================================================================================================
 // Visualization and UI Types
-// ============================================================================
+// ================================================================================================================
 
 export interface SocialVisualizationConfig {
   networkGraph: {
@@ -600,9 +600,9 @@ export interface SocialAnalytics {
   };
 }
 
-// ============================================================================
+// ================================================================================================================
 // Redux State Types
-// ============================================================================
+// ================================================================================================================
 
 export interface SocialState {
   // Current data
@@ -612,7 +612,7 @@ export interface SocialState {
   selectedCommunity: string | null;
   
   // Historical data
-  historicalNetworks: Map<number, SocialNetwork>;
+  historicalNetworks: Record<number, SocialNetwork>;
   evolutionData: TemporalEvolution | null;
   
   // Visualization state
@@ -634,9 +634,9 @@ export interface SocialState {
   subscribedAgents: string[];
 }
 
-// ============================================================================
+// ================================================================================================================
 // Socket.IO Event Types
-// ============================================================================
+// ================================================================================================================
 
 export interface SocialDataUpdateEvent {
   agentId: string;
@@ -660,16 +660,16 @@ export interface SocialNetworkUpdateEvent {
 export interface SocialInteractionEvent {
   interaction: SocialInteraction;
   impact: {
-    trustChanges: Map<string, number>;
-    reputationChanges: Map<string, number>;
-    influenceChanges: Map<string, number>;
+    trustChanges: Record<string, number>;
+    reputationChanges: Record<string, number>;
+    influenceChanges: Record<string, number>;
   };
   timestamp: number;
 }
 
-// ============================================================================
+// ================================================================================================================
 // Component Props Types
-// ============================================================================
+// ================================================================================================================
 
 export interface SocialRelationshipVisualizationProps {
   agentId?: string;
@@ -758,9 +758,9 @@ export interface SocialInteractionTimelineProps {
   className?: string;
 }
 
-// ============================================================================
+// ================================================================================================================
 // D3.js Network Visualization Types
-// ============================================================================
+// ================================================================================================================
 
 export interface NetworkNode {
   id: string;
@@ -798,9 +798,9 @@ export interface NetworkGraphConfig {
   getRelationshipColor: (type: RelationshipType) => string;
 }
 
-// ============================================================================
+// ================================================================================================================
 // Additional Types for Components
-// ============================================================================
+// ================================================================================================================
 
 export interface ReputationSystem {
   events: ReputationEvent[];

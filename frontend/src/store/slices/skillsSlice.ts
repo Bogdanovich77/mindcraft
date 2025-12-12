@@ -92,7 +92,7 @@ const initialState: SkillsState = {
   selectedSkillData: null,
   
   // Progression data
-  progressions: new Map(),
+  progressions: {},
   
   // Synergy data
   synergies: [],
@@ -103,7 +103,7 @@ const initialState: SkillsState = {
   achievements: [],
   
   // Analytics and insights
-  analytics: new Map(),
+  analytics: {},
   insights: [],
   recommendations: [],
   
@@ -154,8 +154,8 @@ const skillsSlice = createSlice({
     
     removeSkill: (state, action: PayloadAction<string>) => {
       state.skills = state.skills.filter(s => s.id !== action.payload);
-      state.progressions.delete(action.payload);
-      state.analytics.delete(action.payload);
+      delete state.progressions[action.payload];
+      delete state.analytics[action.payload];
       if (state.selectedSkill === action.payload) {
         state.selectedSkill = null;
         state.selectedSkillData = null;
@@ -178,22 +178,22 @@ const skillsSlice = createSlice({
     // Progression management
     setSkillProgression: (state, action: PayloadAction<{ skillId: string; progression: SkillProgression }>) => {
       const { skillId, progression } = action.payload;
-      state.progressions.set(skillId, progression);
+      state.progressions[skillId] = progression;
       state.lastUpdated = Date.now();
     },
     
     updateSkillProgression: (state, action: PayloadAction<{ skillId: string; updates: Partial<SkillProgression> }>) => {
       const { skillId, updates } = action.payload;
-      const existingProgression = state.progressions.get(skillId);
+      const existingProgression = state.progressions[skillId];
       if (existingProgression) {
-        state.progressions.set(skillId, { ...existingProgression, ...updates });
+        state.progressions[skillId] = { ...existingProgression, ...updates };
         state.lastUpdated = Date.now();
       }
     },
     
     addExperiencePoint: (state, action: PayloadAction<{ skillId: string; experience: ExperienceEvent }>) => {
       const { skillId, experience } = action.payload;
-      const progression = state.progressions.get(skillId);
+      const progression = state.progressions[skillId];
       const skill = state.skills.find(s => s.id === skillId);
       
       if (skill) {
@@ -212,7 +212,7 @@ const skillsSlice = createSlice({
           timestamp: experience.timestamp,
           amount: experience.amount,
           cumulative: skill?.metadata.totalExperience || 0,
-          source: experience.source,
+          source: experience.source as any,
           context: experience.context.situation,
           efficiency: experience.efficiency,
         };
@@ -296,11 +296,11 @@ const skillsSlice = createSlice({
       }
       
       // Update progression milestone progress
-      state.progressions.forEach(progression => {
-        const milestoneProgress = progression.milestoneProgress.find(mp => mp.milestoneId === milestoneId);
+      Object.values(state.progressions).forEach(progression => {
+        const milestoneProgress = (progression as any).milestoneProgress.find(mp => mp.milestoneId === milestoneId);
         if (milestoneProgress) {
-          milestoneProgress.currentProgress = 1.0;
-          milestoneProgress.achievedAt = achievedAt;
+          (milestoneProgress as any).currentProgress = 1.0;
+          (milestoneProgress as any).achievedAt = achievedAt;
         }
       });
       
@@ -337,15 +337,15 @@ const skillsSlice = createSlice({
     // Analytics management
     setSkillAnalytics: (state, action: PayloadAction<{ skillId: string; analytics: SkillAnalytics }>) => {
       const { skillId, analytics } = action.payload;
-      state.analytics.set(skillId, analytics);
+      state.analytics[skillId] = analytics;
       state.lastUpdated = Date.now();
     },
     
     updateSkillAnalytics: (state, action: PayloadAction<{ skillId: string; updates: Partial<SkillAnalytics> }>) => {
       const { skillId, updates } = action.payload;
-      const existingAnalytics = state.analytics.get(skillId);
+      const existingAnalytics = state.analytics[skillId];
       if (existingAnalytics) {
-        state.analytics.set(skillId, { ...existingAnalytics, ...updates });
+        state.analytics[skillId] = { ...existingAnalytics, ...updates };
         state.lastUpdated = Date.now();
       }
     },
@@ -402,58 +402,58 @@ const skillsSlice = createSlice({
     },
     
     updateProgressionChartsConfig: (state, action: PayloadAction<Partial<SkillsVisualizationConfig['progressionCharts']>>) => {
-      state.visualizationConfig.progressionCharts = { 
-        ...state.visualizationConfig.progressionCharts, 
-        ...action.payload 
+      state.visualizationConfig.progressionCharts = {
+        ...state.visualizationConfig.progressionCharts,
+        ...action.payload
       };
     },
     
     updateLearningAnalysisConfig: (state, action: PayloadAction<Partial<SkillsVisualizationConfig['learningAnalysis']>>) => {
-      state.visualizationConfig.learningAnalysis = { 
-        ...state.visualizationConfig.learningAnalysis, 
-        ...action.payload 
+      state.visualizationConfig.learningAnalysis = {
+        ...state.visualizationConfig.learningAnalysis,
+        ...action.payload
       };
     },
     
     updateSynergyMappingConfig: (state, action: PayloadAction<Partial<SkillsVisualizationConfig['synergyMapping']>>) => {
-      state.visualizationConfig.synergyMapping = { 
-        ...state.visualizationConfig.synergyMapping, 
-        ...action.payload 
+      state.visualizationConfig.synergyMapping = {
+        ...state.visualizationConfig.synergyMapping,
+        ...action.payload
       };
     },
     
     updateMilestoneTrackingConfig: (state, action: PayloadAction<Partial<SkillsVisualizationConfig['milestoneTracking']>>) => {
-      state.visualizationConfig.milestoneTracking = { 
-        ...state.visualizationConfig.milestoneTracking, 
-        ...action.payload 
+      state.visualizationConfig.milestoneTracking = {
+        ...state.visualizationConfig.milestoneTracking,
+        ...action.payload
       };
     },
     
     updatePerformanceTrendsConfig: (state, action: PayloadAction<Partial<SkillsVisualizationConfig['performanceTrends']>>) => {
-      state.visualizationConfig.performanceTrends = { 
-        ...state.visualizationConfig.performanceTrends, 
-        ...action.payload 
+      state.visualizationConfig.performanceTrends = {
+        ...state.visualizationConfig.performanceTrends,
+        ...action.payload
       };
     },
     
     updateSkillComparisonConfig: (state, action: PayloadAction<Partial<SkillsVisualizationConfig['skillComparison']>>) => {
-      state.visualizationConfig.skillComparison = { 
-        ...state.visualizationConfig.skillComparison, 
-        ...action.payload 
+      state.visualizationConfig.skillComparison = {
+        ...state.visualizationConfig.skillComparison,
+        ...action.payload
       };
     },
     
     updateExperienceAnalysisConfig: (state, action: PayloadAction<Partial<SkillsVisualizationConfig['experienceAnalysis']>>) => {
-      state.visualizationConfig.experienceAnalysis = { 
-        ...state.visualizationConfig.experienceAnalysis, 
-        ...action.payload 
+      state.visualizationConfig.experienceAnalysis = {
+        ...state.visualizationConfig.experienceAnalysis,
+        ...action.payload
       };
     },
     
     updateRecommendationsConfig: (state, action: PayloadAction<Partial<SkillsVisualizationConfig['recommendations']>>) => {
-      state.visualizationConfig.recommendations = { 
-        ...state.visualizationConfig.recommendations, 
-        ...action.payload 
+      state.visualizationConfig.recommendations = {
+        ...state.visualizationConfig.recommendations,
+        ...action.payload
       };
     },
     
@@ -561,13 +561,13 @@ const skillsSlice = createSlice({
       }
       
       // Update progression
-      const progression = state.progressions.get(skillId);
+      const progression = state.progressions[skillId];
       if (progression) {
         const newPoint = {
           timestamp: experience.timestamp,
           amount: experience.amount,
           cumulative: skill?.metadata.totalExperience || 0,
-          source: experience.source,
+          source: experience.source as any,
           context: experience.context.situation,
           efficiency: experience.efficiency,
         };
@@ -605,7 +605,7 @@ const skillsSlice = createSlice({
       }
       
       // Update progression
-      const progression = state.progressions.get(skillId);
+      const progression = state.progressions[skillId];
       if (progression) {
         const milestoneProgress = progression.milestoneProgress.find(mp => mp.milestoneId === milestone.id);
         if (milestoneProgress) {
@@ -710,12 +710,12 @@ export const initializeSkillsSocket = createAsyncThunk(
   'skills/initializeSocket',
   async (_, { dispatch, rejectWithValue }) => {
     try {
-      // Initialize streaming service for skills data
-      streamingService.createStream('skills', 'skills', {
-        window: 1000,
-        enabled: true,
-        function: (events) => events[events.length - 1] // Keep latest
-      });
+      // Note: Streams are now created centrally in App.tsx to avoid duplicates
+      // await streamingService.createStream('skills', 'skills', {
+      //   window: 1000,
+      //   enabled: true,
+      //   function: (events) => events[events.length - 1] // Keep latest
+      // });
 
       // Register event handlers
       const socketService = getSocketService();
@@ -915,13 +915,13 @@ export const selectSkillsByCategory = (state: { skills: SkillsState }, category:
 export const selectSkillsByType = (state: { skills: SkillsState }, type: string) => 
   state.skills.skills.filter(s => s.type === type);
 export const selectSkillProgression = (state: { skills: SkillsState }, skillId: string) => 
-  state.skills.progressions.get(skillId) || null;
+  state.skills.progressions[skillId] || null;
 export const selectSkillSynergies = (state: { skills: SkillsState }, skillId: string) => 
   state.skills.synergies.filter(s => s.sourceSkillId === skillId || s.targetSkillId === skillId);
 export const selectSkillMilestones = (state: { skills: SkillsState }, skillId: string) => 
   state.skills.milestones.filter(m => m.requirements.proficiency > 0); // Filter by skill if needed
 export const selectSkillAnalytics = (state: { skills: SkillsState }, skillId: string) => 
-  state.skills.analytics.get(skillId) || null;
+  state.skills.analytics[skillId] || null;
 export const selectSkillsInsights = (state: { skills: SkillsState }) => state.skills.insights;
 export const selectSkillsRecommendations = (state: { skills: SkillsState }) => state.skills.recommendations;
 export const selectSkillsVisualizationConfig = (state: { skills: SkillsState }) => state.skills.visualizationConfig;
@@ -951,7 +951,7 @@ export const selectActiveSynergies = (state: { skills: SkillsState }) =>
   state.skills.synergies.filter(synergy => synergy.evolution.masteryLevel > 0.1);
 
 export const selectRecentExperience = (state: { skills: SkillsState }, skillId: string, hours: number = 24) => {
-  const progression = state.skills.progressions.get(skillId);
+  const progression = state.skills.progressions[skillId];
   if (!progression) return [];
   
   const cutoffTime = Date.now() - (hours * 60 * 60 * 1000);

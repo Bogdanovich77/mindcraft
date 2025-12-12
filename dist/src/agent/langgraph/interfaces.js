@@ -1,39 +1,50 @@
 /**
  * Core TypeScript interfaces for the Mindcraft LangGraph hybrid agent system
- * Defines the complete agent state structure supporting both reactive and cognitive components
+ *
+ * This file contains all TypeScript interfaces and type definitions
+ * for the agent state structure, supporting both reactive and cognitive
+ * components with comprehensive social integration.
  */
-import { Annotation } from "@langchain/langgraph";
-// ============================================================================
-// INTERRUPT PRIORITY SYSTEM
-// ============================================================================
-export var InterruptPriority;
-(function (InterruptPriority) {
-    InterruptPriority[InterruptPriority["EMERGENCY"] = 0] = "EMERGENCY";
-    InterruptPriority[InterruptPriority["SURVIVAL"] = 1] = "SURVIVAL";
-    InterruptPriority[InterruptPriority["OPPORTUNITY"] = 2] = "OPPORTUNITY";
-    InterruptPriority[InterruptPriority["COGNITIVE"] = 3] = "COGNITIVE"; // Planned/goal-directed actions (>500ms)
-})(InterruptPriority || (InterruptPriority = {}));
-export var ProcessingPhase;
-(function (ProcessingPhase) {
-    ProcessingPhase["PERCEPTION"] = "perception";
-    ProcessingPhase["ANALYSIS"] = "analysis";
-    ProcessingPhase["PLANNING"] = "planning";
-    ProcessingPhase["DECISION"] = "decision";
-    ProcessingPhase["EXECUTION"] = "execution";
-    ProcessingPhase["REFLECTION"] = "reflection";
-})(ProcessingPhase || (ProcessingPhase = {}));
-// ============================================================================
-// LANGGRAPH STATE ANNOTATION
-// ============================================================================
+
+import { StateGraph, Annotation } from "@langchain/langgraph";
+import { AntiIdleSystem } from "../cognitive/anti_idle_system.js";
+
+// Export empty objects for interfaces, as they are type-level only.
+export const AgentState = {};
+export const ProcessingPhase = {};
+export const InterruptPriority = {};
+export const EmergencyCondition = {};
+export const ReactiveState = {};
+export const CognitiveState = {};
+export const ExecutiveState = {};
+export const WorldContext = {};
+export const MessageAnalysis = {};
+export const ConversationProcessing = {};
+export const ResponseRouting = {};
+export const EnvironmentalOpportunityDetector = {};
+export const AntiIdleGoalGenerator = {};
+export const FeasibilityAnalyzer = {};
+export const ResourceRequirement = {};
+export const FeasibilityResult = {};
+export const RiskLevel = {};
+export const FeasibilityAnalysisResult = {};
+export const RiskAnalysis = {};
+export const RiskFactor = {};
+export const FeasibilityFactor = {};
+export const MultiAgentCoordinator = {};
+export const CollaborativePlanning = {};
+export const ConflictResolution = {};
+
+// Re-export AntiIdleSystem
+export { AntiIdleSystem };
+
+// LangGraph State Annotation
 export const AgentStateAnnotation = Annotation.Root({
-    // Core context
-    context: (Annotation),
-    // Reactive layer (always active)
-    reactive: (Annotation),
-    // Cognitive layer (LangGraph managed)
+    context: Annotation,
+    reactive: Annotation,
     cognitive: (Annotation),
-    // Executive control
     executive: (Annotation),
-    // System metadata
-    metadata: (Annotation)
+    metadata: (Annotation),
+    antiIdleSystem: (Annotation),
+    multiAgentCoordinator: (Annotation)
 });

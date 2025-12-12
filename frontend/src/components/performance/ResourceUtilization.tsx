@@ -97,9 +97,11 @@ import {
   Pie,
   Cell,
   Legend,
-  ReferenceLine,
-  TooltipProps
+  ReferenceLine
 } from 'recharts';
+
+// Import types separately to avoid Vite bundling issues
+import type { TooltipProps } from 'recharts';
 
 // Import performance selectors and actions
 import {
@@ -868,7 +870,7 @@ const ResourceUtilization: React.FC<ResourceUtilizationProps> = ({
                   24-Hour Resource Overview
                 </Typography>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={cpuChartData.concat(memoryChartData)}>
+                  <LineChart data={cpuChartData.concat(memoryChartData)} >
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="time" />
                     <YAxis />

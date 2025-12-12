@@ -174,7 +174,7 @@ const initialState: GoalHierarchyState = {
   analytics: null,
   conflicts: [],
   selectedGoal: null,
-  expandedNodes: new Set(),
+  expandedNodes: [],
   filterCriteria: {},
   viewMode: 'tree',
   isLoading: false,
@@ -370,27 +370,24 @@ const goalsSlice = createSlice({
 
     toggleNodeExpansion: (state, action: PayloadAction<string>) => {
       const nodeId = action.payload;
-      if (state.expandedNodes.has(nodeId)) {
-        state.expandedNodes.delete(nodeId);
+      if (state.expandedNodes.includes(nodeId)) {
+        state.expandedNodes = state.expandedNodes.filter(id => id !== nodeId);
       } else {
-        state.expandedNodes.add(nodeId);
+        state.expandedNodes.push(nodeId);
       }
     },
 
     expandAllNodes: (state) => {
-      if (!state.hierarchy) return;
-      
       const allGoalIds = [
-        ...state.hierarchy.strategicGoals,
-        ...state.hierarchy.tacticalGoals,
-        ...state.hierarchy.operationalGoals
-      ].map(goal => goal.id);
-      
-      state.expandedNodes = new Set(allGoalIds);
+        ...state.hierarchy?.strategicGoals.map(g => g.id) || [],
+        ...state.hierarchy?.tacticalGoals.map(g => g.id) || [],
+        ...state.hierarchy?.operationalGoals.map(g => g.id) || []
+      ];
+      state.expandedNodes = Array.from(new Set(allGoalIds));
     },
 
     collapseAllNodes: (state) => {
-      state.expandedNodes.clear();
+      state.expandedNodes = [];
     },
 
     setFilterCriteria: (state, action: PayloadAction<Partial<GoalFilterCriteria>>) => {
@@ -640,9 +637,13 @@ const goalsSlice = createSlice({
           );
           
           // Remove from critical paths
-          state.hierarchy.criticalPaths.forEach(path => {
-            path.goals = path.goals.filter(gId => gId !== deletedGoalId);
-          });
+          if (state.hierarchy && typeof state.hierarchy.criticalPaths === 'object') {
+            state.hierarchy.criticalPaths.forEach(path => {
+              if (typeof path.goals === 'object') {
+                path.goals = (path.goals as any[]).filter(gId => gId !== deletedGoalId);
+              }
+            });
+          }
           
           state.hierarchy.lastUpdated = Date.now();
           

@@ -94,7 +94,7 @@ const initialState: SocialState = {
   selectedCommunity: null,
   
   // Historical data
-  historicalNetworks: new Map(),
+  historicalNetworks: {},
   evolutionData: null,
   
   // Visualization state
@@ -137,17 +137,18 @@ const socialSlice = createSlice({
     
     addHistoricalNetwork: (state, action: PayloadAction<{ timestamp: number; network: SocialNetwork }>) => {
       const { timestamp, network } = action.payload;
-      state.historicalNetworks.set(timestamp, network);
+      state.historicalNetworks[timestamp] = network;
       
       // Keep only last 100 historical networks to prevent memory issues
-      if (state.historicalNetworks.size > 100) {
-        const oldestTimestamp = Math.min(...state.historicalNetworks.keys());
-        state.historicalNetworks.delete(oldestTimestamp);
+      const timestamps = Object.keys(state.historicalNetworks).map(Number);
+      if (timestamps.length > 100) {
+        const oldestTimestamp = Math.min(...timestamps);
+        delete state.historicalNetworks[oldestTimestamp];
       }
     },
     
     clearHistoricalNetworks: (state) => {
-      state.historicalNetworks.clear();
+      state.historicalNetworks = {};
     },
     
     // Agent management
@@ -556,7 +557,7 @@ const socialSlice = createSlice({
           
           // Apply impact to relationship metrics
           relationship.trustLevel = Math.max(0, Math.min(1, 
-            relationship.trustLevel + (impact.trustChanges.get(relationship.id) || 0)
+            relationship.trustLevel + (impact.trustChanges[relationship.id] || 0)
           ));
         }
         
@@ -564,7 +565,7 @@ const socialSlice = createSlice({
         interaction.participants.forEach(participantId => {
           const agent = state.currentNetwork!.agents.find(a => a.id === participantId);
           if (agent) {
-            const reputationChange = impact.reputationChanges.get(participantId) || 0;
+            const reputationChange = impact.reputationChanges[participantId] || 0;
             agent.socialStats.reputationScore = Math.max(0, Math.min(1, 
               agent.socialStats.reputationScore + reputationChange
             ));
@@ -688,12 +689,12 @@ export const initializeSocialSocket = createAsyncThunk(
   'social/initializeSocket',
   async (_, { dispatch, rejectWithValue }) => {
     try {
-      // Initialize streaming service for social data
-      streamingService.createStream('social', 'social', {
-        window: 1000,
-        enabled: true,
-        function: (events) => events[events.length - 1] // Keep latest
-      });
+      // Note: Streams are now created centrally in App.tsx to avoid duplicates
+      // streamingService.createStream('social', 'social', {
+      //   window: 1000,
+      //   enabled: true,
+      //   function: (events) => events[events.length - 1] // Keep latest
+      // });
 
       // Register event handlers
       const socketService = getSocketService();
@@ -717,16 +718,14 @@ export const initializeSocialSocket = createAsyncThunk(
         dispatch(handleSocialInteractionEvent({
           interaction: event.interaction,
           impact: event.impact,
-          timestamp: event.timestamp,
-          agentId: event.agentId || '',
-          type: 'interaction'
+          timestamp: event.timestamp
         }));
       });
 
       // Social network changes
       socketService.on('social:network:update', (event: SocialNetworkUpdateEvent) => {
         dispatch(handleSocialNetworkUpdate({
-          networkId: event.agentId || 'default',
+          networkId: 'default',
           timestamp: event.timestamp,
           changes: event.changes
         }));

@@ -2,7 +2,7 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 export interface UIState {
   selectedAgent: string | null;
-  agents: Map<string, any>;
+  agents: Record<string, any>;
   connectionStatus: 'connected' | 'disconnected' | 'connecting' | 'error';
   systemStatus: 'online' | 'offline' | 'maintenance';
   loading: boolean;
@@ -23,7 +23,7 @@ interface Notification {
 
 const initialState: UIState = {
   selectedAgent: null,
-  agents: new Map(),
+  agents: {},
   connectionStatus: 'disconnected',
   systemStatus: 'offline',
   loading: false,

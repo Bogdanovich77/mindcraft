@@ -10,8 +10,15 @@ export class EpisodicMemory {
     forgettingCurve;
     consolidationThreshold = 0.7; // Importance threshold for consolidation
     eventStoredCallbacks = [];
+    semanticMemoryRef = null; // Reference to semantic memory for consolidation
     constructor() {
         this.forgettingCurve = new ForgettingCurve();
+    }
+    /**
+     * Set reference to semantic memory for consolidation
+     */
+    setSemanticMemory(semanticMemory) {
+        this.semanticMemoryRef = semanticMemory;
     }
     /**
      * Store a new episodic event
@@ -42,6 +49,48 @@ export class EpisodicMemory {
         }
         // Trigger callbacks
         this.eventStoredCallbacks.forEach(callback => callback(extendedEvent));
+    }
+    /**
+     * Consolidate a specific episode to semantic memory
+     */
+    async consolidateEpisode(episode) {
+        // Reduce activation level of the episodic event
+        const event = this.events.get(episode.id);
+        if (!event)
+            return;
+        // Call semantic memory to extract and store semantic facts and procedural patterns
+        if (this.semanticMemoryRef && typeof this.semanticMemoryRef.generalizeExperience === 'function') {
+            await this.semanticMemoryRef.generalizeExperience(event);
+        }
+        // Extract patterns locally as well
+        const patterns = await this.extractPatterns(event);
+        // Store extracted patterns in working memory for immediate access
+        await this.storePatternsInWorkingMemory(patterns, event);
+        // Reduce episodic memory activation (forgetting)
+        event.importance *= 0.7; // Reduce importance after consolidation
+        // Mark as consolidated
+        if (!event.tags.includes('consolidated')) {
+            event.tags.push('consolidated');
+        }
+        // Remove from consolidation queue
+        const index = this.consolidationQueue.indexOf(episode.id);
+        if (index >= 0) {
+            this.consolidationQueue.splice(index, 1);
+        }
+        // Trigger consolidation callbacks if any
+        this.eventStoredCallbacks.forEach(callback => callback(event));
+    }
+    /**
+     * Store extracted patterns in working memory for immediate access
+     */
+    async storePatternsInWorkingMemory(patterns, event) {
+        // This would integrate with working memory system
+        // For now, we'll just store them as metadata
+        if (!event.metadata) {
+            event.metadata = {};
+        }
+        event.metadata.extractedPatterns = patterns;
+        event.metadata.consolidationTimestamp = Date.now();
     }
     /**
      * Query episodic memory

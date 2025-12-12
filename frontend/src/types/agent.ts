@@ -165,9 +165,9 @@ export interface ResourceRequirement {
 
 export interface MemoryState {
   semantic: {
-    concepts: Map<string, any>;
-    facts: Map<string, any>;
-    relationships: Map<string, any>;
+    concepts: Record<string, any>;
+    facts: Record<string, any>;
+    relationships: Record<string, any>;
   };
   episodic: {
     events: EpisodicEvent[];
@@ -175,9 +175,9 @@ export interface MemoryState {
     experiences: ExperienceEvent[];
   };
   procedural: {
-    skills: Map<string, any>;
-    procedures: Map<string, any>;
-    habits: Map<string, any>;
+    skills: Record<string, any>;
+    procedures: Record<string, any>;
+    habits: Record<string, any>;
   };
   working: {
     currentFocus: string;
@@ -322,10 +322,10 @@ export interface ResponseRecord {
 
 // Social State Types
 export interface SocialState {
-  relationships: Map<string, Relationship>;
+  relationships: Record<string, Relationship>;
   reputation: Reputation;
   socialContext: SocialContext;
-  mentalModels: Map<string, MentalModel>;
+  mentalModels: Record<string, MentalModel>;
 }
 
 export interface Relationship {
@@ -341,8 +341,8 @@ export interface Relationship {
 
 export interface Reputation {
   globalScore: number;       // -1 to 1
-  factionScores: Map<string, number>;
-  traitScores: Map<string, number>;
+  factionScores: Record<string, number>;
+  traitScores: Record<string, number>;
   recentEvents: ReputationEvent[];
 }
 
@@ -360,7 +360,7 @@ export interface MentalModel {
   intentions: IntentionPrediction[];
   emotions: EmotionalState;
   capabilities: Skill[];
-  beliefs: Map<string, any>;
+  beliefs: Record<string, any>;
   lastUpdated: number;
 }
 
@@ -415,7 +415,7 @@ export interface AgentState {
       activeGoals: Goal[];
       goalHistory: Goal[];
     };
-    skills: Map<string, Skill>;
+    skills: Record<string, Skill>;
     memory: MemoryState;
     processing: ProcessingState;
   };
@@ -455,7 +455,7 @@ export interface SystemStatusEvent {
 // UI State Types
 export interface DashboardState {
   selectedAgent: string | null;
-  agents: Map<string, AgentState>;
+  agents: Record<string, AgentState>;
   connectionStatus: 'connected' | 'disconnected' | 'connecting' | 'error';
   systemStatus: 'online' | 'offline' | 'maintenance';
   loading: boolean;

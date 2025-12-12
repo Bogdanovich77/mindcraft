@@ -542,4 +542,26 @@ export type MetricFilter = {
 export type SortOrder = 'asc' | 'desc';
 export type SortField = 'timestamp' | 'value' | 'name' | 'severity';
 
+// Predictive Analytics Types
+export interface PredictionModel {
+  id: string;
+  name: string;
+  description: string;
+  accuracy: number;
+  confidence: number;
+  parameters: Record<string, any>;
+}
+
+export interface ConfidenceInterval {
+  lower: number;
+  upper: number;
+}
+
+export interface PredictionAccuracy {
+  accuracy: number;
+  confidence: number;
+  error: number;
+  r2?: number;
+}
+
 // All types are already exported with their individual declarations

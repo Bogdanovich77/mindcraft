@@ -135,7 +135,8 @@ export class LangGraphAgent {
      */
     async initializeBotConnection() {
         // Import and initialize bot connection
-        const { initBot } = await import('../../utils/mcdata.js');
+        const { initBot, settings } = await import('../../utils/mcdata.js');
+        console.log(`[${this.name}] Settings before initBot:`, settings);
         this.bot = initBot(this.name);
         // Set up bot event handlers
         this.setupBotEventHandlers();

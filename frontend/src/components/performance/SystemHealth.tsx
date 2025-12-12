@@ -119,9 +119,11 @@ import {
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
-  Radar,
-  TooltipProps
+  Radar
 } from 'recharts';
+
+// Import types separately to avoid Vite bundling issues
+import type { TooltipProps } from 'recharts';
 
 // Import performance selectors and actions
 import {

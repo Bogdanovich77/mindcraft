@@ -1,328 +1,240 @@
 /**
  * Core TypeScript interfaces for the Mindcraft LangGraph hybrid agent system
- * Defines the complete agent state structure supporting both reactive and cognitive components
+ *
+ * This file contains all TypeScript interfaces and type definitions
+ * for the agent state structure, supporting both reactive and cognitive
+ * components with comprehensive social integration.
  */
 
 import { StateGraph, Annotation } from "@langchain/langgraph";
 import { Bot } from "mineflayer";
-import { AntiIdleSystem } from "../cognitive/anti_idle_system.js";
+import { AntiIdleSystem } from "../cognitive/anti_idle_system";
 
-// ============================================================================
-// INTERRUPT PRIORITY SYSTEM
-// ============================================================================
-
-export enum InterruptPriority {
-  EMERGENCY = 0,    // Life-threatening situations (<50ms)
-  SURVIVAL = 1,     // Health/safety threats (<100ms)
-  OPPORTUNITY = 2,  // Resource/advantage opportunities (<200ms)
-  COGNITIVE = 3     // Planned/goal-directed actions (>500ms)
+// Basic Types
+export interface Position {
+  x: number;
+  y: number;
+  z: number;
 }
 
-// ============================================================================
-// WORLD CONTEXT INTERFACES
-// ============================================================================
-
-export interface WorldContext {
-  position: { x: number; y: number; z: number };
-  health: number;
-  food: number;
-  experience: number;
-  dimension: string;
-  timeOfDay: number;
-  weather: string;
-  nearbyEntities: EntityInfo[];
-  nearbyBlocks: BlockInfo[];
-  inventory: InventoryItem[];
-  equipment: EquipmentInfo;
-  lastMessage?: MessageInfo;
-}
-
-export interface EntityInfo {
-  id: number;
-  type: string;
-  position: { x: number; y: number; z: number };
-  health?: number;
-  distance: number;
-  hostile: boolean;
-}
-
-export interface BlockInfo {
-  type: string;
-  position: { x: number; y: number; z: number };
-  distance: number;
-  accessible: boolean;
+export interface Inventory {
+  items: InventoryItem[];
+  slots: number;
+  usedSlots: number;
+  // Add find method for compatibility
+  find?(predicate: (item: InventoryItem) => boolean): InventoryItem | undefined;
+  // Add length property
+  length?: number;
 }
 
 export interface InventoryItem {
-  type: string;
+  name: string;
   count: number;
-  slot: number;
   metadata?: any;
 }
 
-export interface EquipmentInfo {
+export interface Entity {
+  name?: string;
+  position: Position;
+  type: string;
+  distance?: number;
+  health?: number;
+  hostile?: boolean;
+  // Add id property for compatibility
+  id?: string;
+}
+
+export interface Block {
+  type: string;
+  position: Position;
+  distance?: number;
+  // Add accessible property for compatibility
+  accessible?: boolean;
+}
+
+export interface Equipment {
   helmet?: InventoryItem;
   chestplate?: InventoryItem;
   leggings?: InventoryItem;
   boots?: InventoryItem;
   weapon?: InventoryItem;
+  tool?: InventoryItem;
+}
+
+// World Context
+export interface WorldContext {
+  position: Position;
+  health: number;
+  food: number;
+  dimension: string;
+  time: number;
+  inventory: Inventory;
+  nearbyEntities: Entity[];
+  nearbyBlocks: Block[];
+  environmentalFactors: any;
+  lastMessage?: MessageInfo;
+  // Add missing properties for compatibility
+  weather?: string;
+  timeOfDay?: number;
+  equipment?: Equipment;
 }
 
 export interface MessageInfo {
   source: string;
   message: string;
   timestamp: number;
-  type: 'conversational' | 'command' | 'system';
-  priority: number;
-  metadata?: Record<string, any>;
-}
-
-// ============================================================================
-// REACTIVE STATE INTERFACES
-// ============================================================================
-
-export interface ReactiveState {
-  activeMode: string;
-  emergencyConditions: EmergencyCondition[];
-  lastReactiveAction?: ReactiveAction;
-  interruptHistory: InterruptEvent[];
-}
-
-export interface EmergencyCondition {
-  type: 'drowning' | 'burning' | 'low_health' | 'hostile_nearby' | 'stuck' | 'falling' | 'pathfinder_stuck';
-  severity: number;
-  detectedAt: number;
-  position: { x: number; y: number; z: number };
-}
-
-export interface ReactiveAction {
-  mode: string;
-  priority: InterruptPriority;
-  timestamp: number;
-  context: WorldContext;
-  action: string;
-  result?: 'success' | 'failed' | 'interrupted';
-}
-
-export interface InterruptEvent {
-  priority: InterruptPriority;
   type: string;
-  timestamp: number;
-  handled: boolean;
-  bypassedCognitive: boolean;
+  priority: number;
 }
 
-// ============================================================================
-// COGNITIVE STATE INTERFACES
-// ============================================================================
+// Personality Traits
+export interface PersonalityTraits {
+  openness: number;        // 0-1
+  conscientiousness: number; // 0-1
+  extraversion: number;     // 0-1
+  agreeableness: number;    // 0-1
+  neuroticism: number;      // 0-1
+  riskTolerance: number;    // 0-1
+  creativity: number;        // 0-1
+  patience: number;          // 0-1
+  competitiveness: number;   // 0-1
+  curiosity: number;         // 0-1
+  // Add missing properties for compatibility
+  explorationDrive: number;  // 0-1
+  socialTendency: number;    // 0-1
+  buildingCreativity: number; // 0-1
+  combatAggression: number;  // 0-1
+}
 
-export interface CognitiveState {
-  purpose: PurposeState;
-  goals: GoalState;
-  skills: SkillState;
-  memory: MemoryState;
-  processing: ProcessingState;
-  social: SocialState;
+export interface Motivation {
+  id: string;
+  type: string;
+  strength: number;         // 0-1
+  satisfaction: number;      // 0-1
+  priority: number;         // 1-10
+}
+
+export interface Value {
+  id: string;
+  name: string;
+  importance: number;       // 0-1
+  priority: number;         // 1-10
 }
 
 export interface PurposeState {
-  identity: AgentIdentity;
+  identity: {
+    name: string;
+    role: string;
+    background: string;
+    corePurpose: string;
+  };
   personality: PersonalityTraits;
-  motivations: MotivationSystem;
-  values: ValueHierarchy;
-  ethics: EthicalFramework;
+  motivations: Motivation[];
+  values: Value[];
+  ethics: {
+    harmAvoidance: number;
+    fairness: number;
+    loyalty: number;
+    authority: number;
+    purity: number;
+  };
 }
 
-export interface AgentIdentity {
-  name: string;
-  role: string;
-  background: string;
-  corePurpose: string;
-}
-
-export interface PersonalityTraits {
-  openness: number;        // Big Five traits
-  conscientiousness: number;
-  extraversion: number;
-  agreeableness: number;
-  neuroticism: number;
-  riskTolerance: number;   // Gaming-specific traits
-  explorationDrive: number;
-  socialTendency: number;
-  buildingCreativity: number;
-  combatAggression: number;
-}
-
-export interface MotivationSystem {
-  primaryMotivation: string;
-  secondaryMotivations: string[];
-  drives: Record<string, number>;
-  satisfactions: Record<string, number>;
-}
-
-export interface ValueHierarchy {
-  coreValues: string[];
-  valuePriorities: Record<string, number>;
-  moralConstraints: string[];
-}
-
-export interface EthicalFramework {
-  harmAvoidance: number;
-  fairnessConcern: number;
-  loyaltyPriority: number;
-  authorityRespect: number;
-  purityConcern: number;
-}
-
-export interface GoalState {
-  strategicGoals: Goal[];
-  tacticalGoals: Goal[];
-  operationalGoals: Goal[];
-  activeGoals: Goal[];
-  goalHistory: GoalExecution[];
+// Skills and Goals
+export interface Skill {
+  type: string;
+  proficiency: {
+    overall: number;         // 0-1
+    knowledge: number;       // 0-1
+    practical: number;       // 0-1
+    creative: number;         // 0-1
+  };
+  experience: number;
+  level: number;
+  components: {
+    knowledge: number;
+    practical: number;
+    creative: number;
+  };
+  learning: {
+    rate: number;
+    plateau: boolean;
+    breakthrough: boolean;
+  };
+  usage: {
+    frequency: number;
+    success: number;
+    efficiency: number;
+  };
 }
 
 export interface Goal {
   id: string;
-  type: "strategic" | "tactical" | "operational";
-  description: string;
-  priority: number;
-  dependencies: string[];
-  resources: ResourceRequirements;
-  progress: GoalProgress;
+  type: 'strategic' | 'tactical' | 'operational';
+  priority: 'critical' | 'high' | 'medium' | 'low';
   status: 'pending' | 'active' | 'completed' | 'failed' | 'paused';
+  description: string;
   createdAt: number;
-  deadline?: number;
+  updatedAt: number;
+  dependencies: string[];
+  resources: {
+    required: ResourceRequirement[];
+    allocated: ResourceRequirement[];
+    // Add items property for compatibility
+    items?: ResourceRequirement[];
+    // Add tools property for compatibility
+    tools?: ResourceRequirement[];
+  };
+  progress: {
+    current: number;
+    target: number;
+    percentage: number;
+    // Add completedSteps property for compatibility
+    completedSteps?: number;
+  };
+  // Add missing properties for compatibility
+  deadline?: string;
+  memberIds?: string[];
+  isAntiIdle?: boolean;
 }
 
-export interface ResourceRequirements {
-  items: Record<string, number>;
-  tools: string[];
-  location?: { x: number; y: number; z: number; radius: number };
-  time?: number;
-  assistance?: string[];
-}
-
-export interface GoalProgress {
-  percentage: number;
-  completedSteps: string[];
-  currentStep?: string;
-  blockers: string[];
-  estimatedTimeRemaining?: number;
-}
-
-export interface GoalExecution {
-  goalId: string;
-  startTime: number;
-  endTime?: number;
-  result?: 'success' | 'failed' | 'abandoned';
-  lessons: string[];
-}
-
-export interface SkillState {
-  skills: Record<string, Skill>;
-  experience: ExperienceRecord[];
-  learningRate: number;
-  skillSynergies: Record<string, string[]>;
-}
-
-export interface Skill {
-  name: string;
-  proficiency: ProficiencyMetrics;
-  components: SkillComponents;
-  learning: LearningCharacteristics;
-  usage: UsageStatistics;
-}
-
-export interface ProficiencyMetrics {
-  level: number;
-  experience: number;
-  nextLevelThreshold: number;
-  masteryBonus: number;
-}
-
-export interface SkillComponents {
-  knowledge: number;    // Theoretical understanding
-  practical: number;    // Hands-on capability
-  creative: number;     // Innovation and adaptation
-}
-
-export interface LearningCharacteristics {
-  learningRate: number;
-  retentionRate: number;
-  transferAbility: number;
-  practiceEffectiveness: number;
-}
-
-export interface UsageStatistics {
-  totalUses: number;
-  successfulUses: number;
-  recentUses: number[];
-  averageExecutionTime: number;
-  lastUsed: number;
-}
-
-export interface ExperienceRecord {
-  skillName: string;
+export interface ResourceRequirement {
+  type: string;
   amount: number;
-  source: string;
-  timestamp: number;
-  context: string;
-  impact: number;
+  priority: number;
 }
 
-export interface MemoryState {
-  semantic: SemanticMemory;
-  episodic: EpisodicMemory;
-  procedural: ProceduralMemory;
-  working: WorkingMemory;
-}
-
-export interface SemanticMemory {
-  facts: Record<string, SemanticFact>;
-  concepts: Record<string, Concept>;
-  relationships: Record<string, Relationship>;
-}
-
-export interface SemanticFact {
-  content: string;
-  confidence: number;
-  source: string;
-  learnedAt: number;
-  lastAccessed: number;
-  accessCount: number;
-}
-
-export interface Concept {
+// Memory Systems
+export interface SemanticConcept {
+  id: string;
   name: string;
+  type?: string; // Add type property for compatibility
   category: string;
-  attributes: Record<string, any>;
-  examples: string[];
-  relatedConcepts: string[];
+  properties: Map<string, any>;
+  relationships: string[];
+  importance: number;
+  lastAccessed: number;
+  // Add missing properties for compatibility
+  activation?: number;
+  attributes?: any;
 }
 
-export interface Relationship {
-  from: string;
-  to: string;
+export interface SemanticRelationship {
+  sourceId: string;
+  targetId: string;
   type: string;
   strength: number;
   context: string;
-}
-
-export interface EpisodicMemory {
-  episodes: EpisodicEvent[];
-  currentIndex: number;
-  compressionLevel: number;
 }
 
 export interface EpisodicEvent {
   id: string;
   timestamp: number;
   duration: number;
-  location: { x: number; y: number; z: number };
+  location: Position;
   participants: string[];
   actions: ActionRecord[];
-  outcomes: string[];
+  outcomes: any[];
   emotionalImpact: number;
   importance: number;
   tags: string[];
@@ -331,199 +243,135 @@ export interface EpisodicEvent {
 export interface ActionRecord {
   actor: string;
   action: string;
-  target?: string;
+  target: string;
   timestamp: number;
-  result: string;
+  result: any;
 }
 
-export interface ProceduralMemory {
-  procedures: Record<string, Procedure>;
-  sequences: Record<string, ActionSequence>;
-  habits: Habit[];
-}
-
-export interface Procedure {
+export interface ProceduralSkill {
+  id: string;
   name: string;
-  steps: ProcedureStep[];
-  prerequisites: string[];
+  type: string;
+  sequence: ProceduralStep[];
+  conditions: any[];
+  outcomes: any[];
+  proficiency: number;
+  usageCount: number;
+  lastUsed: number;
+  adaptations: ProceduralAdaptation[];
+}
+
+export interface ProceduralStep {
+  id: string;
+  action: string;
+  parameters: any;
+  conditions: any[];
+  expectedOutcome: any;
+  // Add missing properties for compatibility
+  duration?: number;
+  requiredSkills?: string[];
+  requiredResources?: ResourceRequirement[];
+}
+
+export interface ProceduralAdaptation {
   context: string;
+  modification: any;
   successRate: number;
+  timestamp: number;
+  // Add performance property for compatibility
+  performance?: {
+    successRate: number;
+    executionTime: number;
+    errorRate: number;
+  };
 }
 
-export interface ProcedureStep {
-  action: string;
-  parameters: Record<string, any>;
-  expectedOutcome: string;
-  timeout: number;
-  fallback?: string;
-}
-
-export interface ActionSequence {
-  name: string;
-  actions: string[];
-  conditions: Record<string, any>;
-  optimizations: string[];
-}
-
-export interface Habit {
-  trigger: string;
-  action: string;
-  frequency: number;
-  strength: number;
-  context: string;
-}
-
-export interface WorkingMemory {
+export interface WorkingMemoryState {
   currentFocus: string;
   activeTasks: string[];
-  buffer: any[];
+  conversationContext: any;
+  buffer: WorkingMemoryItem[];
   capacity: number;
+  utilization: number;
+  // Add items property for compatibility
+  items?: WorkingMemoryItem[];
+  // Add decayRate property for compatibility
+  decayRate?: number;
+}
+
+export interface WorkingMemoryItem {
+  content: any;
+  type: string;
+  timestamp: number;
+  priority: number;
   decayRate: number;
+  // Add id property for compatibility
+  id?: string;
 }
 
-// ============================================================================
-// SOCIAL STATE INTERFACES
-// ============================================================================
-
-export interface SocialState {
-  relationships: RelationshipManagerState;
-  theoryOfMind: TheoryOfMindState;
-  socialContext: SocialContextState;
-  socialLearning: SocialLearningState;
+export interface MemoryQuery {
+  type: 'semantic' | 'episodic' | 'procedural' | 'working';
+  criteria: any;
+  limit?: number;
+  relevanceThreshold?: number;
+  // Add missing properties for compatibility
+  query?: string;
+  types?: string[];
+  filters?: any;
+  importance?: number;
 }
 
-export interface RelationshipManagerState {
-  agentId: string;
-  relationshipCount: number;
-  activeRelationships: string[];
-  trustLevels: Record<string, number>;
-  friendshipLevels: Record<string, number>;
-  reputationScore: number;
-  lastUpdate: number;
-}
-
-export interface TheoryOfMindState {
-  mentalModels: Record<string, MentalModelState>;
-  activePredictions: PredictionState[];
-  emotionalUnderstanding: Record<string, EmotionalState>;
-  perspectiveTakingHistory: PerspectiveTakingRecord[];
-  lastUpdate: number;
-}
-
-export interface MentalModelState {
-  agentId: string;
+export interface MemoryRetrieval {
+  results: any[];
   confidence: number;
-  lastUpdated: number;
-  intentions: string[];
-  beliefs: Record<string, number>;
-  emotions: EmotionalState;
+  processingTime: number;
+  query: MemoryQuery;
+  // Add missing properties for compatibility
+  semantic?: any[];
+  episodic?: any[];
+  procedural?: any[];
+  working?: any[];
 }
 
-export interface EmotionalState {
-  primary: string;
-  intensity: number;
-  valence: number;
-  arousal: number;
-  timestamp: number;
+export interface MemoryStatistics {
+  totalEpisodicEvents: number;
+  totalSemanticConcepts: number;
+  totalProceduralSkills: number;
+  workingMemoryUtilization: number;
+  consolidationQueue: number;
+  lastCleanup: number;
+  // Add semantic property for compatibility
+  semantic?: any;
 }
 
-export interface PredictionState {
-  targetAgentId: string;
-  prediction: string;
-  confidence: number;
-  timeHorizon: number;
-  timestamp: number;
+// Memory System
+export interface MemoryState {
+  semantic: {
+    concepts: Map<string, SemanticConcept>;
+    facts: Map<string, any>;
+    relationships: Map<string, SemanticRelationship>;
+  };
+  episodic: {
+    episodes: EpisodicEvent[];
+    conversations: any[];
+    experiences: any[];
+  };
+  procedural: {
+    skills: Map<string, ProceduralSkill>;
+    procedures: Map<string, any>;
+    habits: Map<string, any>;
+  };
+  working: WorkingMemoryState;
 }
 
-export interface PerspectiveTakingRecord {
-  targetAgentId: string;
-  situation: string;
-  perspective: string;
-  confidence: number;
-  timestamp: number;
-}
-
-export interface SocialContextState {
-  nearbyAgents: string[];
-  groupDynamics: GroupDynamicsState;
-  socialNorms: SocialNorm[];
-  culturalContext: CulturalContextState;
-  currentSituation: SocialSituationState;
-}
-
-export interface GroupDynamicsState {
-  leader?: string;
-  cohesion: number;
-  hierarchy: string[];
-  roles: Record<string, string>;
-  alliances: Array<{ agent1: string; agent2: string; strength: number }>;
-}
-
-export interface SocialNorm {
-  name: string;
-  description: string;
-  context: string;
-  strength: number;
-  violations: string[];
-}
-
-export interface CulturalContextState {
-  culturalBackground: string;
-  values: string[];
-  practices: string[];
-  communicationStyle: string;
-  socialHierarchy: string[];
-}
-
-export interface SocialSituationState {
-  type: 'cooperation' | 'competition' | 'conflict' | 'neutral' | 'celebration' | 'trading';
-  participants: string[];
-  goals: string[];
-  resources: string[];
-  powerDynamics: Record<string, number>;
-}
-
-export interface SocialLearningState {
-  observedBehaviors: ObservedBehavior[];
-  learnedPatterns: SocialPattern[];
-  teachingHistory: TeachingRecord[];
-  socialSkillProgress: Record<string, number>;
-  lastUpdate: number;
-}
-
-export interface ObservedBehavior {
-  agentId: string;
-  behavior: string;
-  context: string;
-  outcome: string;
-  timestamp: number;
-  learned: boolean;
-}
-
-export interface SocialPattern {
-  pattern: string;
-  context: string;
-  frequency: number;
-  success: number;
-  agents: string[];
-  lastObserved: number;
-}
-
-export interface TeachingRecord {
-  studentId: string;
-  skill: string;
-  method: string;
-  success: boolean;
-  improvement: number;
-  timestamp: number;
-}
-
+// Processing State
 export interface ProcessingState {
   currentPhase: ProcessingPhase;
-  cognitiveLoad: number;
-  attentionLevel: number;
-  decisionThreshold: number;
+  cognitiveLoad: number;     // 0-1
+  attentionLevel: number;     // 0-1
   processingHistory: ProcessingRecord[];
+  // Add decisionThreshold property for compatibility
+  decisionThreshold?: number;
 }
 
 export enum ProcessingPhase {
@@ -532,7 +380,9 @@ export enum ProcessingPhase {
   PLANNING = 'planning',
   DECISION = 'decision',
   EXECUTION = 'execution',
-  REFLECTION = 'reflection'
+  REFLECTION = 'reflection',
+  CONVERSATION = 'conversation',
+  COORDINATION = 'coordination'
 }
 
 export interface ProcessingRecord {
@@ -541,16 +391,59 @@ export interface ProcessingRecord {
   endTime: number;
   duration: number;
   success: boolean;
-  details: Record<string, any>;
+  details: any;
 }
 
-// ============================================================================
-// EXECUTIVE STATE INTERFACES
-// ============================================================================
+// Reactive State
+export interface ReactiveState {
+  activeMode: string;
+  emergencyLevel: number;
+  emergencyConditions: EmergencyCondition[];
+  lastReactiveAction: ReactiveAction | null;
+  interruptHistory: InterruptEvent[];
+}
 
+export interface EmergencyCondition {
+  type: string;
+  severity: number;
+  timestamp: number;
+  context: any;
+  // Add missing properties for compatibility
+  detectedAt?: number;
+  position?: Position;
+}
+
+export interface ReactiveAction {
+  mode: string;
+  priority: number | InterruptPriority; // Allow both types for compatibility
+  timestamp: number;
+  context: any;
+  action: string;
+  result: string;
+}
+
+export interface InterruptEvent {
+  timestamp: number;
+  priority: InterruptPriority;
+  source: string;
+  context: any;
+  action: string;
+  // Add missing properties for compatibility
+  type?: string;
+  bypassedCognitive?: boolean;
+}
+
+export enum InterruptPriority {
+  EMERGENCY = 'emergency',
+  SURVIVAL = 'survival',
+  OPPORTUNITY = 'opportunity',
+  COGNITIVE = 'cognitive'
+}
+
+// Executive State
 export interface ExecutiveState {
-  currentAction?: AgentAction;
-  actionQueue: AgentAction[];
+  currentAction: Action | null;
+  actionQueue: Action[];
   decisionHistory: DecisionRecord[];
   performanceMetrics: PerformanceMetrics;
   conversationalResponse?: string;
@@ -559,43 +452,39 @@ export interface ExecutiveState {
   processingMode: 'conversational' | 'action';
 }
 
-export interface AgentAction {
+export interface Action {
   id: string;
   type: string;
   priority: number;
-  parameters: Record<string, any>;
+  description: string;
+  status: 'pending' | 'executing' | 'completed' | 'failed';
+  createdAt: number;
   startTime?: number;
   endTime?: number;
-  status: 'pending' | 'executing' | 'completed' | 'failed' | 'interrupted';
-  cognitive: boolean; // true if from cognitive processing, false if reactive
+  result?: any;
+  cognitive?: boolean;
+  metadata?: any;
 }
 
 export interface DecisionRecord {
   timestamp: number;
-  context: WorldContext;
-  options: DecisionOption[];
+  context: any;
+  options: any[];
   selected: string;
   reasoning: string;
   outcome: string;
   confidence: number;
 }
 
-export interface DecisionOption {
-  action: string;
-  utility: number;
-  risk: number;
-  expectedOutcome: string;
-  reasoning: string;
-}
-
 export interface PerformanceMetrics {
   reactiveResponseTime: number[];
   cognitiveProcessingTime: number[];
   successRate: number;
-  learningRate: number;
-  goalCompletionRate: number;
-  survivalEvents: number;
-  socialInteractions: number;
+  errorRate: number;
+  memoryUsage: number;
+  cpuUsage: number;
+  // Add learningRate property for compatibility
+  learningRate?: number;
 }
 
 export interface ResponseRecord {
@@ -608,427 +497,549 @@ export interface ResponseRecord {
   success: boolean;
 }
 
-// ============================================================================
-// CONVERSATION PROCESSING INTERFACES
-// ============================================================================
-
-export interface MessageAnalysis {
-  message: string;
-  source: string;
-  isConversational: boolean;
-  isActionCommand: boolean;
-  processingMode: 'conversational' | 'action';
-  confidence: number;
-  extractedIntent?: string;
-  entities?: Record<string, any>;
-  emotionalTone?: string;
-  urgency: number;
+// Social State
+export interface SocialState {
+  relationships: Map<string, Relationship>;
+  reputation: Reputation;
+  socialContext: SocialContext;
+  theoryOfMind: Map<string, MentalModel>;
+  // Add missing properties for compatibility
+  agentId?: string;
+  trustLevels?: Map<string, number>;
+  mentalModels?: Map<string, MentalModel>;
 }
 
-export interface ConversationContext {
-  isActive: boolean;
-  startTime?: number;
-  lastMessageTime: number;
-  messageCount: number;
-  participants: string[];
-  currentTopic?: string;
-  conversationHistory: ConversationEntry[];
-  contextBuffer: string[];
-  emotionalState: Record<string, number>;
+export interface Relationship {
+  agentId: string;
+  trustLevel: number;        // 0-1
+  friendshipScore: number;   // 0-1
+  respectLevel: number;       // 0-1
+  interactionHistory: InteractionEvent[];
+  lastInteraction: number;
+  status: 'stranger' | 'acquaintance' | 'friend' | 'close_friend' | 'ally' | 'enemy';
 }
 
-export interface ConversationEntry {
-  id: string;
+export interface Reputation {
+  globalScore: number;       // -1 to 1
+  factionScores: Map<string, number>;
+  traitScores: Map<string, number>;
+  recentEvents: ReputationEvent[];
+  reputationScore: number;
+}
+
+export interface SocialContext {
+  currentSituation: any;
+  nearbyAgents: string[];
+  socialNorms: string[];
+  culturalContext: string;
+  groupDynamics: any;
+}
+
+export interface MentalModel {
+  agentId: string;
+  personality: PersonalityTraits;
+  intentions: IntentionPrediction[];
+  emotions: EmotionalState;
+  capabilities: Skill[];
+  beliefs: Map<string, any>;
+  lastUpdated: number;
+  // Add updateMentalModel method for compatibility
+  updateMentalModel?(agentId: string, updates: any): void;
+}
+
+export interface InteractionEvent {
   timestamp: number;
-  source: string;
-  message: string;
-  response?: string;
-  type: 'user' | 'agent' | 'system';
-  metadata?: Record<string, any>;
+  type: string;
+  outcome: string;
+  impact: number;
+  context: any;
 }
 
-export interface ConversationProcessingResult {
-  response: string;
+export interface ReputationEvent {
+  timestamp: number;
+  type: string;
+  impact: number;
+  source: string;
+  description: string;
+}
+
+export interface IntentionPrediction {
+  intention: string;
+  confidence: number;
+  timeframe: number;
+  context: any;
+}
+
+export interface EmotionalState {
+  current: string;
+  intensity: number;
+  valence: number;          // -1 to 1 (negative to positive)
+  arousal: number;          // 0-1 (calm to excited)
+  lastUpdated: number;
+}
+
+// Planning Engine Types
+export interface Plan {
+  id: string;
+  goalId: string;
+  description: string;
+  priority: number;
+  status: 'pending' | 'active' | 'completed' | 'failed';
+  steps: PlanStep[];
+  estimatedDuration: number;
+  resourceAllocation: ResourceAllocation;
+  blockingFactors: BlockingFactor[];
+  createdAt: number;
+  updatedAt: number;
+  // Add missing properties for compatibility
+  type?: string;
+  deadline?: string;
+  dependencies?: string[];
+  requiredResources?: ResourceRequirement[];
+  resourceRequirements?: ResourceRequirement[];
+}
+
+export interface PlanStep {
+  id: string;
+  type: string;
+  description: string;
+  estimatedDuration: number;
+  resourceRequirements: ResourceRequirement[];
+  dependencies: string[];
+  status: 'pending' | 'active' | 'completed' | 'failed';
+  // Add missing properties for compatibility
+  requiredSkills?: string[];
+  requiredResources?: ResourceRequirement[];
+}
+
+export interface ResourceAllocation {
+  items: Map<string, number>;
+  tools: Map<string, number>;
+  time: number;
+  skills: SkillRequirement[];
+  assistance: Map<string, number>;
+}
+
+export interface SkillRequirement {
+  type: string;
+  minimumLevel: number;
+  importance: number;
+}
+
+export interface BlockingFactor {
+  type: string;
+  description: string;
+  severity: number;
+  mitigation?: string;
+}
+
+export interface FeasibilityAnalysisResult {
+  feasibilityScore: number;
+  feasibilityLevel: FeasibilityLevel;
+  riskLevel: RiskLevel;
+  riskAnalysis: RiskAnalysis;
+  resourceAssessment: ResourceAssessment;
+  timeEstimate: TimeEstimate;
+  costEstimate: CostEstimate;
+  alternativePlans: AlternativePlan[];
+  confidence: number;
+  // Add missing properties for compatibility
+  analysisTime?: number;
+  planId?: string;
+}
+
+export enum FeasibilityLevel {
+  IMPOSSIBLE = 'impossible',
+  VERY_DIFFICULT = 'very_difficult',
+  DIFFICULT = 'difficult',
+  MODERATE = 'moderate',
+  EASY = 'easy',
+  TRIVIAL = 'trivial',
+  // Add missing values for compatibility
+  VERY_HIGH = 'very_high',
+  HIGH = 'high',
+  MEDIUM = 'medium',
+  LOW = 'low',
+  VERY_LOW = 'very_low'
+}
+
+export enum RiskLevel {
+  EXTREME = 'extreme',
+  HIGH = 'high',
+  MODERATE = 'moderate',
+  LOW = 'low',
+  MINIMAL = 'minimal',
+  // Add missing values for compatibility
+  CRITICAL = 'critical',
+  MEDIUM = 'medium'
+}
+
+export interface RiskAnalysis {
+  overallRisk: number;
+  riskFactors: RiskFactor[];
+  mitigationStrategies: MitigationStrategy[];
+  residualRisk: number;
+}
+
+export interface RiskFactor {
+  type: string;
+  description: string;
+  probability: number;
+  impact: number;
+  severity: number;
+}
+
+export interface MitigationStrategy {
+  riskId: string;
+  strategy: string;
+  effectiveness: number;
+  cost: number;
+}
+
+export interface ResourceAssessment {
+  availableResources: Map<string, number>;
+  requiredResources: Map<string, number>;
+  deficitResources: Map<string, number>;
+  totalValue: number;
+  accessibility: number;
+}
+
+export interface TimeEstimate {
+  minimumTime: number;
+  maximumTime: number;
+  expectedTime: number;
+  confidence: number;
+  factors: string[];
+}
+
+export interface CostEstimate {
+  resourceCost: number;
+  timeCost: number;
+  opportunityCost: number;
+  totalCost: number;
+  currency: string;
+}
+
+export interface AlternativePlan {
+  id: string;
+  description: string;
+  feasibilityScore: number;
+  riskLevel: RiskLevel;
+  costDifference: number;
+  timeDifference: number;
+  advantages: string[];
+  disadvantages: string[];
+}
+
+export interface FeasibilityResult {
+  result: FeasibilityAnalysisResult;
   processingTime: number;
   confidence: number;
-  personalityAlignment: number;
-  contextUpdated: boolean;
-  followUpActions?: string[];
+  recommendations: string[];
+  // Add missing properties for compatibility
+  planId?: string;
 }
 
-// ============================================================================
-// MAIN AGENT STATE INTERFACE
-// ============================================================================
+export interface FeasibilityFactor {
+  name: string;
+  weight: number;
+  value: number;
+  impact: number;
+  // Add factor property for compatibility
+  factor?: string;
+}
 
+// Planning Engine Configuration
+export interface PlanningEngineConfig {
+  maxActivePlans: number;
+  planningTimeout: number;
+  resourceAssessmentInterval: number;
+  feasibilityCheckInterval: number;
+  replanningThreshold: number;
+  optimizationInterval: number;
+  enableResourceSharing: boolean;
+  enableCollaborativePlanning: boolean;
+  performanceTracking: boolean;
+}
+
+// Metadata
+export interface AgentMetadata {
+  agentId: string;
+  startTime: number;
+  lastUpdate: number;
+  version: string;
+  performanceMode: string;
+}
+
+// Main Agent State
 export interface AgentState {
-  // Core context
   context: WorldContext;
-  
-  // Reactive layer (always active)
   reactive: ReactiveState;
-  
-  // Cognitive layer (LangGraph managed)
-  cognitive: CognitiveState;
-  
-  // Executive control
+  cognitive: {
+    purpose: PurposeState;
+    goals: {
+      strategicGoals: Goal[];
+      tacticalGoals: Goal[];
+      operationalGoals: Goal[];
+      activeGoals: Goal[];
+      goalHistory: Goal[];
+    };
+    skills: Map<string, Skill>;
+    memory: MemoryState;
+    processing: ProcessingState;
+    planning?: PlanningEngine;
+    social: SocialState;
+  };
   executive: ExecutiveState;
-  
-  // Anti-idle system
+  metadata: AgentMetadata;
   antiIdleSystem?: AntiIdleSystem;
-  
-  // System metadata
-  metadata: {
-    agentId: string;
-    startTime: number;
-    lastUpdate: number;
-    version: string;
-    performanceMode: 'survival' | 'balanced' | 'cognitive';
-  };
+  multiAgentCoordinator?: any;
 }
 
-// ============================================================================
-// LANGGRAPH STATE ANNOTATION
-// ============================================================================
-
-export const AgentStateAnnotation = Annotation.Root({
-  // Core context
-  context: Annotation<WorldContext>,
-  
-  // Reactive layer (always active)
-  reactive: Annotation<ReactiveState>,
-  
-  // Cognitive layer (LangGraph managed)
-  cognitive: Annotation<CognitiveState>,
-  
-  // Executive control
-  executive: Annotation<ExecutiveState>,
-  
-  // System metadata
-  metadata: Annotation<{
-    agentId: string;
-    startTime: number;
-    lastUpdate: number;
-    version: string;
-    performanceMode: 'survival' | 'balanced' | 'cognitive';
-  }>
-});
-
-// ============================================================================
-// LANGGRAPH STATE GRAPH TYPE
-// ============================================================================
-
-export type AgentStateGraph = StateGraph<typeof AgentStateAnnotation>;
-
-// ============================================================================
-// REACTIVE INTEGRATION INTERFACES
-// ============================================================================
-
-export interface ReactiveBehaviorLayer {
-  update(agent: Agent, deltaTime: number): Promise<void>;
-  checkEmergencyConditions(state: AgentState): InterruptPriority;
-  executeReactiveResponse(agent: Agent, priority: InterruptPriority): Promise<void>;
-  selectReactiveMode(agent: Agent, priority: InterruptPriority): ReactiveMode;
+// Planning Engine Interface
+export interface PlanningEngine {
+  initialize(state: AgentState): Promise<void>;
+  executePlanningCycle(state: AgentState): Promise<any>;
+  getMetrics(): any;
+  shutdown(): Promise<void>;
+  // Add missing properties for compatibility
+  activePlans?: Plan[];
 }
 
-export interface ReactiveMode {
-  name: string;
-  priority: InterruptPriority;
-  execute(agent: Agent): Promise<void>;
-  canHandle(state: AgentState): boolean;
-}
-
-export interface InterruptController {
-  checkEmergencyConditions(state: AgentState): InterruptPriority;
-  preemptCognitiveProcessing(priority: InterruptPriority): void;
-  resumeCognitiveProcessing(): void;
-  shouldBypassCognitive(priority: InterruptPriority): boolean;
-}
-
-// ============================================================================
-// AGENT INTERFACE
-// ============================================================================
-
-export interface Agent {
-  bot: Bot;
-  state: AgentState;
-  reactiveLayer: ReactiveBehaviorLayer;
-  interruptController: InterruptController;
-  
-  update(deltaTime: number): Promise<void>;
-  handleEmergency(priority: InterruptPriority): Promise<void>;
-  processCognitive(): Promise<void>;
-  executeAction(action: AgentAction): Promise<void>;
-}
-
-// ============================================================================
-// UTILITY INTERFACES
-// ============================================================================
-
-export interface DecisionContext {
-  currentTime: number;
-  availableTime: number;
-  cognitiveLoad: number;
-  urgency: number;
-  riskTolerance: number;
-  nearbyAgents?: string[];
-  socialInfluence?: any;
-  socialContext?: any;
-}
-
-export interface LearningContext {
-  experience: ExperienceRecord;
-  previousPerformance: PerformanceMetrics;
-  environmentalFactors: Record<string, number>;
-  socialContext: Record<string, any>;
-}
-
-export interface PerformanceThresholds {
-  maxReactiveResponseTime: number;      // 100ms
-  maxCognitiveProcessingTime: number;   // 2000ms
-  maxMemoryUsage: number;               // 2GB
-  minSuccessRate: number;               // 0.8
-  maxCognitiveLoad: number;             // 0.9
-}
-
-// ============================================================================
-// MEMORY QUERY INTERFACES
-// ============================================================================
-
-export interface MemoryQuery {
-  query: string;
-  types: ('semantic' | 'episodic' | 'procedural' | 'working' | 'all')[];
-  context?: WorldContext;
-  timeRange?: {
-    start: number;
-    end: number;
-  };
-  importance?: number; // 0 to 1, minimum importance threshold
-  limit?: number;
-  filters?: Record<string, any>;
-}
-
-export interface MemoryRetrieval {
-  semantic: SemanticConcept[];
-  episodic: EpisodicEvent[];
-  procedural: ProceduralSkill[];
-  working: WorkingMemoryItem[];
-}
-
-export interface SemanticConcept {
+// Extended types for memory systems
+export interface ExtendedEpisodicEvent extends EpisodicEvent {
+  importance: number;
   id: string;
-  name: string;
-  type: 'entity' | 'property' | 'relation' | 'schema';
-  activation: number; // 0 to 1
-  attributes: Record<string, any>;
-  relationships: SemanticRelationship[];
-  lastAccessed: number;
-  importance: number; // 0 to 1
-}
-
-export interface SemanticRelationship {
-  type: 'causal' | 'spatial' | 'temporal' | 'categorical' | 'functional';
-  target: string;
-  strength: number; // 0 to 1
-  confidence: number; // 0 to 1
-}
-
-export interface ProceduralSkill {
-  id: string;
-  name: string;
-  type: 'skill' | 'routine' | 'strategy';
-  sequence: ProceduralStep[];
-  conditions: string[];
-  outcomes: string[];
-  proficiency: number; // 0 to 1
-  usageCount: number;
-  lastUsed: number;
-  adaptations: ProceduralAdaptation[];
-}
-
-export interface ProceduralStep {
-  action: string;
-  parameters: Record<string, any>;
-  conditions: string[];
-  expectedOutcome: string;
+  timestamp: number;
+  location: Position;
+  participants: string[];
   duration: number;
 }
 
-export interface ProceduralAdaptation {
-  context: string;
-  modification: ProceduralStep[];
-  performance: number; // 0 to 1
-  timestamp: number;
-}
-
-export interface WorkingMemoryItem {
+export interface ExtendedProceduralSkill extends ProceduralSkill {
+  proficiency: number;
+  usageCount: number;
+  lastUsed: number;
+  type: string;
+  name: string;
   id: string;
-  content: any;
-  type: 'perception' | 'event' | 'goal' | 'concept';
-  priority: number; // 0 to 1
-  timestamp: number;
-  decayRate: number;
+  sequence: ProceduralStep[];
+  conditions: any[];
+  outcomes: any[];
+  adaptations: ProceduralAdaptation[];
 }
 
-export interface WorkingMemoryState {
-  items: WorkingMemoryItem[];
-  currentFocus: string | null;
-  capacity: number;
-  attentionLevel: number;
-}
-
-// ============================================================================
-// ANTI-IDLE SYSTEM INTERFACES
-// ============================================================================
-
-export interface AntiIdleConfig {
-  enabled: boolean;
-  idleDetection: {
-    inactivityThreshold: number;    // milliseconds
-    minActivityLevel: number;       // 0-1 scale
-    checkInterval: number;           // milliseconds
-    activityHistorySize: number;     // number of records to keep
-  };
-  goalGeneration: {
-    maxAntiIdleGoals: number;       // maximum concurrent anti-idle goals
-    goalPriority: number;           // priority for anti-idle goals
-    goalTypes: string[];            // allowed goal types
-    refreshInterval: number;         // milliseconds
-  };
-  opportunityDetection: {
-    scanInterval: number;           // milliseconds
-    maxOpportunities: number;        // maximum opportunities to track
-    opportunityTimeout: number;      // milliseconds
-    priorityWeights: {
-      resource: number;
-      structure: number;
-      exploration: number;
-      social: number;
-      skill: number;
-      danger: number;
-    };
-  };
-  personalityActivities: {
-    enabled: boolean;
-    minPersonalityAlignment: number; // 0-1 scale
-    maxActivities: number;            // maximum activities to generate
-    diversityFactor: number;         // 0-1 scale, higher = more diverse
-  };
-  monitoring: {
-    enabled: boolean;
-    alertThreshold: number;          // consecutive idle periods
-    metricsRetention: number;        // days
-    reportInterval: number;          // milliseconds
-  };
-}
-
-export interface ActivityRecord {
-  type: 'action' | 'movement' | 'interaction' | 'communication';
-  timestamp: number;
-  description: string;
-  intensity: number; // 0-1 scale
-}
-
-export interface EnvironmentalOpportunity {
+// Additional interfaces for coordination and social systems
+export interface AgentAction {
   id: string;
-  type: 'resource' | 'structure' | 'exploration' | 'social' | 'skill' | 'danger';
+  type: string;
   priority: number;
   description: string;
-  location: { x: number; y: number; z: number };
-  requirements: { type: string; amount: number }[];
-  estimatedValue: number;
-  timeWindow?: number; // milliseconds
+  status: 'pending' | 'executing' | 'completed' | 'failed';
+  createdAt: number;
+  startTime?: number;
+  endTime?: number;
+  result?: any;
+  cognitive?: boolean;
+  metadata?: any;
 }
 
-export interface ActivitySuggestion {
-  type: string;
+export interface DecisionOption {
+  id: string;
   description: string;
-  personalityAlignment: number;
-  estimatedDuration: number;
-  requirements: string[];
-  expectedOutcomes: string[];
+  utility: number;
+  risk: number;
+  confidence: number;
+  reasoning: string;
 }
 
-export interface AntiIdleMetrics {
-  agentId: string;
+export interface DecisionContext {
+  situation: any;
+  options: DecisionOption[];
+  constraints: any;
+  priorities: any;
+}
+
+export interface MessageType {
+  id: string;
+  type: string;
+  priority: number;
+  content: any;
+}
+
+export interface MessagePriority {
+  LOW: 'low';
+  MEDIUM: 'medium';
+  HIGH: 'high';
+  CRITICAL: 'critical';
+}
+
+export interface CoordinationStatus {
+  status: 'active' | 'inactive' | 'busy' | 'available';
+  currentTask?: string;
+  availability: number;
+}
+
+export interface CoordinationMessage {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  type: string;
+  content: any;
   timestamp: number;
-  idlePeriods: IdlePeriod[];
-  activityLevel: number;
-  antiIdleGoalsGenerated: number;
-  antiIdleGoalsCompleted: number;
-  opportunitiesDetected: number;
-  opportunitiesActed: number;
-  personalityActivitiesGenerated: number;
-  systemPerformance: {
-    cpuUsage: number;
-    memoryUsage: number;
+  priority: MessagePriority;
+}
+
+export interface CollaborationRequest {
+  id: string;
+  requesterId: string;
+  targetId: string;
+  task: any;
+  requirements: any;
+  timestamp: number;
+  status: 'pending' | 'accepted' | 'rejected' | 'completed';
+}
+
+export interface TaskDelegation {
+  id: string;
+  delegatorId: string;
+  delegateeId: string;
+  task: any;
+  deadline: number;
+  status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'failed';
+}
+
+export interface ConflictDetection {
+  conflicts: any[];
+  severity: number;
+  resolution: any;
+}
+
+export interface NegotiationProcess {
+  id: string;
+  participants: string[];
+  issue: any;
+  status: 'active' | 'resolved' | 'failed';
+  startTime: number;
+  endTime?: number;
+}
+
+export interface MediationProcess {
+  id: string;
+  mediatorId: string;
+  disputants: string[];
+  conflict: any;
+  status: 'active' | 'resolved' | 'failed';
+  startTime: number;
+  endTime?: number;
+}
+
+export interface CoordinationMetrics {
+  collaborations: {
+    offered: number;
+    accepted: number;
+    completed: number;
+    averageSessionTime: number;
+    satisfactionRate: number;
+    complianceRate: number;
+    // Add failed property for compatibility
+    failed?: number;
+  };
+  conflicts: {
+    detected: number;
+    resolved: number;
+    escalated: number;
+  };
+  communications: {
+    sent: number;
+    received: number;
     responseTime: number;
   };
 }
 
-export interface IdlePeriod {
-  startTime: number;
-  endTime: number;
-  duration: number;
-  triggerType: 'inactivity' | 'low_activity' | 'no_goals';
-  resolutionType: 'auto_goal' | 'manual_intervention' | 'system_restart';
+export interface MultiAgentCoordinator {
+  initialize(config: any): void;
+  shutdown(): void;
+  sendMessage(message: CoordinationMessage): void;
+  requestCollaboration(request: CollaborationRequest): void;
+  detectConflict(conflict: ConflictDetection): void;
+  initiateNegotiation(negotiation: NegotiationProcess): void;
+  initiateMediation(mediation: MediationProcess): void;
+  getMetrics(): CoordinationMetrics;
 }
 
-export interface AntiIdleAlert {
-  id: string;
-  agentId: string;
-  type: 'consecutive_idle' | 'low_activity' | 'high_cpu' | 'high_memory' | 'slow_response';
-  timestamp: number;
-  severity: 'info' | 'warning' | 'critical';
-  message: string;
-  data: any;
-  acknowledged: boolean;
-  resolved: boolean;
+export interface MessageAnalysis {
+  type: 'conversational' | 'action';
+  priority: MessagePriority;
+  content: any;
+  context: any;
 }
 
-export interface AntiIdleReport {
-  timestamp: number;
-  agents: AgentReport[];
-  summary: {
-    totalAgents: number;
-    totalIdlePeriods: number;
-    averageActivityLevel: number;
-    totalAlerts: number;
-    activeAlerts: number;
-  };
+export interface ConversationProcessingResult {
+  response: string;
+  confidence: number;
+  processingTime: number;
+  metadata: any;
 }
 
-export interface AgentReport {
-  agentId: string;
-  metrics: AntiIdleMetrics[];
-  alerts: AntiIdleAlert[];
-  summary: {
-    totalIdlePeriods: number;
-    averageActivityLevel: number;
-    totalAntiIdleGoals: number;
-    totalOpportunities: number;
-  };
+// Additional interfaces for reactive behavior
+export interface ReactiveMode {
+  name: string;
+  priority: number;
+  conditions: any;
+  behaviors: any;
 }
 
-export interface MemoryStatistics {
-  semantic: {
-    conceptCount: number;
-    relationshipCount: number;
-    averageActivation: number;
-  };
-  episodic: {
-    eventCount: number;
-    averageImportance: number;
-    oldestEvent: number;
-  };
-  procedural: {
-    skillCount: number;
-    averageProficiency: number;
-    totalUsage: number;
-  };
-  working: {
-    itemCount: number;
-    averagePriority: number;
-    attentionLevel: number;
-  };
-  lastConsolidation: number;
+export interface ReactiveBehaviorLayer {
+  name: string;
+  modes: ReactiveMode[];
+  activeMode: string;
+  interruptController: InterruptController;
 }
+
+export interface InterruptController {
+  checkInterrupts(state: AgentState): InterruptEvent[];
+  handleInterrupt(event: InterruptEvent): void;
+  getHistory(): InterruptEvent[];
+}
+
+export interface Agent {
+  initialize(): Promise<void>;
+  shutdown(): Promise<void>;
+  processMessage(message: any): Promise<any>;
+  getState(): AgentState;
+}
+
+// Additional interfaces for skills and goals
+export interface SkillState {
+  skills: Map<string, Skill>;
+  experience: number;
+  learningRate: number;
+  skillSynergies: Map<string, any>;
+}
+
+export interface GoalState {
+  activeGoals: Goal[];
+  completedGoals: Goal[];
+  failedGoals: Goal[];
+  currentGoal?: Goal;
+}
+
+export interface GoalProgress {
+  current: number;
+  target: number;
+  percentage: number;
+  // Add completedSteps property for compatibility
+  completedSteps?: number;
+}
+
+// LangGraph State Annotation
+export const AgentStateAnnotation = Annotation.Root({
+  context: Annotation<WorldContext>,
+  reactive: Annotation<ReactiveState>,
+  cognitive: Annotation<any>,
+  executive: Annotation<ExecutiveState>,
+  metadata: Annotation<AgentMetadata>,
+  antiIdleSystem: Annotation<AntiIdleSystem>,
+  multiAgentCoordinator: Annotation<any>
+});

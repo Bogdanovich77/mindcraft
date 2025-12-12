@@ -56,9 +56,11 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const initializeStreamingServices = async () => {
       try {
+        console.log('🚀 Starting streaming services initialization...');
+        
         // Initialize the socket service first with default config
-        initializeSocket({
-          url: 'http://localhost:8080',
+        const socketService = initializeSocket({
+          url: import.meta.env.VITE_SOCKET_URL || 'http://localhost:8080',
           options: {
             transports: ['websocket', 'polling'],
             timeout: 20000,
@@ -69,32 +71,61 @@ const AppContent: React.FC = () => {
           },
         });
         
-        // Then connect to the server
+        // Connect to the server first
+        console.log('📡 Connecting to server...');
         await dispatch(connectToServer()).unwrap();
         
-        // Initialize all cognitive component streaming
-        await Promise.all([
+        // Initialize streaming service once and create all cognitive streams
+        console.log('📊 Creating cognitive streams...');
+        const { streamingService } = await import('./services/streamingService');
+        
+        // Ensure streams are created before proceeding
+        await streamingService.createCognitiveStreams();
+        
+        // Wait a brief moment for streams to be fully registered
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Then initialize all cognitive component sockets in sequence
+        console.log('🧠 Initializing cognitive components...');
+        const initPromises = [
           dispatch(initializePersonalitySocket()).unwrap(),
           dispatch(initializeMemorySocket()).unwrap(),
           dispatch(initializeGoalsSocket()).unwrap(),
           dispatch(initializeSocialSocket()).unwrap(),
           dispatch(initializeSkillsSocket()).unwrap(),
-          dispatch(initializePerformanceSocket()).unwrap()
-        ]);
+          dispatch(initializePerformanceSocket('default')).unwrap()
+        ];
         
-        console.log('✅ All streaming services initialized successfully');
+        // Wait for all to complete with error handling
+        const results = await Promise.allSettled(initPromises);
+        
+        // Check for any failed initializations
+        const failed = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+        if (failed.length > 0) {
+          console.warn('⚠️ Some cognitive components failed to initialize:', failed.map(f => f.reason));
+        } else {
+          console.log('✅ All cognitive components initialized successfully');
+        }
+        
+        console.log('🎉 All streaming services initialized successfully');
+        
       } catch (error) {
         console.error('❌ Failed to initialize streaming services:', error);
+        // Don't let initialization failure crash the app
+        // The dashboard will show connection status and allow retry
       }
     };
 
-    initializeStreamingServices();
+    // Add a small delay to ensure React is fully mounted
+    const timer = setTimeout(initializeStreamingServices, 100);
+    
+    return () => clearTimeout(timer);
   }, [dispatch]);
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Box sx={{ flexGrow: 1 }}>
           <AppBar position="static" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
             <Toolbar>

@@ -829,7 +829,7 @@ export interface SkillsState {
   selectedSkillData: Skill | null;
   
   // Progression data
-  progressions: Map<string, SkillProgression>; // skillId -> progression
+  progressions: Record<string, SkillProgression>; // skillId -> progression
   
   // Synergy data
   synergies: SkillSynergy[];
@@ -840,7 +840,7 @@ export interface SkillsState {
   achievements: SkillAchievement[];
   
   // Analytics and insights
-  analytics: Map<string, SkillAnalytics>; // skillId -> analytics
+  analytics: Record<string, SkillAnalytics>; // skillId -> analytics
   insights: SkillInsight[];
   recommendations: SkillRecommendation[];
   

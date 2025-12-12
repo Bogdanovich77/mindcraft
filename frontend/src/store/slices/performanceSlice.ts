@@ -351,18 +351,26 @@ export const initializePerformanceSocket = createAsyncThunk(
       };
 
       // Register event handlers with streaming service
-      streamingService.createCognitiveStreams();
+      // Note: cognitive streams are already created in App.tsx, no need to recreate them
       
       // Subscribe to performance stream
     const performanceStream = streamingService.getStream('performance');
-    if (performanceStream) {
-      streamingService.subscribe('performance', (data: any) => {
-        if (data && data.length > 0) {
-          const latestData = data[data.length - 1] as PerformanceMetrics;
-          dispatch(updateMetrics(latestData));
-        }
-      });
+    if (!performanceStream) {
+      console.warn('[PERFORMANCE_SLICE] Performance stream not found, skipping subscription');
+      return { agentId, success: false, error: 'Performance stream not available' };
     }
+    
+    if (!performanceStream.isActive) {
+      console.warn('[PERFORMANCE_SLICE] Performance stream is not active');
+      return { agentId, success: false, error: 'Performance stream is inactive' };
+    }
+    
+    streamingService.subscribe('performance', (data: any) => {
+      if (data && data.length > 0) {
+        const latestData = data[data.length - 1] as PerformanceMetrics;
+        dispatch(updateMetrics(latestData));
+      }
+    });
 
       console.log(`[PERFORMANCE_SLICE] Socket.IO initialized for agent ${agentId}`);
       

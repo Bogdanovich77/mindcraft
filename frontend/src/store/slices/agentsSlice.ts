@@ -1,12 +1,13 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { AgentState, AgentSummary } from '../../types/agent';
-import type {
-  AgentStateUpdateEvent,
-  AgentConnectionEvent
+import type { 
+  AgentStateUpdateEvent, 
+  AgentConnectionEvent, 
+  AgentDisconnectionEvent 
 } from '../../types/socketEvents';
 
 export interface AgentsState {
-  agents: Map<string, AgentState>;
+  agents: Record<string, AgentState>;
   selectedAgent: string | null;
   loading: boolean;
   error: string | null;
@@ -30,7 +31,7 @@ export interface AgentsState {
 }
 
 const initialState: AgentsState = {
-  agents: new Map(),
+  agents: {},
   selectedAgent: null,
   loading: false,
   error: null,
@@ -55,16 +56,34 @@ const agentsSlice = createSlice({
   name: 'agents',
   initialState,
   reducers: {
-    setAgents: (state, action: PayloadAction<AgentSummary[]>) => {
+    setAgents: (state, action: PayloadAction<AgentSummary[] | { agents: AgentSummary[]; timestamp: number }>) => {
       state.loading = false;
       state.error = null;
       state.lastUpdate = Date.now();
       
-      // Convert array to Map for efficient lookup
-      const agentsMap = new Map<string, AgentState>();
-      action.payload.forEach(summary => {
+      // Handle both old format (direct array) and new format (object with agents property)
+      let agentsArray = Array.isArray(action.payload) ? action.payload : action.payload.agents;
+      
+      // Handle backend format transformation
+      if (agentsArray.length > 0 && 'name' in agentsArray[0] && !('id' in agentsArray[0])) {
+        // Transform backend format {name, in_game, viewerPort, socket_connected} to AgentSummary
+        agentsArray = agentsArray.map((agent: any) => ({
+          id: agent.name, // Use name as ID since backend doesn't send ID
+          name: agent.name,
+          profile: 'default', // Backend doesn't send profile
+          status: agent.in_game ? 'online' : 'offline', // Convert boolean to string
+          position: { x: 0, y: 0, z: 0 }, // Default position
+          health: 100, // Default health
+          level: 1, // Default level
+          lastUpdate: Date.now(),
+        }));
+      }
+      
+      // Convert array to object for efficient lookup
+      const agentsObj: Record<string, AgentState> = {};
+      agentsArray.forEach(summary => {
         // Convert summary to full agent state (will be updated with full data later)
-        agentsMap.set(summary.id, {
+        agentsObj[summary.id] = {
           id: summary.id,
           name: summary.name,
           profile: summary.profile,
@@ -133,12 +152,12 @@ const agentsSlice = createSlice({
               activeGoals: [],
               goalHistory: [],
             },
-            skills: new Map(),
+            skills: {},
             memory: {
               semantic: {
-                concepts: new Map(),
-                facts: new Map(),
-                relationships: new Map(),
+                concepts: {},
+                facts: {},
+                relationships: {},
               },
               episodic: {
                 events: [],
@@ -146,9 +165,9 @@ const agentsSlice = createSlice({
                 experiences: [],
               },
               procedural: {
-                skills: new Map(),
-                procedures: new Map(),
-                habits: new Map(),
+                skills: {},
+                procedures: {},
+                habits: {},
               },
               working: {
                 currentFocus: 'idle',
@@ -188,11 +207,11 @@ const agentsSlice = createSlice({
             processingMode: 'action',
           },
           social: {
-            relationships: new Map(),
+            relationships: {},
             reputation: {
               globalScore: 0,
-              factionScores: new Map(),
-              traitScores: new Map(),
+              factionScores: {},
+              traitScores: {},
               recentEvents: [],
             },
             socialContext: {
@@ -202,20 +221,20 @@ const agentsSlice = createSlice({
               culturalContext: 'default',
               groupDynamics: null,
             },
-            mentalModels: new Map(),
+            mentalModels: {},
           },
-        });
+        };
       });
       
-      state.agents = agentsMap;
+      state.agents = agentsObj;
     },
     
     updateAgent: (state, action: PayloadAction<{ agentId: string; updates: Partial<AgentState> }>) => {
       const { agentId, updates } = action.payload;
-      const existingAgent = state.agents.get(agentId);
+      const existingAgent = state.agents[agentId];
       
       if (existingAgent) {
-        state.agents.set(agentId, { ...existingAgent, ...updates });
+        state.agents[agentId] = { ...existingAgent, ...updates };
         state.lastUpdate = Date.now();
       }
     },
@@ -242,7 +261,7 @@ const agentsSlice = createSlice({
     },
     
     removeAgent: (state, action: PayloadAction<string>) => {
-      state.agents.delete(action.payload);
+      delete state.agents[action.payload];
       if (state.selectedAgent === action.payload) {
         state.selectedAgent = null;
       }
@@ -250,7 +269,7 @@ const agentsSlice = createSlice({
     
     updateAgentStatus: (state, action: PayloadAction<{ agentId: string; status: string }>) => {
       const { agentId, status } = action.payload;
-      const agent = state.agents.get(agentId);
+      const agent = state.agents[agentId];
       if (agent) {
         agent.status = status as any;
         agent.lastUpdate = Date.now();
@@ -259,7 +278,7 @@ const agentsSlice = createSlice({
     
     updateAgentPosition: (state, action: PayloadAction<{ agentId: string; position: { x: number; y: number; z: number } }>) => {
       const { agentId, position } = action.payload;
-      const agent = state.agents.get(agentId);
+      const agent = state.agents[agentId];
       if (agent) {
         agent.context.position = position;
         agent.lastUpdate = Date.now();
@@ -268,7 +287,7 @@ const agentsSlice = createSlice({
     
     updateAgentHealth: (state, action: PayloadAction<{ agentId: string; health: number }>) => {
       const { agentId, health } = action.payload;
-      const agent = state.agents.get(agentId);
+      const agent = state.agents[agentId];
       if (agent) {
         agent.context.health = health;
         agent.lastUpdate = Date.now();
@@ -278,18 +297,29 @@ const agentsSlice = createSlice({
     // Real-time streaming actions
     agentStateUpdate: (state, action: PayloadAction<AgentStateUpdateEvent>) => {
       const { agentId, state: agentState, changes, timestamp } = action.payload;
-      const existingAgent = state.agents.get(agentId);
+      const existingAgent = state.agents[agentId];
       
       if (existingAgent) {
-        // Merge the incoming state with existing state
-        const updatedAgent = {
+        // Update only the basic fields that come from the socket state
+        const updatedAgent: AgentState = {
           ...existingAgent,
-          ...agentState,
           lastUpdate: timestamp,
           status: agentState.status as any, // Handle status type compatibility
+          // Update context fields if they exist in the incoming state
+          context: {
+            ...existingAgent.context,
+            position: agentState.position || existingAgent.context.position,
+            health: agentState.health ?? existingAgent.context.health,
+            food: agentState.food ?? existingAgent.context.food,
+            experience: agentState.experience ?? existingAgent.context.experience,
+            level: agentState.level ?? existingAgent.context.level,
+            dimension: agentState.context?.dimension || existingAgent.context.dimension,
+            timeOfDay: agentState.context?.timeOfDay ?? existingAgent.context.timeOfDay,
+            weather: agentState.context?.weather || existingAgent.context.weather,
+          },
         };
         
-        state.agents.set(agentId, updatedAgent);
+        state.agents[agentId] = updatedAgent;
         state.streaming.lastStreamUpdate = timestamp;
         state.performance.totalUpdates++;
         
@@ -312,9 +342,9 @@ const agentsSlice = createSlice({
             food: agentState.food,
             experience: agentState.experience,
             level: agentState.level,
-            dimension: agentState.context.dimension,
-            timeOfDay: agentState.context.timeOfDay,
-            weather: agentState.context.weather,
+            dimension: agentState.context?.dimension || 'overworld',
+            timeOfDay: agentState.context?.timeOfDay || 0,
+            weather: agentState.context?.weather || 'clear',
             nearbyEntities: [],
             nearbyBlocks: [],
             inventory: { items: [], slots: 36, usedSlots: 0 },
@@ -369,12 +399,12 @@ const agentsSlice = createSlice({
               activeGoals: [],
               goalHistory: [],
             },
-            skills: new Map(),
+            skills: {},
             memory: {
               semantic: {
-                concepts: new Map(),
-                facts: new Map(),
-                relationships: new Map(),
+                concepts: {},
+                facts: {},
+                relationships: {},
               },
               episodic: {
                 events: [],
@@ -382,9 +412,9 @@ const agentsSlice = createSlice({
                 experiences: [],
               },
               procedural: {
-                skills: new Map(),
-                procedures: new Map(),
-                habits: new Map(),
+                skills: {},
+                procedures: {},
+                habits: {},
               },
               working: {
                 currentFocus: 'idle',
@@ -424,11 +454,11 @@ const agentsSlice = createSlice({
             processingMode: 'action',
           },
           social: {
-            relationships: new Map(),
+            relationships: {},
             reputation: {
               globalScore: 0,
-              factionScores: new Map(),
-              traitScores: new Map(),
+              factionScores: {},
+              traitScores: {},
               recentEvents: [],
             },
             socialContext: {
@@ -438,17 +468,17 @@ const agentsSlice = createSlice({
               culturalContext: 'default',
               groupDynamics: null,
             },
-            mentalModels: new Map(),
+            mentalModels: {},
           },
         };
         
-        state.agents.set(agentId, newAgent);
+        state.agents[agentId] = newAgent;
       }
     },
 
     agentConnected: (state, action: PayloadAction<AgentConnectionEvent>) => {
       const { agentId, timestamp, connectionType } = action.payload;
-      const agent = state.agents.get(agentId);
+      const agent = state.agents[agentId];
       
       if (agent) {
         agent.status = 'online';
@@ -462,7 +492,7 @@ const agentsSlice = createSlice({
 
     agentDisconnected: (state, action: PayloadAction<AgentDisconnectionEvent>) => {
       const { agentId, timestamp, reason } = action.payload;
-      const agent = state.agents.get(agentId);
+      const agent = state.agents[agentId];
       
       if (agent) {
         agent.status = 'offline';
@@ -541,16 +571,27 @@ const agentsSlice = createSlice({
     batchAgentUpdates: (state, action: PayloadAction<AgentStateUpdateEvent[]>) => {
       action.payload.forEach(update => {
         const { agentId, state: agentState, timestamp } = update;
-        const existingAgent = state.agents.get(agentId);
+        const existingAgent = state.agents[agentId];
         
         if (existingAgent) {
-          const updatedAgent = {
+          const updatedAgent: AgentState = {
             ...existingAgent,
-            ...agentState,
             lastUpdate: timestamp,
             status: agentState.status as any, // Handle status type compatibility
+            // Update context fields if they exist in the incoming state
+            context: {
+              ...existingAgent.context,
+              position: agentState.position || existingAgent.context.position,
+              health: agentState.health ?? existingAgent.context.health,
+              food: agentState.food ?? existingAgent.context.food,
+              experience: agentState.experience ?? existingAgent.context.experience,
+              level: agentState.level ?? existingAgent.context.level,
+              dimension: agentState.context?.dimension || existingAgent.context.dimension,
+              timeOfDay: agentState.context?.timeOfDay ?? existingAgent.context.timeOfDay,
+              weather: agentState.context?.weather || existingAgent.context.weather,
+            },
           };
-          state.agents.set(agentId, updatedAgent);
+          state.agents[agentId] = updatedAgent;
         } else {
           // For batch updates, create minimal agent state
           const newAgent: AgentState = {
@@ -622,12 +663,12 @@ const agentsSlice = createSlice({
                 activeGoals: [],
                 goalHistory: [],
               },
-              skills: new Map(),
+              skills: {},
               memory: {
                 semantic: {
-                  concepts: new Map(),
-                  facts: new Map(),
-                  relationships: new Map(),
+                  concepts: {},
+                  facts: {},
+                  relationships: {},
                 },
                 episodic: {
                   events: [],
@@ -635,9 +676,9 @@ const agentsSlice = createSlice({
                   experiences: [],
                 },
                 procedural: {
-                  skills: new Map(),
-                  procedures: new Map(),
-                  habits: new Map(),
+                  skills: {},
+                  procedures: {},
+                  habits: {},
                 },
                 working: {
                   currentFocus: 'idle',
@@ -677,11 +718,11 @@ const agentsSlice = createSlice({
               processingMode: 'action',
             },
             social: {
-              relationships: new Map(),
+              relationships: {},
               reputation: {
                 globalScore: 0,
-                factionScores: new Map(),
-                traitScores: new Map(),
+                factionScores: {},
+                traitScores: {},
                 recentEvents: [],
               },
               socialContext: {
@@ -691,10 +732,10 @@ const agentsSlice = createSlice({
                 culturalContext: 'default',
                 groupDynamics: null,
               },
-              mentalModels: new Map(),
+              mentalModels: {},
             },
           };
-          state.agents.set(agentId, newAgent);
+          state.agents[agentId] = newAgent;
         }
       });
       
@@ -733,17 +774,17 @@ export default agentsSlice.reducer;
 // Selectors
 export const selectAllAgents = (state: { agents: AgentsState }) => state.agents.agents;
 export const selectAgentById = (state: { agents: AgentsState }, agentId: string) => 
-  state.agents.agents.get(agentId);
+  state.agents.agents[agentId];
 export const selectSelectedAgent = (state: { agents: AgentsState }) => {
   const selectedId = state.agents.selectedAgent;
-  return selectedId ? state.agents.agents.get(selectedId) || null : null;
+  return selectedId ? state.agents.agents[selectedId] || null : null;
 };
 export const selectAgentsLoading = (state: { agents: AgentsState }) => state.agents.loading;
 export const selectAgentsError = (state: { agents: AgentsState }) => state.agents.error;
 export const selectAgentIds = (state: { agents: AgentsState }) => 
-  Array.from(state.agents.agents.keys());
+  Object.keys(state.agents.agents);
 export const selectOnlineAgents = (state: { agents: AgentsState }) =>
-  Array.from(state.agents.agents.values()).filter(agent => agent.status === 'online');
+  Object.values(state.agents.agents).filter(agent => agent.status === 'online');
 
 // Streaming selectors
 export const selectStreamingStatus = (state: { agents: AgentsState }) => state.agents.streaming;

@@ -17,6 +17,7 @@ import { GoalPrioritizationEngine } from './goal_prioritization.js';
 import { GoalExecutionEngine } from './goal_execution.js';
 import { GoalResourceManager } from './goal_resources.js';
 import { LegacyGoalBridge, MigrationStrategy, LegacyGoal } from './goal_bridge.js';
+import { PlanningEngine, PlanRequest, PlanType } from '../langgraph/interfaces.js';
 
 /**
  * Goal system configuration
@@ -68,6 +69,7 @@ export class GoalSystem {
   private executionHistory: GoalExecutionResult[];
   private statistics: GoalSystemStats;
   private socialState?: SocialState;
+  private planningEngine?: PlanningEngine;
 
   constructor(config?: Partial<GoalSystemConfig>) {
     this.config = {
@@ -98,6 +100,9 @@ export class GoalSystem {
       this.prioritizationEngine,
       this.resourceManager
     );
+    
+    // Initialize planning engine (will be set later)
+    this.planningEngine = undefined;
 
     this.goals = new Map();
     this.goalHierarchy = new Map();
@@ -1109,5 +1114,169 @@ export class GoalSystem {
       // This would need an anti-idle goal generator instance
       console.log(`[GOAL_SYSTEM] Should generate anti-idle goals but generator not available`);
     }
+  }
+  
+  /**
+   * Set planning engine for goal-driven planning
+   */
+  setPlanningEngine(planningEngine: PlanningEngine): void {
+    this.planningEngine = planningEngine;
+    console.log('Planning engine connected to goal system');
+  }
+  
+  /**
+   * Create plan from goal
+   */
+  async createPlanFromGoal(goalId: string, agentState: AgentState): Promise<string | null> {
+    if (!this.planningEngine) {
+      console.warn('Planning engine not available');
+      return null;
+    }
+    
+    const goal = this.goals.get(goalId);
+    if (!goal) {
+      console.warn(`Goal not found: ${goalId}`);
+      return null;
+    }
+    
+    try {
+      // Determine plan type based on goal level
+      let planType: PlanType;
+      switch (goal.type) {
+        case 'strategic':
+          planType = PlanType.STRATEGIC;
+          break;
+        case 'tactical':
+          planType = PlanType.TACTICAL;
+          break;
+        case 'operational':
+          planType = PlanType.OPERATIONAL;
+          break;
+        default:
+          planType = PlanType.OPERATIONAL;
+      }
+      
+      // Create plan request
+      const planRequest: PlanRequest = {
+        id: `plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        goalId: goal.id,
+        type: planType,
+        title: goal.name,
+        description: goal.description,
+        priority: this.mapGoalPriorityToPlanPriority(goal.priority),
+        deadline: goal.deadline,
+        context: agentState,
+        requirements: this.convertGoalRequirementsToPlanRequirements(goal.requirements)
+      };
+      
+      // Create plan using planning engine
+      const plan = await this.planningEngine.createPlan(planRequest, agentState);
+      
+      // Link plan to goal
+      goal.planId = plan.id;
+      
+      console.log(`Created plan ${plan.id} for goal ${goalId}`);
+      return plan.id;
+      
+    } catch (error) {
+      console.error(`Failed to create plan for goal ${goalId}:`, error);
+      return null;
+    }
+  }
+  
+  /**
+   * Get plan for goal
+   */
+  getPlanForGoal(goalId: string): string | null {
+    const goal = this.goals.get(goalId);
+    return goal?.planId || null;
+  }
+  
+  /**
+   * Update goal based on plan progress
+   */
+  async updateGoalFromPlanProgress(planId: string, progress: any, agentState: AgentState): Promise<void> {
+    // Find goal associated with this plan
+    const associatedGoal = Array.from(this.goals.values()).find(goal => goal.planId === planId);
+    if (!associatedGoal) {
+      console.warn(`No goal found for plan ${planId}`);
+      return;
+    }
+    
+    // Update goal progress based on plan progress
+    if (progress.percentage !== undefined) {
+      associatedGoal.progress.percentage = progress.percentage;
+    }
+    
+    if (progress.completedSteps) {
+      associatedGoal.progress.completedSteps = progress.completedSteps;
+    }
+    
+    if (progress.currentStep) {
+      associatedGoal.progress.currentStep = progress.currentStep;
+    }
+    
+    // Update goal status based on plan status
+    if (progress.status) {
+      switch (progress.status) {
+        case 'completed':
+          associatedGoal.status = 'completed' as any;
+          break;
+        case 'failed':
+          associatedGoal.status = 'failed' as any;
+          break;
+        case 'active':
+          associatedGoal.status = 'active' as any;
+          break;
+        case 'paused':
+          associatedGoal.status = 'paused' as any;
+          break;
+      }
+    }
+    
+    // Update last update time
+    associatedGoal.progress.lastUpdate = Date.now();
+    
+    console.log(`Updated goal ${associatedGoal.id} from plan ${planId} progress`);
+  }
+  
+  /**
+   * Map goal priority to plan priority
+   */
+  private mapGoalPriorityToPlanPriority(goalPriority: number): any {
+    if (goalPriority <= 1) return 'CRITICAL';
+    if (goalPriority <= 3) return 'HIGH';
+    if (goalPriority <= 5) return 'MEDIUM';
+    if (goalPriority <= 7) return 'LOW';
+    return 'BACKGROUND';
+  }
+  
+  /**
+   * Convert goal requirements to plan requirements
+   */
+  private convertGoalRequirementsToPlanRequirements(goalRequirements: any): any {
+    if (!goalRequirements) return {};
+    
+    const planRequirements: any = {
+      items: {},
+      tools: [],
+      location: goalRequirements.location,
+      time: goalRequirements.time,
+      assistance: goalRequirements.assistance || []
+    };
+    
+    // Convert items
+    if (goalRequirements.items) {
+      for (const [name, quantity] of Object.entries(goalRequirements.items)) {
+        planRequirements.items[name] = quantity;
+      }
+    }
+    
+    // Convert tools
+    if (goalRequirements.tools) {
+      planRequirements.tools = [...goalRequirements.tools];
+    }
+    
+    return planRequirements;
   }
 }

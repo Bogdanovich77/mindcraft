@@ -21,19 +21,19 @@ import {
 import { useAppSelector, useAppDispatch } from '../../store';
 import {
   selectDashboardState,
-  selectSelectedAgentMetrics,
-  selectAllAgentIds,
-  selectOnlineAgents,
-  selectAverageResponseTime,
-  selectAverageCognitiveLoad,
-  selectAverageSuccessRate,
-  fetchAgentMetrics,
-  fetchPerformanceData,
-  fetchPositionData,
+  selectAgentMetrics,
+  selectDashboardAgentIds,
+  selectDashboardAverageResponseTime,
+  selectDashboardAverageCognitiveLoad,
+  selectDashboardAverageSuccessRate,
+  selectPerformanceData,
+  selectPositionData,
+  fetchDashboardData,
   selectAgent,
-  setLoading,
-  setError,
-} from '../../store/slices/dashboardSlice';
+  setDashboardLoading,
+  setDashboardError,
+  selectOnlineAgents,
+} from '../../store';
 import type { AgentOverviewDashboardProps } from '../../types/dashboard';
 
 // Import dashboard components (we'll create these next)
@@ -42,22 +42,12 @@ import type { AgentOverviewDashboardProps } from '../../types/dashboard';
 // import PerformanceMetrics from './PerformanceMetrics';
 // import AgentPositionMap from './AgentPositionMap';
 
-// Temporary placeholder components to avoid import errors
-interface CognitiveLoadGaugeProps {
-  value: number;
-  threshold: number;
-  trend: 'increasing' | 'decreasing' | 'stable';
-  size: string;
-  animated: boolean;
-  showThreshold: boolean;
-  showTrend: boolean;
-}
-
 // Import the missing interfaces from types/dashboard.ts
 import type {
   AgentStatusIndicatorProps,
   PerformanceMetricsProps,
-  AgentPositionMapProps
+  AgentPositionMapProps,
+  CognitiveLoadGaugeProps
 } from '../../types/dashboard';
 
 const CognitiveLoadGauge = React.memo((props: CognitiveLoadGaugeProps) => (
@@ -81,28 +71,22 @@ const AgentPositionMap = React.memo((props: AgentPositionMapProps) => (
  * 
  * This component provides a comprehensive view of agent cognitive states,
  * performance metrics, and real-time monitoring capabilities.
+ * 
+ * Updated: Fixed import errors to use store exports instead of direct slice imports
  */
-const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({
-  agent,
-  performanceData,
-  positionData,
-  settings,
-  onAgentSelect,
-  className,
-}) => {
+const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({ agent, performanceData, positionData, settings, onAgentSelect, className }) => {
   const theme = useTheme();
   const dispatch = useAppDispatch();
   const dashboardState = useAppSelector(selectDashboardState);
-  const selectedMetrics = useAppSelector(selectSelectedAgentMetrics);
-  const allAgentIds = useAppSelector(selectAllAgentIds);
+  const selectedMetrics = useAppSelector((state) => 
+    dashboardState.selectedAgentId ? selectAgentMetrics(dashboardState.selectedAgentId)(state) : null
+  );
+  const allAgentIds = useAppSelector(selectDashboardAgentIds);
   const onlineAgents = useAppSelector(selectOnlineAgents);
-  const avgResponseTime = useAppSelector(selectAverageResponseTime);
-  const avgCognitiveLoad = useAppSelector(selectAverageCognitiveLoad);
-  const avgSuccessRate = useAppSelector(selectAverageSuccessRate);
 
-  // Local state for UI interactions
-  const [isFullscreen, setIsFullscreen] = React.useState(false);
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const avgResponseTime = useAppSelector(selectDashboardAverageResponseTime);
+  const avgCognitiveLoad = useAppSelector(selectDashboardAverageCognitiveLoad);
+  const avgSuccessRate = useAppSelector(selectDashboardAverageSuccessRate);
 
   // Calculate derived metrics
   const derivedMetrics = useMemo(() => {
@@ -110,7 +94,7 @@ const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({
     const onlineCount = onlineAgents.length;
     const offlineCount = totalAgents - onlineCount;
     const healthStatus = onlineAgents.filter(agent => 
-      agent.health.healthStatus === 'optimal' || agent.health.healthStatus === 'normal'
+      agent.context.health > 50 // Consider agents with health > 50 as healthy
     ).length;
 
     return {
@@ -125,38 +109,43 @@ const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({
     };
   }, [allAgentIds, onlineAgents, avgResponseTime, avgCognitiveLoad, avgSuccessRate]);
 
+  // Get performance and position data for selected agent
+  const selectedPerformanceData = useAppSelector((state) => 
+    dashboardState.selectedAgentId ? selectPerformanceData(dashboardState.selectedAgentId)(state) : null
+  );
+  const selectedPositionData = useAppSelector((state) => 
+    dashboardState.selectedAgentId ? selectPositionData(dashboardState.selectedAgentId)(state) : null
+  );
+
+  // Local state for UI interactions
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+
   // Refresh data handler
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
     
     setIsRefreshing(true);
-    dispatch(setLoading(true));
+    dispatch(setDashboardLoading(true));
     
     try {
       if (dashboardState.selectedAgentId) {
         // Refresh selected agent data
-        await Promise.all([
-          dispatch(fetchAgentMetrics(dashboardState.selectedAgentId)).unwrap(),
-          dispatch(fetchPerformanceData({ 
-            agentId: dashboardState.selectedAgentId, 
-            timeRange: settings.visualization.chartType === 'line' ? '1h' : '6h' 
-          })).unwrap(),
-          dispatch(fetchPositionData(dashboardState.selectedAgentId)).unwrap(),
-        ]);
+        await dispatch(fetchDashboardData(dashboardState.selectedAgentId)).unwrap();
       } else {
         // Refresh all agents data (limited to first 10 for performance)
         const agentIdsToRefresh = allAgentIds.slice(0, 10);
         await Promise.all(
-          agentIdsToRefresh.map(id => dispatch(fetchAgentMetrics(id)).unwrap())
+          agentIdsToRefresh.map(id => dispatch(fetchDashboardData(id)).unwrap())
         );
       }
     } catch (error) {
-      dispatch(setError(error instanceof Error ? error.message : 'Failed to refresh data'));
+      dispatch(setDashboardError(error instanceof Error ? error.message : 'Failed to refresh data'));
     } finally {
       setIsRefreshing(false);
-      dispatch(setLoading(false));
+      dispatch(setDashboardLoading(false));
     }
-  }, [dispatch, isRefreshing, dashboardState.selectedAgentId, allAgentIds, settings]);
+  }, [dispatch, isRefreshing, dashboardState.selectedAgentId, allAgentIds]);
 
   // Auto-refresh effect
   useEffect(() => {
@@ -179,7 +168,6 @@ const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({
       setIsFullscreen(false);
     }
   }, []);
-
 
   // Agent selection handler
   const handleAgentSelect = useCallback((selectedAgentId: string) => {
@@ -411,7 +399,7 @@ const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({
                   value={selectedMetrics.cognitiveLoad.current}
                   threshold={selectedMetrics.cognitiveLoad.threshold}
                   trend={selectedMetrics.cognitiveLoad.trend}
-                  size="large"
+                  size={'large' as const}
                   animated={settings.animations}
                   showThreshold={true}
                   showTrend={true}
@@ -421,7 +409,147 @@ const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({
               {/* Agent Status Indicator */}
               <Box>
                 <AgentStatusIndicator
-                  agent={agent}
+                  agent={agent || {
+                    id: selectedMetrics.agentId,
+                    name: selectedMetrics.agentId,
+                    profile: '',
+                    status: 'online',
+                    lastUpdate: Date.now(),
+                    context: {
+                      position: { x: 0, y: 0, z: 0 },
+                      health: selectedMetrics.health.healthScore,
+                      food: 100,
+                      experience: 0,
+                      level: 1,
+                      dimension: 'overworld',
+                      timeOfDay: 0,
+                      weather: 'clear',
+                      nearbyEntities: [],
+                      nearbyBlocks: [],
+                      inventory: { items: [], slots: 36, usedSlots: 0 },
+                      equipment: {},
+                    },
+                    reactive: {
+                      activeMode: 'idle',
+                      emergencyConditions: [],
+                      lastReactiveAction: {
+                        mode: 'idle',
+                        priority: 0,
+                        timestamp: Date.now(),
+                        context: {},
+                        outcome: 'none',
+                      },
+                      interruptHistory: [],
+                    },
+                    cognitive: {
+                      purpose: {
+                        identity: {
+                          name: selectedMetrics.agentId,
+                          role: 'agent',
+                          background: 'Unknown',
+                          corePurpose: 'Survival and exploration',
+                        },
+                        personality: {
+                          openness: 0.5,
+                          conscientiousness: 0.5,
+                          extraversion: 0.5,
+                          agreeableness: 0.5,
+                          neuroticism: 0.5,
+                          riskTolerance: 0.5,
+                          creativity: 0.5,
+                          patience: 0.5,
+                          competitiveness: 0.5,
+                          curiosity: 0.5,
+                        },
+                        motivations: [],
+                        values: [],
+                        ethics: {
+                          harmAvoidance: 0.8,
+                          fairness: 0.7,
+                          loyalty: 0.6,
+                          authority: 0.5,
+                          purity: 0.4,
+                        },
+                      },
+                      goals: {
+                        strategicGoals: [],
+                        tacticalGoals: [],
+                        operationalGoals: [],
+                        activeGoals: [],
+                        goalHistory: [],
+                      },
+                      skills: {},
+                      memory: {
+                        semantic: {
+                          concepts: {},
+                          facts: {},
+                          relationships: {},
+                        },
+                        episodic: {
+                          events: [],
+                          conversations: [],
+                          experiences: [],
+                        },
+                        procedural: {
+                          skills: {},
+                          procedures: {},
+                          habits: {},
+                        },
+                        working: {
+                          currentFocus: 'idle',
+                          activeTasks: [],
+                          conversationContext: null,
+                          buffer: [],
+                        },
+                      },
+                      processing: {
+                        currentPhase: 'perception',
+                        cognitiveLoad: 0,
+                        attentionLevel: 0.5,
+                        processingHistory: [],
+                      },
+                    },
+                    executive: {
+                      currentAction: {
+                        id: '',
+                        type: 'idle',
+                        description: 'Agent is idle',
+                        priority: 0,
+                        status: 'pending',
+                        createdAt: Date.now(),
+                        context: {},
+                      },
+                      actionQueue: [],
+                      decisionHistory: [],
+                      performanceMetrics: {
+                        reactiveResponseTime: 0,
+                        cognitiveProcessingTime: 0,
+                        successRate: 1.0,
+                        errorRate: 0.0,
+                        memoryUsage: 0,
+                        cpuUsage: 0,
+                      },
+                      responseHistory: [],
+                      processingMode: 'action',
+                    },
+                    social: {
+                      relationships: {},
+                      reputation: {
+                        globalScore: 0,
+                        factionScores: {},
+                        traitScores: {},
+                        recentEvents: [],
+                      },
+                      socialContext: {
+                        currentSituation: 'idle',
+                        nearbyAgents: [],
+                        socialNorms: [],
+                        culturalContext: 'default',
+                        groupDynamics: null,
+                      },
+                      mentalModels: {},
+                    },
+                  }}
                   metrics={selectedMetrics}
                   selected={true}
                   onSelect={handleAgentSelect}
@@ -434,7 +562,43 @@ const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({
               <Box sx={{ gridColumn: '1 / -1' }}>
                 <PerformanceMetrics
                   agentId={selectedMetrics.agentId}
-                  data={performanceData}
+                  data={selectedPerformanceData || {
+                    agentId: selectedMetrics.agentId,
+                    timeRange: '1h',
+                    metrics: {
+                      responseTime: {
+                        timestamps: [],
+                        values: [],
+                        average: 0,
+                        min: 0,
+                        max: 0,
+                      },
+                      cognitiveLoad: {
+                        timestamps: [],
+                        values: [],
+                        average: 0,
+                        peaks: [],
+                      },
+                      successRate: {
+                        timestamps: [],
+                        values: [],
+                        average: 0,
+                        trend: 'stable',
+                      },
+                      memoryUsage: {
+                        timestamps: [],
+                        values: [],
+                        average: 0,
+                        peak: 0,
+                      },
+                      cpuUsage: {
+                        timestamps: [],
+                        values: [],
+                        average: 0,
+                        peak: 0,
+                      },
+                    },
+                  }}
                   timeRange="1h"
                   onTimeRangeChange={(range: any) => console.log('Time range changed:', range)}
                   chartType="line"
@@ -455,7 +619,22 @@ const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({
             </Typography>
             <AgentPositionMap
               agentId={selectedMetrics.agentId}
-              positionData={positionData}
+              positionData={selectedPositionData || {
+                agentId: selectedMetrics.agentId,
+                currentPosition: {
+                  x: 0,
+                  y: 0,
+                  z: 0,
+                  dimension: 'overworld',
+                },
+                positionHistory: [],
+                movement: {
+                  speed: 0,
+                  direction: 0,
+                  distance: 0,
+                },
+                nearbyEntities: [],
+              }}
               showHistory={true}
               showEntities={true}
               mapStyle={settings.visualization.mapStyle}
@@ -483,10 +662,152 @@ const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({
               gap: { xs: 1, sm: 1.5, md: 2, lg: 2, xl: 2 },
             }}
           >
-            {Array.from(dashboardState.metrics.values()).slice(0, 12).map((agentMetrics) => (
+            {Object.values(dashboardState.metrics).slice(0, 12).map((agentMetrics) => (
               <AgentStatusIndicator
                 key={agentMetrics.agentId}
-                agent={agent} // We'll need to get the actual agent data
+                agent={agent || {
+                  id: agentMetrics.agentId,
+                  name: agentMetrics.agentId,
+                  profile: '',
+                  status: 'online',
+                  lastUpdate: Date.now(),
+                  context: {
+                    position: { x: 0, y: 0, z: 0 },
+                    health: agentMetrics.health.healthScore,
+                    food: 100,
+                    experience: 0,
+                    level: 1,
+                    dimension: 'overworld',
+                    timeOfDay: 0,
+                    weather: 'clear',
+                    nearbyEntities: [],
+                    nearbyBlocks: [],
+                    inventory: { items: [], slots: 36, usedSlots: 0 },
+                    equipment: {},
+
+                  },
+                  reactive: {
+                    activeMode: 'idle',
+                    emergencyConditions: [],
+                    lastReactiveAction: {
+                      mode: 'idle',
+                      priority: 0,
+                      timestamp: Date.now(),
+                      context: {},
+                      outcome: 'none',
+                    },
+                    interruptHistory: [],
+                  },
+                  cognitive: {
+                    purpose: {
+                      identity: {
+                        name: agentMetrics.agentId,
+                        role: 'agent',
+                        background: 'Unknown',
+                        corePurpose: 'Survival and exploration',
+                      },
+                      personality: {
+                        openness: 0.5,
+                        conscientiousness: 0.5,
+                        extraversion: 0.5,
+                        agreeableness: 0.5,
+                        neuroticism: 0.5,
+                        riskTolerance: 0.5,
+                        creativity: 0.5,
+                        patience: 0.5,
+                        competitiveness: 0.5,
+                        curiosity: 0.5,
+                      },
+                      motivations: [],
+                      values: [],
+                      ethics: {
+                        harmAvoidance: 0.8,
+                        fairness: 0.7,
+                        loyalty: 0.6,
+                        authority: 0.5,
+                        purity: 0.4,
+                      },
+                    },
+                    goals: {
+                      strategicGoals: [],
+                      tacticalGoals: [],
+                      operationalGoals: [],
+                      activeGoals: [],
+                      goalHistory: [],
+                    },
+                    skills: {},
+
+                    memory: {
+                      semantic: {
+                        concepts: {},
+                        facts: {},
+                        relationships: {},
+                      },
+                      episodic: {
+                        events: [],
+                        conversations: [],
+                        experiences: [],
+                      },
+                      procedural: {
+                        skills: {},
+                        procedures: {},
+                        habits: {},
+                      },
+                      working: {
+                        currentFocus: 'idle',
+                        activeTasks: [],
+                        conversationContext: null,
+                        buffer: [],
+                      },
+                    },
+                    processing: {
+                      currentPhase: 'perception',
+                      cognitiveLoad: 0,
+                      attentionLevel: 0.5,
+                      processingHistory: [],
+                    },
+                  },
+                  executive: {
+                    currentAction: {
+                      id: '',
+                      type: 'idle',
+                      description: 'Agent is idle',
+                      priority: 0,
+                      status: 'pending',
+                      createdAt: Date.now(),
+                      context: {},
+                    },
+                    actionQueue: [],
+                    decisionHistory: [],
+                    performanceMetrics: {
+                      reactiveResponseTime: 0,
+                      cognitiveProcessingTime: 0,
+                      successRate: 1.0,
+                      errorRate: 0.0,
+                      memoryUsage: 0,
+                      cpuUsage: 0,
+                    },
+                    responseHistory: [],
+                    processingMode: 'action',
+                  },
+                  social: {
+                    relationships: {},
+                    reputation: {
+                      globalScore: 0,
+                      factionScores: {},
+                      traitScores: {},
+                      recentEvents: [],
+                    },
+                    socialContext: {
+                      currentSituation: 'idle',
+                      nearbyAgents: [],
+                      socialNorms: [],
+                      culturalContext: 'default',
+                      groupDynamics: null,
+                    },
+                    mentalModels: {},
+                  },
+                }}
                 metrics={agentMetrics}
                 selected={dashboardState.selectedAgentId === agentMetrics.agentId}
                 onSelect={handleAgentSelect}

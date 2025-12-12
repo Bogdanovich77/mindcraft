@@ -13,7 +13,7 @@ const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/favicon.ico',
+  // '/favicon.ico', // Temporarily commented out - add favicon.ico to frontend/public/ if needed
   // Add other static assets as needed
 ];
 

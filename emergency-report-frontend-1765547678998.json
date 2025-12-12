@@ -1,0 +1,69 @@
+{
+  "timestamp": "2025-12-12T13:54:38.998Z",
+  "reason": "critical",
+  "source": "frontend",
+  "system_status": {
+    "isRunning": true,
+    "backend": {
+      "running": true,
+      "errors": 11
+    },
+    "frontend": {
+      "running": true,
+      "errors": 9
+    },
+    "websocket": {
+      "connected": true,
+      "lastCheck": 1765547674228,
+      "successRate": 75
+    },
+    "api": {
+      "reachable": false,
+      "lastCheck": 1765547674213
+    }
+  },
+  "recent_alerts": [
+    {
+      "timestamp": "2025-12-12T13:54:23.989Z",
+      "source": "frontend",
+      "severity": "critical",
+      "message": "Process failure detected: frontend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765547663989.9592
+    },
+    {
+      "timestamp": "2025-12-12T13:54:28.981Z",
+      "source": "frontend",
+      "severity": "critical",
+      "message": "Process failure detected: frontend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765547668981.0261
+    },
+    {
+      "timestamp": "2025-12-12T13:54:33.997Z",
+      "source": "frontend",
+      "severity": "critical",
+      "message": "Process failure detected: frontend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765547673997.5164
+    },
+    {
+      "timestamp": "2025-12-12T13:54:38.997Z",
+      "source": "frontend",
+      "severity": "critical",
+      "message": "Process failure detected: frontend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765547678997.299
+    }
+  ],
+  "error_counts": {
+    "backend": 11,
+    "frontend": 9
+  },
+  "recommendations": [
+    "Immediate restart of the frontend process",
+    "Review recent code changes for breaking modifications",
+    "Check system resources (memory, CPU, disk space)",
+    "Verify external dependencies and services"
+  ]
+}

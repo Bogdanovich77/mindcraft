@@ -95,7 +95,13 @@ export const fetchMemorySystem = createAsyncThunk(
             totalEvents: 0,
             successRate: 0,
             averageDuration: 0,
-            efficiencyByType: {} as any,
+            efficiencyByType: { 
+              semantic_extraction: 0, 
+              episodic_to_semantic: 0, 
+              procedural_refinement: 0, 
+              memory_forgetting: 0, 
+              memory_reorganization: 0 
+            },
             bottlenecks: []
           },
           correlationAnalysis: {
@@ -180,24 +186,34 @@ export const initializeMemorySocket = createAsyncThunk(
   'memory/initializeMemorySocket',
   async (_, { rejectWithValue }) => {
     try {
-      // Register memory event handlers
-      // Set up memory event handlers
-      streamingService.subscribe('memory:semantic:update', (event: any) => {
-        console.log('Memory semantic update:', event);
-      });
-      streamingService.subscribe('memory:episodic:update', (event: any) => {
-        console.log('Memory episodic update:', event);
-      });
-      streamingService.subscribe('memory:procedural:update', (event: any) => {
-        console.log('Memory procedural update:', event);
-      });
-      streamingService.subscribe('memory:consolidation:event', (event: any) => {
-        console.log('Memory consolidation event:', event);
-      });
-
-      // Memory streams are set up in the handlers above
+      // Import socketService dynamically to avoid circular dependencies
+      const { getSocketService } = await import('../../services/socketService');
+      const socketService = getSocketService();
       
-      console.log('✅ Memory streaming initialized');
+      if (!socketService) {
+        throw new Error('Socket service not initialized');
+      }
+
+      // Register memory event handlers with error handling
+      const memoryEvents = [
+        'streaming:memory:semantic',
+        'streaming:memory:episodic', 
+        'streaming:memory:procedural',
+        'streaming:memory:consolidation'
+      ];
+
+      for (const eventType of memoryEvents) {
+        try {
+          socketService.on(eventType, (event: any) => {
+            console.log(`Memory ${eventType.split(':')[2]} update:`, event);
+          });
+        } catch (error) {
+          console.warn(`⚠️ Failed to subscribe to ${eventType}:`, error);
+          // Continue with other events even if one fails
+        }
+      }
+
+      console.log('✅ Memory streaming initialized (with possible missing streams)');
       return true;
     } catch (error) {
       console.error('❌ Failed to initialize memory streaming:', error);
@@ -307,7 +323,7 @@ const memorySlice = createSlice({
         };
       } else {
         state.memorySystems[agentId] = {
-          ...memorySystem as MemorySystem,
+          ...(memorySystem as MemorySystem),
           lastUpdate: Date.now()
         };
       }
@@ -328,7 +344,7 @@ const memorySlice = createSlice({
             accessPatterns: [],
             strengthDistribution: { memoryType: MemoryType.SEMANTIC, ranges: [], average: 0, median: 0, standardDeviation: 0 },
             decayAnalysis: { memoryType: MemoryType.SEMANTIC, averageDecayRate: 0, criticalMemories: [], decayTrends: [], recommendations: [] },
-            consolidationMetrics: { totalEvents: 0, successRate: 0, averageDuration: 0, efficiencyByType: {}, bottlenecks: [] as any[] },
+            consolidationMetrics: { totalEvents: 0, successRate: 0, averageDuration: 0, efficiencyByType: { semantic_extraction: 0, episodic_to_semantic: 0, procedural_refinement: 0, memory_forgetting: 0, memory_reorganization: 0 }, bottlenecks: [] as any[] },
             correlationAnalysis: { correlations: [], insights: [], predictions: [] }
           },
           lastUpdate: Date.now()
@@ -354,7 +370,7 @@ const memorySlice = createSlice({
             accessPatterns: [],
             strengthDistribution: { memoryType: MemoryType.SEMANTIC, ranges: [], average: 0, median: 0, standardDeviation: 0 },
             decayAnalysis: { memoryType: MemoryType.SEMANTIC, averageDecayRate: 0, criticalMemories: [], decayTrends: [], recommendations: [] },
-            consolidationMetrics: { totalEvents: 0, successRate: 0, averageDuration: 0, efficiencyByType: {}, bottlenecks: [] },
+            consolidationMetrics: { totalEvents: 0, successRate: 0, averageDuration: 0, efficiencyByType: {} as any, bottlenecks: [] as any[] },
             correlationAnalysis: { correlations: [], insights: [], predictions: [] }
           },
           lastUpdate: Date.now()
@@ -380,7 +396,7 @@ const memorySlice = createSlice({
             accessPatterns: [],
             strengthDistribution: { memoryType: MemoryType.SEMANTIC, ranges: [], average: 0, median: 0, standardDeviation: 0 },
             decayAnalysis: { memoryType: MemoryType.SEMANTIC, averageDecayRate: 0, criticalMemories: [], decayTrends: [], recommendations: [] },
-            consolidationMetrics: { totalEvents: 0, successRate: 0, averageDuration: 0, efficiencyByType: {}, bottlenecks: [] as any[] },
+            consolidationMetrics: { totalEvents: 0, successRate: 0, averageDuration: 0, efficiencyByType: {} as any, bottlenecks: [] as any[] },
             correlationAnalysis: { correlations: [], insights: [], predictions: [] }
           },
           lastUpdate: Date.now()
@@ -406,7 +422,7 @@ const memorySlice = createSlice({
             accessPatterns: [],
             strengthDistribution: { memoryType: MemoryType.SEMANTIC, ranges: [], average: 0, median: 0, standardDeviation: 0 },
             decayAnalysis: { memoryType: MemoryType.SEMANTIC, averageDecayRate: 0, criticalMemories: [], decayTrends: [], recommendations: [] },
-            consolidationMetrics: { totalEvents: 0, successRate: 0, averageDuration: 0, efficiencyByType: {}, bottlenecks: [] as any[] },
+            consolidationMetrics: { totalEvents: 0, successRate: 0, averageDuration: 0, efficiencyByType: { semantic_extraction: 0, episodic_to_semantic: 0, procedural_refinement: 0, memory_forgetting: 0, memory_reorganization: 0 }, bottlenecks: [] as any[] },
             correlationAnalysis: { correlations: [], insights: [], predictions: [] }
           },
           lastUpdate: Date.now()

@@ -47,10 +47,11 @@ export class Agent {
             taskStart = Date.now();
         }
         this.task = new Task(this, settings.task, taskStart);
-        this.blocked_actions = settings.blocked_actions.concat(this.task.blocked_actions || []);
+        this.blocked_actions = (settings.blocked_actions || []).concat(this.task.blocked_actions || []);
         blacklistCommands(this.blocked_actions);
 
         console.log(this.name, 'logging into minecraft...');
+        console.log('Settings before initBot:', settings);
         this.bot = initBot(this.name);
 
         initModes(this);
@@ -418,6 +419,19 @@ export class Agent {
     }
 
     startEvents() {
+        // Add client-level error handling to catch protocol parsing errors
+        if (this.bot._client) {
+            this.bot._client.on('error', (err) => {
+                // Handle protocol parsing errors that occur during initial world loading
+                if (err.message && err.message.includes('PartialReadError')) {
+                    console.warn('[PROTOCOL] PartialReadError caught during entity metadata parsing. This is expected during initial world loading and will be ignored.');
+                    return; // Suppress this error as it's typically non-fatal
+                }
+                // Re-emit other client errors to the main bot error handler
+                this.bot.emit('error', err);
+            });
+        }
+
         // Custom events
         this.bot.on('time', () => {
             if (this.bot.time.timeOfDay == 0)

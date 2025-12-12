@@ -2,53 +2,33 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
-    
-    "strict": false,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
-    "strictFunctionTypes": false,
-    "strictBindCallApply": false,
-    "strictPropertyInitialization": false,
-    "noImplicitThis": false,
-    "alwaysStrict": false,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "exactOptionalPropertyTypes": false,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "removeComments": false,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitThis": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": false,
-    
-    "allowJs": true,
-    "checkJs": false,
-    "noEmit": false,
-    "outDir": "./dist",
-    
-    "baseUrl": "./",
-    "paths": {
-      "@agent/*": ["agent/*"],
-      "@langgraph/*": ["agent/langgraph/*"],
-      "@cognitive/*": ["agent/cognitive/*"],
-      "@memory/*": ["agent/memory/*"],
-      "@social/*": ["agent/social/*"],
-      "@library/*": ["agent/library/*"],
-      "@npc/*": ["agent/npc/*"],
-      "@utils/*": ["utils/*"],
-      "@models/*": ["models/*"],
-      "@mindcraft/*": ["mindcraft/*"]
-    },
-    
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
-    
-    "skipLibCheck": true,
-    "downlevelIteration": true,
-    
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    
-    "resolveJsonModule": true
+    "emitDecoratorMetadata": true
   },
   "include": [
     "src/**/*"
@@ -56,14 +36,14 @@
   "exclude": [
     "node_modules",
     "dist",
-    "**/*.test.ts",
-    "**/*.test.js",
-    "**/*.spec.ts",
-    "**/*.spec.js",
-    "src/agent/cognitive/skills_integration_test.ts"
-  ],
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node"
-  }
+    "frontend",
+    "tests",
+    "reports",
+    "Design-Documentation",
+    "docs",
+    "profiles",
+    "profiles_backup",
+    "services",
+    "tasks"
+  ]
 }

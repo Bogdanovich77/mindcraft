@@ -92,7 +92,7 @@ import {
   RocketLaunch as RocketLaunchIcon,
   Assessment as AssessmentIcon,
   Analytics as AnalyticsIcon,
-  Insight as InsightIcon,
+  Insights as InsightIcon,
   Psychology as PsychologyIcon,
   SmartToy as SmartToyIcon,
   Biotech as BiotechIcon,
@@ -162,9 +162,11 @@ import {
   Radar,
   ScatterChart,
   Scatter,
-  TooltipProps,
   ReferenceLine
 } from 'recharts';
+
+// Import type separately
+import type { TooltipProps } from 'recharts';
 
 // Import performance selectors and actions
 import {

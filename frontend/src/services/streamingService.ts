@@ -524,63 +524,130 @@ export class StreamingService {
    * Create predefined streams for cognitive components
    */
   createCognitiveStreams(): void {
+    const existingStreams = Array.from(this.streams.keys());
+    const requiredStreams = [
+      'agent-state',
+      'personality', 
+      'emotions',
+      'memory:semantic',
+      'memory:episodic',
+      'memory:procedural',
+      'memory:consolidation',
+      'goals',
+      'social',
+      'skills',
+      'performance'
+    ];
+    
+    const missingStreams = requiredStreams.filter(id => !existingStreams.includes(id));
+    
+    if (missingStreams.length === 0) {
+      console.log('[StreamingService] All cognitive streams already exist');
+      return;
+    }
+    
+    console.log(`[StreamingService] Creating missing streams: ${missingStreams.join(', ')}`);
+
     // Agent state stream
-    this.createStream<AgentStateUpdateEvent>('agent-state', 'agent-state', {
-      window: this.config.aggregationWindow,
-      enabled: this.config.enableAggregation,
-      function: (events) => events[events.length - 1] // Keep latest
-    });
+    if (missingStreams.includes('agent-state')) {
+      this.createStream<AgentStateUpdateEvent>('agent-state', 'agent-state', {
+        window: this.config.aggregationWindow,
+        enabled: this.config.enableAggregation,
+        function: (events) => events[events.length - 1] // Keep latest
+      });
+    }
 
     // Personality stream
-    this.createStream<PersonalityTraitUpdateEvent>('personality', 'personality', {
-      window: this.config.aggregationWindow,
-      enabled: this.config.enableAggregation,
-      function: (events) => events[events.length - 1] // Keep latest
-    });
+    if (missingStreams.includes('personality')) {
+      this.createStream<PersonalityTraitUpdateEvent>('personality', 'personality', {
+        window: this.config.aggregationWindow,
+        enabled: this.config.enableAggregation,
+        function: (events) => events[events.length - 1] // Keep latest
+      });
+    }
 
     // Emotion stream
-    this.createStream<PersonalityEmotionEvent>('emotions', 'emotions', {
-      window: this.config.aggregationWindow,
-      enabled: this.config.enableAggregation,
-      function: (events) => events[events.length - 1] // Keep latest
-    });
+    if (missingStreams.includes('emotions')) {
+      this.createStream<PersonalityEmotionEvent>('emotions', 'emotions', {
+        window: this.config.aggregationWindow,
+        enabled: this.config.enableAggregation,
+        function: (events) => events[events.length - 1] // Keep latest
+      });
+    }
 
-    // Memory stream
-    this.createStream<MemoryUpdateEvent>('memory', 'memory', {
-      window: this.config.aggregationWindow,
-      enabled: this.config.enableAggregation,
-      function: (events) => events[events.length - 1] // Keep latest
-    });
+    // Memory semantic stream
+    if (missingStreams.includes('memory:semantic')) {
+      this.createStream<MemoryUpdateEvent>('memory:semantic', 'memory:semantic', {
+        window: this.config.aggregationWindow,
+        enabled: this.config.enableAggregation,
+        function: (events) => events[events.length - 1] // Keep latest
+      });
+    }
+
+    // Memory episodic stream
+    if (missingStreams.includes('memory:episodic')) {
+      this.createStream<MemoryUpdateEvent>('memory:episodic', 'memory:episodic', {
+        window: this.config.aggregationWindow,
+        enabled: this.config.enableAggregation,
+        function: (events) => events[events.length - 1] // Keep latest
+      });
+    }
+
+    // Memory procedural stream
+    if (missingStreams.includes('memory:procedural')) {
+      this.createStream<MemoryUpdateEvent>('memory:procedural', 'memory:procedural', {
+        window: this.config.aggregationWindow,
+        enabled: this.config.enableAggregation,
+        function: (events) => events[events.length - 1] // Keep latest
+      });
+    }
+
+    // Memory consolidation stream
+    if (missingStreams.includes('memory:consolidation')) {
+      this.createStream<MemoryConsolidationEvent>('memory:consolidation', 'memory:consolidation', {
+        window: this.config.aggregationWindow,
+        enabled: this.config.enableAggregation,
+        function: (events) => events[events.length - 1] // Keep latest
+      });
+    }
 
     // Goals stream
-    this.createStream<GoalUpdateEvent>('goals', 'goals', {
-      window: this.config.aggregationWindow,
-      enabled: this.config.enableAggregation,
-      function: (events) => events[events.length - 1] // Keep latest
-    });
+    if (missingStreams.includes('goals')) {
+      this.createStream<GoalUpdateEvent>('goals', 'goals', {
+        window: this.config.aggregationWindow,
+        enabled: this.config.enableAggregation,
+        function: (events) => events[events.length - 1] // Keep latest
+      });
+    }
 
     // Social stream
-    this.createStream<SocialDataUpdateEvent>('social', 'social', {
-      window: this.config.aggregationWindow,
-      enabled: this.config.enableAggregation,
-      function: (events) => events[events.length - 1] // Keep latest
-    });
+    if (missingStreams.includes('social')) {
+      this.createStream<SocialDataUpdateEvent>('social', 'social', {
+        window: this.config.aggregationWindow,
+        enabled: this.config.enableAggregation,
+        function: (events) => events[events.length - 1] // Keep latest
+      });
+    }
 
     // Skills stream
-    this.createStream<SkillDataUpdateEvent>('skills', 'skills', {
-      window: this.config.aggregationWindow,
-      enabled: this.config.enableAggregation,
-      function: (events) => events[events.length - 1] // Keep latest
-    });
+    if (missingStreams.includes('skills')) {
+      this.createStream<SkillDataUpdateEvent>('skills', 'skills', {
+        window: this.config.aggregationWindow,
+        enabled: this.config.enableAggregation,
+        function: (events) => events[events.length - 1] // Keep latest
+      });
+    }
 
     // Performance stream
-    this.createStream<PerformanceMetricsUpdateEvent>('performance', 'performance', {
-      window: this.config.aggregationWindow,
-      enabled: this.config.enableAggregation,
-      function: (events) => events[events.length - 1] // Keep latest
-    });
+    if (missingStreams.includes('performance')) {
+      this.createStream<PerformanceMetricsUpdateEvent>('performance', 'performance', {
+        window: this.config.aggregationWindow,
+        enabled: this.config.enableAggregation,
+        function: (events) => events[events.length - 1] // Keep latest
+      });
+    }
 
-    console.log('[StreamingService] Created cognitive streams');
+    console.log(`[StreamingService] Created ${missingStreams.length} missing cognitive streams`);
   }
 }
 

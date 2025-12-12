@@ -1,0 +1,44 @@
+{
+  "timestamp": "2025-12-12T13:54:23.991Z",
+  "reason": "critical",
+  "source": "frontend",
+  "system_status": {
+    "isRunning": true,
+    "backend": {
+      "running": true,
+      "errors": 5
+    },
+    "frontend": {
+      "running": true,
+      "errors": 3
+    },
+    "websocket": {
+      "connected": false,
+      "lastCheck": 0
+    },
+    "api": {
+      "reachable": false,
+      "lastCheck": 0
+    }
+  },
+  "recent_alerts": [
+    {
+      "timestamp": "2025-12-12T13:54:23.989Z",
+      "source": "frontend",
+      "severity": "critical",
+      "message": "Process failure detected: frontend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765547663989.9592
+    }
+  ],
+  "error_counts": {
+    "backend": 5,
+    "frontend": 3
+  },
+  "recommendations": [
+    "Immediate restart of the frontend process",
+    "Review recent code changes for breaking modifications",
+    "Check system resources (memory, CPU, disk space)",
+    "Verify external dependencies and services"
+  ]
+}

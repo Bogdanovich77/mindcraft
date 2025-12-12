@@ -28,7 +28,7 @@ const initialPersonalityUIState: PersonalityUIState = {
     start: Date.now() - 24 * 60 * 60 * 1000, // 24 hours ago
     end: Date.now()
   },
-  visualizationMode: 'radar',
+  visualizationMode: 'radar' as const,
   filters: {
     traitCategories: ['big_five', 'gaming_specific'],
     minSignificance: 0.5,
@@ -41,7 +41,7 @@ const initialPersonalityUIState: PersonalityUIState = {
 
 const initialCorrelationMatrix: CorrelationMatrix = {
   traits: ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism', 'riskTolerance', 'creativity', 'patience', 'competitiveness', 'curiosity'],
-  matrix: [],
+  matrix: [] as number[][],
   significantCorrelations: [],
   insights: {
     strongPositive: [],
@@ -51,9 +51,9 @@ const initialCorrelationMatrix: CorrelationMatrix = {
 };
 
 const initialPersonalityState: PersonalityState = {
-  agents: new Map(),
-  behavioralPatterns: new Map(),
-  comparisons: new Map(),
+  agents: {} as Record<string, PersonalityEvolution>,
+  behavioralPatterns: {} as Record<string, BehavioralPattern[]>,
+  comparisons: {} as Record<string, PersonalityComparison>,
   correlations: initialCorrelationMatrix,
   ui: initialPersonalityUIState
 };
@@ -65,7 +65,7 @@ export const fetchPersonalityEvolution = createAsyncThunk(
     try {
       // This would typically make an API call to fetch personality evolution
       // For now, we'll simulate with mock data
-      const evolution: PersonalityEvolution = {
+      const evolution = {
         timestamp: Date.now(),
         traits: {
           openness: 0.7 + Math.random() * 0.3,
@@ -96,7 +96,7 @@ export const fetchPersonalityComparison = createAsyncThunk(
   async ({ agent1Id, agent2Id }: { agent1Id: string; agent2Id: string }, { rejectWithValue }) => {
     try {
       // This would typically make an API call to fetch personality comparison
-      const comparison: PersonalityComparison = {
+      const comparison = {
         agent1: {
           id: agent1Id,
           name: `Agent ${agent1Id}`,
@@ -151,7 +151,7 @@ export const fetchBehavioralPatterns = createAsyncThunk(
   async (agentId: string, { rejectWithValue }) => {
     try {
       // This would typically make an API call to fetch behavioral patterns
-      const patterns: BehavioralPattern[] = [
+      const patterns = [
         {
           id: 'exploratory_pattern',
           name: 'Exploratory Behavior',
@@ -191,7 +191,7 @@ export const fetchTraitCorrelations = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       // This would typically make an API call to fetch trait correlations
-      const correlations: TraitCorrelation[] = [
+      const correlations = [
         {
           trait1: 'openness',
           trait2: 'creativity',
@@ -215,17 +215,17 @@ export const fetchTraitCorrelations = createAsyncThunk(
       const matrix: number[][] = [];
       
       for (let i = 0; i < traits.length; i++) {
-        matrix[i] = [];
+        matrix[i] = [] as number[];
         for (let j = 0; j < traits.length; j++) {
           if (i === j) {
-            matrix[i][j] = 1.0;
+            matrix[i]![j] = 1.0;
           } else {
-            matrix[i][j] = (Math.random() - 0.5) * 1.5; // Random correlation between -0.75 and 0.75
+            matrix[i]![j] = (Math.random() - 0.5) * 1.5; // Random correlation between -0.75 and 0.75
           }
         }
       }
 
-      const correlationMatrix: CorrelationMatrix = {
+      const correlationMatrix = {
         traits,
         matrix,
         significantCorrelations: correlations,
@@ -299,16 +299,16 @@ const personalitySlice = createSlice({
     updatePersonalityTraits: (state, action: PayloadAction<PersonalityUpdateEvent>) => {
       const { agentId, traits, timestamp, influences, events } = action.payload;
       
-      if (!state.agents.has(agentId)) {
-        state.agents.set(agentId, {
+      if (!state.agents[agentId]) {
+        state.agents[agentId] = {
           timestamp,
           traits,
           experiences: [],
           influences: influences || [],
           significantEvents: events || []
-        });
+        };
       } else {
-        const evolution = state.agents.get(agentId)!;
+        const evolution = state.agents[agentId];
         evolution.traits = traits;
         evolution.timestamp = timestamp;
         
@@ -326,8 +326,8 @@ const personalitySlice = createSlice({
     updateEmotionalState: (state, action: PayloadAction<{ agentId: string; emotions: any; timestamp: number }>) => {
       const { agentId, emotions, timestamp } = action.payload;
       
-      if (!state.agents.has(agentId)) {
-        state.agents.set(agentId, {
+      if (!state.agents[agentId]) {
+        state.agents[agentId] = {
           timestamp,
           traits: {
             openness: 0.5,
@@ -351,9 +351,9 @@ const personalitySlice = createSlice({
             description: `Emotional state updated: ${JSON.stringify(emotions)}`,
             context: { source: 'realtime_update' }
           }]
-        });
+        };
       } else {
-        const evolution = state.agents.get(agentId)!;
+        const evolution = state.agents[agentId];
         evolution.timestamp = timestamp;
         
         // Add emotional state as a significant event
@@ -372,8 +372,8 @@ const personalitySlice = createSlice({
     updateMoodState: (state, action: PayloadAction<{ agentId: string; mood: any; timestamp: number }>) => {
       const { agentId, mood, timestamp } = action.payload;
       
-      if (!state.agents.has(agentId)) {
-        state.agents.set(agentId, {
+      if (!state.agents[agentId]) {
+        state.agents[agentId] = {
           timestamp,
           traits: {
             openness: 0.5,
@@ -397,9 +397,9 @@ const personalitySlice = createSlice({
             description: `Mood state updated: ${JSON.stringify(mood)}`,
             context: { source: 'realtime_update' }
           }]
-        });
+        };
       } else {
-        const evolution = state.agents.get(agentId)!;
+        const evolution = state.agents[agentId];
         evolution.timestamp = timestamp;
         
         // Add mood state as a significant event
@@ -436,8 +436,8 @@ const personalitySlice = createSlice({
         context: { source: 'realtime_update' }
       };
 
-      if (!state.agents.has(action.payload.agentId)) {
-        state.agents.set(action.payload.agentId, {
+      if (!state.agents[action.payload.agentId]) {
+        state.agents[action.payload.agentId] = {
           timestamp: action.payload.timestamp,
           traits: {
             openness: 0.5,
@@ -454,9 +454,9 @@ const personalitySlice = createSlice({
           experiences: [],
           influences: [],
           significantEvents: [subscriptionEvent]
-        });
+        };
       } else {
-        const evolution = state.agents.get(action.payload.agentId)!;
+        const evolution = state.agents[action.payload.agentId];
         evolution.significantEvents.push(subscriptionEvent);
       }
     },
@@ -464,8 +464,8 @@ const personalitySlice = createSlice({
     addPersonalityEvent: (state, action: PayloadAction<{ agentId: string; event: PersonalityEvent }>) => {
       const { agentId, event } = action.payload;
       
-      if (state.agents.has(agentId)) {
-        const evolution = state.agents.get(agentId)!;
+      if (state.agents[agentId]) {
+        const evolution = state.agents[agentId];
         evolution.significantEvents.push(event);
       }
     },
@@ -473,8 +473,8 @@ const personalitySlice = createSlice({
     addPersonalityInfluence: (state, action: PayloadAction<{ agentId: string; influence: PersonalityInfluence }>) => {
       const { agentId, influence } = action.payload;
       
-      if (state.agents.has(agentId)) {
-        const evolution = state.agents.get(agentId)!;
+      if (state.agents[agentId]) {
+        const evolution = state.agents[agentId];
         evolution.influences.push(influence);
       }
     },
@@ -493,13 +493,13 @@ const personalitySlice = createSlice({
     // Data cleanup
     clearAgentData: (state, action: PayloadAction<string>) => {
       const agentId = action.payload;
-      state.agents.delete(agentId);
-      state.behavioralPatterns.delete(agentId);
+      delete state.agents[agentId];
+      delete state.behavioralPatterns[agentId];
       
       // Remove from comparisons
-      state.comparisons.forEach((comparison, key) => {
+      Object.keys(state.comparisons).forEach(key => {
         if (key.includes(agentId)) {
-          state.comparisons.delete(key);
+          delete state.comparisons[key];
         }
       });
       
@@ -512,9 +512,9 @@ const personalitySlice = createSlice({
     },
 
     clearAllData: (state) => {
-      state.agents.clear();
-      state.behavioralPatterns.clear();
-      state.comparisons.clear();
+      state.agents = {};
+      state.behavioralPatterns = {};
+      state.comparisons = {};
       state.ui.selectedAgent = null;
       state.ui.comparisonAgents = [];
     },
@@ -534,7 +534,7 @@ const personalitySlice = createSlice({
       .addCase(fetchPersonalityEvolution.fulfilled, (state, action) => {
         state.ui.loading = false;
         const { agentId, evolution } = action.payload;
-        state.agents.set(agentId, evolution);
+        state.agents[agentId] = evolution;
       })
       .addCase(fetchPersonalityEvolution.rejected, (state, action) => {
         state.ui.loading = false;
@@ -550,7 +550,7 @@ const personalitySlice = createSlice({
       .addCase(fetchPersonalityComparison.fulfilled, (state, action) => {
         state.ui.loading = false;
         const { comparisonKey, comparison } = action.payload;
-        state.comparisons.set(comparisonKey, comparison);
+        state.comparisons[comparisonKey] = comparison;
       })
       .addCase(fetchPersonalityComparison.rejected, (state, action) => {
         state.ui.loading = false;
@@ -566,7 +566,7 @@ const personalitySlice = createSlice({
       .addCase(fetchBehavioralPatterns.fulfilled, (state, action) => {
         state.ui.loading = false;
         const { agentId, patterns } = action.payload;
-        state.behavioralPatterns.set(agentId, patterns);
+        state.behavioralPatterns[agentId] = patterns;
       })
       .addCase(fetchBehavioralPatterns.rejected, (state, action) => {
         state.ui.loading = false;
@@ -602,45 +602,45 @@ export const selectFilters = (state: { personality: PersonalityState }) => state
 
 // Data selectors
 export const selectAgentPersonality = (agentId: string) => (state: { personality: PersonalityState }) =>
-  state.personality.agents.get(agentId);
+  state.personality.agents[agentId] || null;
 
 export const selectSelectedAgentPersonality = (state: { personality: PersonalityState }) => {
   const selectedAgent = state.personality.ui.selectedAgent;
-  return selectedAgent ? state.personality.agents.get(selectedAgent) : null;
+  return selectedAgent ? state.personality.agents[selectedAgent] : null;
 };
 
 export const selectAgentBehavioralPatterns = (agentId: string) => (state: { personality: PersonalityState }) =>
-  state.personality.behavioralPatterns.get(agentId);
+  state.personality.behavioralPatterns[agentId] || null;
 
 export const selectPersonalityComparison = (agent1Id: string, agent2Id: string) => (state: { personality: PersonalityState }) =>
-  state.personality.comparisons.get(`${agent1Id}-${agent2Id}`);
+  state.personality.comparisons[`${agent1Id}-${agent2Id}`] || null;
 
 export const selectCorrelationMatrix = (state: { personality: PersonalityState }) => state.personality.correlations;
 
 // Memoized selectors
 export const selectAllAgents = createSelector(
   [selectPersonalityState],
-  (personality: PersonalityState) => Array.from(personality.agents.keys())
+  (personality: PersonalityState) => Object.keys(personality.agents)
 );
 
 export const selectPersonalityTraits = (agentId: string) => createSelector(
   [selectAgentPersonality(agentId)],
-  (evolution: PersonalityEvolution | undefined) => evolution?.traits
+  (evolution: PersonalityEvolution | null) => evolution?.traits
 );
 
 export const selectPersonalityEvolution = (agentId: string) => createSelector(
   [selectAgentPersonality(agentId)],
-  (evolution: PersonalityEvolution | undefined) => evolution
+  (evolution: PersonalityEvolution | null) => evolution
 );
 
 export const selectSignificantEvents = (agentId: string) => createSelector(
   [selectAgentPersonality(agentId)],
-  (evolution: PersonalityEvolution | undefined) => evolution?.significantEvents || []
+  (evolution: PersonalityEvolution | null) => evolution?.significantEvents || []
 );
 
 export const selectPersonalityInfluences = (agentId: string) => createSelector(
   [selectAgentPersonality(agentId)],
-  (evolution: PersonalityEvolution | undefined) => evolution?.influences || []
+  (evolution: PersonalityEvolution | null) => evolution?.influences || []
 );
 
 export const selectFilteredPersonalityEvents = (agentId: string) => createSelector(
@@ -677,8 +677,8 @@ export const initializePersonalitySocket = createAsyncThunk(
         lastUpdate: Date.now()
       }));
 
-      // Create cognitive streams
-      streamingSvc.createCognitiveStreams();
+      // Create cognitive streams - REMOVED: Now handled centrally in App.tsx
+      // streamingSvc.createCognitiveStreams();
 
       // Set up event handlers
       socketService.setHandlers({
@@ -690,7 +690,13 @@ export const initializePersonalitySocket = createAsyncThunk(
               agentId: data.agentId,
               traits: data.traits,
               timestamp: data.timestamp,
-              influences: data.changes,
+              influences: data.changes ? [{
+                type: 'experience' as const,
+                traitName: 'updated',
+                impact: 0.1,
+                source: 'socket_update',
+                timestamp: data.timestamp
+              }] : [],
               events: []
             }));
           }
@@ -719,12 +725,12 @@ export const initializePersonalitySocket = createAsyncThunk(
           }
         },
 
-        onPersonalityEvolution: (data: PersonalityEvolutionEvent) => {
+        onPersonalityEvolution: (data: any) => {
           const validation = validateEvent('personality:evolution', data);
           if (validation.isValid) {
             dispatch(personalitySlice.actions.updatePersonalityTraits({
               agentId: data.agentId,
-              traits: (data as any).traits,
+              traits: data.traits || (data.evolution?.traits) || {},
               timestamp: data.timestamp,
               influences: [],
               events: []
@@ -855,16 +861,16 @@ export const {
 export const selectRealTimePersonalityUpdates = createSelector(
   [selectPersonalityState],
   (personality: PersonalityState) => ({
-    lastUpdate: Math.max(...Array.from(personality.agents.values()).map(e => e.timestamp)),
-    totalEvents: Array.from(personality.agents.values()).reduce((sum, e) => sum + e.significantEvents.length, 0),
-    totalInfluences: Array.from(personality.agents.values()).reduce((sum, e) => sum + e.influences.length, 0),
-    activeAgents: personality.agents.size
+    lastUpdate: Math.max(...Object.values(personality.agents).map(e => e.timestamp)),
+    totalEvents: Object.values(personality.agents).reduce((sum, e) => sum + e.significantEvents.length, 0),
+    totalInfluences: Object.values(personality.agents).reduce((sum, e) => sum + e.influences.length, 0),
+    activeAgents: Object.keys(personality.agents).length
   })
 );
 
 export const selectAgentPersonalityWithRealTimeData = (agentId: string) => createSelector(
   [selectAgentPersonality(agentId), selectRealTimePersonalityUpdates],
-  (evolution: PersonalityEvolution | undefined, realTimeData: any) => {
+  (evolution: PersonalityEvolution | null, realTimeData: any) => {
     if (!evolution) return null;
     
     return {

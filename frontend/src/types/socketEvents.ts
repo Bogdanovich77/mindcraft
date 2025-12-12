@@ -45,6 +45,11 @@ export interface AgentConnectionEvent extends BaseEvent {
   reason?: string;
 }
 
+export interface AgentDisconnectionEvent extends BaseEvent {
+  agentId: string;
+  reason?: string;
+}
+
 // Personality events
 export interface PersonalityTraits {
   openness: number;

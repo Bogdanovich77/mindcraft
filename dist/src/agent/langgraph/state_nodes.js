@@ -2,8 +2,7 @@
  * State Nodes for Mindcraft LangGraph System
  * Defines the core processing nodes: perception, analysis, planning, decision, execution, and reflection
  */
-import { ProcessingPhase, InterruptPriority } from './interfaces.js';
-import { AntiIdleSystem } from '../cognitive/anti_idle_system.js';
+import { AgentState, ProcessingPhase, InterruptPriority, EmergencyCondition, ReactiveState, CognitiveState, ExecutiveState, WorldContext, MessageAnalysis, ConversationProcessing, ResponseRouting, AntiIdleSystem, EnvironmentalOpportunityDetector, AntiIdleGoalGenerator, FeasibilityAnalyzer, ResourceRequirement, FeasibilityResult, RiskLevel, FeasibilityAnalysisResult, RiskAnalysis, RiskFactor, FeasibilityFactor, MultiAgentCoordinator, CollaborativePlanning, ConflictResolution } from './interfaces.js';
 /**
  * Perception Node - Gather and process sensory information from the world
  */
@@ -26,7 +25,7 @@ export async function perceptionNode(state) {
         }
         // Initialize anti-idle system if available
         if (state.metadata && state.metadata.agentId && !state.antiIdleSystem) {
-            state.antiIdleSystem = new AntiIdleSystem(state.metadata.agentId, state.cognitive?.purpose, state.cognitive?.skills, state.cognitive?.memory, undefined // Use default config
+            state.antiIdleSystem = new AntiIdleSystem(state.metadata.agentId, state.cognitive.purpose, state.cognitive.skills, state.cognitive.memory, undefined // Use default config
             );
             // Start anti-idle system
             state.antiIdleSystem.start();
@@ -149,20 +148,86 @@ export async function analysisNode(state) {
     }
 }
 /**
- * Planning Node - Create and update action plans based on goals and current situation
+ * Planning Node - Create and update action plans based on goals and current situation using Planning Engine
  */
 export async function planningNode(state) {
     const startTime = Date.now();
     try {
-        // Review and prioritize goals
-        const prioritizedGoals = await prioritizeGoals(state.cognitive.goals, state.context);
-        // Generate action plans for top priority goals
-        const actionPlans = await generateActionPlans(prioritizedGoals.slice(0, 3), state);
-        // Update goal state
-        state.cognitive.goals.activeGoals = prioritizedGoals.filter(g => g.status === 'active');
-        // Queue actions for execution
-        const newActions = actionPlans.flatMap(plan => plan.actions);
-        state.executive.actionQueue = [...state.executive.actionQueue, ...newActions];
+        // Initialize planning engine if not already present
+        if (!state.cognitive.planning) {
+            const { PlanningEngine } = await import('../cognitive/planning_engine.js');
+            // Create planning engine with default configuration
+            state.cognitive.planning = new PlanningEngine({
+                maxActivePlans: 5,
+                planningTimeout: 30000,
+                resourceAssessmentInterval: 5000,
+                feasibilityCheckInterval: 3000,
+                replanningThreshold: 0.3,
+                optimizationInterval: 10000,
+                enableResourceSharing: true,
+                enableCollaborativePlanning: true,
+                performanceTracking: true
+            });
+            // Initialize planning engine with agent context
+            await state.cognitive.planning.initialize(state);
+            console.log('[PLANNING] Planning engine initialized');
+        }
+        const planningEngine = state.cognitive.planning;
+        if (!planningEngine) {
+            console.warn('[PLANNING] Planning engine not available');
+            return state;
+        }
+        // Execute planning cycle
+        const planningResult = await planningEngine.executePlanningCycle(state);
+        // Update planning state with results
+        if (planningResult.plans && planningResult.plans.length > 0) {
+            state.cognitive.planning.activePlans = planningResult.plans.map(plan => ({
+                planId: plan.id,
+                goalId: plan.goalId,
+                currentStep: 0,
+                progress: 0,
+                status: plan.status,
+                startTime: Date.now(),
+                estimatedCompletion: Date.now() + (plan.estimatedDuration || 0),
+                resourceUsage: plan.resourceAllocation || { items: {}, tools: {}, time: 0, skills: {}, assistance: {} },
+                blockingFactors: plan.blockingFactors || []
+            }));
+            // Convert plan steps to actions for execution queue
+            const newActions = planningResult.plans[0].steps.map(step => ({
+                id: `plan_${planningResult.plans[0].id}_${step.id}`,
+                type: step.type,
+                priority: planningResult.plans[0].priority,
+                description: step.description,
+                status: 'pending',
+                createdAt: Date.now(),
+                startTime: null,
+                endTime: null,
+                result: null,
+                cognitive: true,
+                metadata: {
+                    planId: planningResult.plans[0].id,
+                    stepId: step.id,
+                    estimatedDuration: step.estimatedDuration,
+                    resourceRequirements: step.resourceRequirements,
+                    dependencies: step.dependencies
+                }
+            }));
+            // Add new actions to queue
+            state.executive.actionQueue = [...state.executive.actionQueue, ...newActions];
+            console.log(`[PLANNING] Generated ${planningResult.plans.length} plans with ${newActions.length} actions`);
+        }
+        // Update goal state based on planning results
+        if (planningResult.goalUpdates && planningResult.goalUpdates.length > 0) {
+            planningResult.goalUpdates.forEach(goalUpdate => {
+                const goalIndex = state.cognitive.goals.activeGoals.findIndex(g => g.id === goalUpdate.goalId);
+                if (goalIndex >= 0) {
+                    state.cognitive.goals.activeGoals[goalIndex] = {
+                        ...state.cognitive.goals.activeGoals[goalIndex],
+                        ...goalUpdate.updates
+                    };
+                }
+            });
+        }
         // Update cognitive processing state
         state.cognitive.processing.currentPhase = ProcessingPhase.PLANNING;
         // Store processing record
@@ -171,11 +236,14 @@ export async function planningNode(state) {
             startTime,
             endTime: Date.now(),
             duration: Date.now() - startTime,
-            success: true,
+            success: planningResult.success,
             details: {
-                goalsPrioritized: prioritizedGoals.length,
-                plansGenerated: actionPlans.length,
-                actionsQueued: newActions.length
+                plansGenerated: planningResult.plans?.length || 0,
+                actionsQueued: planningResult.plans?.[0]?.steps?.length || 0,
+                resourceAssessments: planningResult.resourceAssessment?.totalValue || 0,
+                feasibilityScore: planningResult.feasibilityAnalysis?.feasibilityScore || 0,
+                optimizationLevel: planningResult.optimizationResult?.efficiencyGain || 0,
+                planningTime: planningResult.planningTime || 0
             }
         };
         state.cognitive.processing.processingHistory.push(processingRecord);
@@ -186,6 +254,7 @@ export async function planningNode(state) {
         return {
             cognitive: {
                 ...state.cognitive,
+                planning: state.cognitive.planning,
                 goals: state.cognitive.goals,
                 processing: state.cognitive.processing
             },
@@ -830,7 +899,8 @@ async function generateConversationalResponse(message, state) {
             processingTime: Date.now() - startTime,
             confidence: 0.1,
             personalityAlignment: 0.1,
-            contextUpdated: false
+            contextUpdated: false,
+            followUpActions: []
         };
     }
 }
@@ -993,7 +1063,7 @@ async function generatePersonalityBasedResponse(message, personality, context, h
     }
     if (traits.conscientiousness > 0.7) {
         if (messageText.includes('what are you doing')) {
-            return "I'm currently focused on my tasks and making sure everything is in order. Is there something specific you need help with?";
+            return "I'm currently focused on my tasks and making sure everything is in order. What would you like to do?";
         }
     }
     // Default responses
@@ -1004,7 +1074,7 @@ async function generatePersonalityBasedResponse(message, personality, context, h
         return "I'm doing well, thank you for asking! Ready to help with whatever you need.";
     }
     if (messageText.includes('what are you doing')) {
-        return "I'm currently exploring and working on my goals. What brings you here?";
+        return "I'm currently exploring and working on my goals. What would you like to do?";
     }
     // Generic response for other messages
     return "That's interesting! I'm here to help and learn. What would you like to do?";
@@ -1124,7 +1194,6 @@ async function processSocialContext(context, socialState) {
     const groupDynamics = {
         leader: socialState.socialContext.groupDynamics.leader,
         cohesion: socialState.socialContext.groupDynamics.cohesion,
-        hierarchy: socialState.socialContext.groupDynamics.hierarchy,
         roles: socialState.socialContext.groupDynamics.roles,
         alliances: socialState.socialContext.groupDynamics.alliances
     };
@@ -1282,42 +1351,6 @@ async function executeAction(action, state) {
 async function analyzeRecentExperiences(state) {
     return [];
 }
-async function updateSemanticMemory(state, experiences) {
-    // Update semantic memory based on experiences
-}
-async function updateEpisodicMemory(state, experiences) {
-    // Update episodic memory based on experiences
-}
-async function updateProceduralMemory(state, experiences) {
-    // Update procedural memory based on experiences
-}
-async function updateSkillProficiencies(state, experiences) {
-    // Update skill proficiencies based on experiences
-}
-async function updatePersonalityTraits(state, experiences) {
-    // Update personality traits based on experiences
-}
-async function executeEmergencyResponse(emergency, state) {
-    return {
-        success: true,
-        action: emergency.type + '_response'
-    };
-}
-function getEmergencyPriority(emergencyType) {
-    switch (emergencyType) {
-        case 'drowning':
-        case 'burning':
-        case 'falling':
-            return InterruptPriority.EMERGENCY;
-        case 'low_health':
-        case 'hostile_nearby':
-            return InterruptPriority.SURVIVAL;
-        case 'stuck':
-            return InterruptPriority.OPPORTUNITY;
-        default:
-            return InterruptPriority.COGNITIVE;
-    }
-}
 // ============================================================================
 // MEMORY MANAGEMENT UTILITIES
 // ============================================================================
@@ -1436,4 +1469,589 @@ export function initializeAntiIdleSystem(state) {
     catch (error) {
         console.error('[ANTI_IDLE] Error initializing anti-idle system:', error);
     }
+}
+/**
+ * Multi-Agent Coordination Processing Node - Handle coordination between agents
+ */
+export async function multiAgentCoordinationNode(state) {
+    const startTime = Date.now();
+    try {
+        // Initialize multi-agent coordinator if not already present
+        if (!state.multiAgentCoordinator && state.cognitive.social) {
+            // Import MultiAgentCoordinator from the social module
+            const { MultiAgentCoordinator } = await import('../social/multi_agent_coordinator.js');
+            // Create coordinator with default configuration
+            state.multiAgentCoordinator = new MultiAgentCoordinator({
+                agentId: state.metadata?.agentId || 'unknown',
+                maxConcurrentCollaborations: 5,
+                communicationTimeout: 5000,
+                conflictResolutionTimeout: 10000,
+                enableNegotiation: true,
+                enableMediation: true,
+                trustThreshold: 0.5,
+                performanceTracking: true
+            });
+            // Initialize coordinator with social context
+            await state.multiAgentCoordinator.initialize(state.cognitive.social);
+            console.log('[MULTI_AGENT_COORDination] Multi-agent coordinator initialized');
+        }
+        if (!state.multiAgentCoordinator) {
+            return state;
+        }
+        // Process incoming coordination messages
+        const coordinator = state.multiAgentCoordinator;
+        const messages = coordinator.getIncomingMessages();
+        for (const message of messages) {
+            await processCoordinationMessage(state, message, coordinator);
+        }
+        // Check for collaborative opportunities
+        const collaborationOpportunities = await identifyCollaborationOpportunities(state);
+        for (const opportunity of collaborationOpportunities) {
+            await processCollaborationOpportunity(state, opportunity, coordinator);
+        }
+        // Detect and resolve conflicts
+        const conflicts = await detectCoordinationConflicts(state);
+        for (const conflict of conflicts) {
+            await resolveCoordinationConflict(state, conflict, coordinator);
+        }
+        // Update coordination metrics
+        const metrics = coordinator.getMetrics();
+        // Store coordination record in processing history
+        const processingRecord = {
+            phase: ProcessingPhase.COORDINATION,
+            startTime,
+            endTime: Date.now(),
+            duration: Date.now() - startTime,
+            success: true,
+            details: {
+                messagesProcessed: messages.length,
+                collaborationsFormed: collaborationOpportunities.length,
+                conflictsResolved: conflicts.length,
+                coordinationSuccess: metrics.successRate,
+                averageResponseTime: metrics.averageResponseTime
+            }
+        };
+        state.cognitive.processing.processingHistory.push(processingRecord);
+        // Limit processing history to prevent memory buildup
+        if (state.cognitive.processing.processingHistory.length > 100) {
+            state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+        }
+        return {
+            cognitive: {
+                ...state.cognitive,
+                processing: {
+                    ...state.cognitive.processing,
+                    currentPhase: ProcessingPhase.COORDINATION
+                }
+            }
+        };
+    }
+    catch (error) {
+        console.error('[MULTI_AGENT_COORDINATION] Error during coordination processing:', error);
+        state.cognitive.processing.processingHistory.push({
+            phase: ProcessingPhase.COORDINATION,
+            startTime,
+            endTime: Date.now(),
+            duration: Date.now() - startTime,
+            success: false,
+            details: { error: error instanceof Error ? error.message : String(error) }
+        });
+        return state;
+    }
+}
+// ============================================================================
+// MULTI-AGENT COORDINATION HELPER FUNCTIONS
+// ============================================================================
+async function processCoordinationMessage(state, message, coordinator) {
+    try {
+        // Process message based on type and priority
+        switch (message.type) {
+            case 'social':
+                await processSocialMessage(state, message, coordinator);
+                break;
+            case 'coordination':
+                await processCoordinationMessageInternal(state, message, coordinator);
+                break;
+            case 'emergency':
+                await processEmergencyMessage(state, message, coordinator);
+                break;
+            case 'collaborative':
+                await processCollaborativeMessage(state, message, coordinator);
+                break;
+            default:
+                console.warn(`[MULTI_AGENT_COORDINATION] Unknown message type: ${message.type}`);
+        }
+    }
+    catch (error) {
+        console.error('[MULTI_AGENT_COORDINATION] Error processing coordination message:', error);
+    }
+}
+async function processSocialMessage(state, message, coordinator) {
+    // Update social context based on message
+    if (state.cognitive.social && state.cognitive.social.theoryOfMind) {
+        await state.cognitive.social.theoryOfMind.updateMentalModel(message.senderId, message.content, 'social_message');
+    }
+    // Add to episodic memory
+    if (state.cognitive.memory && state.cognitive.memory.episodic) {
+        state.cognitive.memory.episodic.episodes.push({
+            id: `coord_social_${Date.now()}`,
+            timestamp: Date.now(),
+            duration: 0,
+            location: state.context.position || { x: 0, y: 64, z: 0 },
+            participants: [message.senderId, state.metadata ? state.metadata.agentId : 'unknown'],
+            actions: [{
+                    actor: message.senderId,
+                    action: 'send_social_message',
+                    target: state.metadata ? state.metadata.agentId : 'unknown',
+                    timestamp: Date.now(),
+                    result: 'message_received'
+                }],
+            outcomes: [message.content],
+            emotionalImpact: 0.3,
+            importance: 0.6,
+            tags: ['coordination', 'social', 'message']
+        });
+    }
+}
+async function processCoordinationMessageInternal(state, message, coordinator) {
+    // Process coordination requests and responses
+    const coordinationData = JSON.parse(message.content);
+    if (coordinationData.type === 'collaboration_request') {
+        await handleCollaborationRequest(state, coordinationData, coordinator);
+    }
+    else if (coordinationData.type === 'task_delegation') {
+        await handleTaskDelegation(state, coordinationData, coordinator);
+    }
+    else if (coordinationData.type === 'resource_sharing') {
+        await handleResourceSharing(state, coordinationData, coordinator);
+    }
+}
+async function processEmergencyMessage(state, message, coordinator) {
+    // Handle emergency coordination messages
+    console.log(`[MULTI_AGENT_COORDINATION] Emergency message from ${message.senderId}: ${message.content}`);
+    // Prioritize emergency actions
+    if (state.executive && state.executive.actionQueue) {
+        state.executive.actionQueue.unshift({
+            id: `emergency_coord_${Date.now()}`,
+            type: 'emergency_coordination',
+            priority: 10, // Highest priority
+            description: `Emergency coordination: ${message.content}`,
+            status: 'pending',
+            createdAt: Date.now(),
+            startTime: null,
+            endTime: null,
+            result: null
+        });
+    }
+}
+async function processCollaborativeMessage(state, message, coordinator) {
+    // Process collaborative planning messages
+    const collaborationData = JSON.parse(message.content);
+    if (collaborationData.type === 'goal_formation') {
+        await handleCollaborativeGoalFormation(state, collaborationData, coordinator);
+    }
+    else if (collaborationData.type === 'consensus_building') {
+        await handleConsensusBuilding(state, collaborationData, coordinator);
+    }
+}
+async function identifyCollaborationOpportunities(state) {
+    const opportunities = [];
+    // Identify nearby agents for potential collaboration
+    const nearbyAgents = state.context.nearbyEntities || [];
+    const agentEntities = nearbyAgents.filter(entity => entity.type === 'player' || entity.type === 'agent');
+    if (agentEntities.length > 1) {
+        // Check if there are shared goals or resources
+        const sharedGoals = await identifySharedGoals(state, agentEntities);
+        const sharedResources = await identifySharedResources(state, agentEntities);
+        if (sharedGoals.length > 0 || sharedResources.length > 0) {
+            opportunities.push({
+                id: `collaboration_${Date.now()}`,
+                type: 'collaboration',
+                description: 'Potential collaboration with nearby agents',
+                priority: 0.7,
+                participants: agentEntities.map(e => e.id.toString()),
+                sharedGoals,
+                sharedResources,
+                timestamp: Date.now()
+            });
+        }
+    }
+    return opportunities;
+}
+async function processCollaborationOpportunity(state, opportunity, coordinator) {
+    try {
+        // Form collaborative goal if conditions are met
+        const collaborationRequest = {
+            id: `collab_req_${Date.now()}`,
+            initiatorId: state.metadata?.agentId || 'unknown',
+            targetAgents: opportunity.participants,
+            goal: {
+                id: `collab_goal_${Date.now()}`,
+                type: 'collaborative',
+                description: `${opportunity.description}`,
+                priority: opportunity.priority,
+                status: 'proposed',
+                participants: [state.metadata?.agentId || 'unknown', ...opportunity.participants],
+                resources: opportunity.sharedResources || [],
+                deadline: Date.now() + 3600000, // 1 hour
+                createdAt: Date.now()
+            },
+            timestamp: Date.now()
+        };
+        await coordinator.formCollaborativeGoal(collaborationRequest);
+        console.log(`[MULTI_AGENT_COORDINATION] Collaboration request sent to ${opportunity.participants.length} agents`);
+    }
+    catch (error) {
+        console.error('[MULTI_AGENT_COORDINATION] Error processing collaboration opportunity:', error);
+    }
+}
+async function detectCoordinationConflicts(state) {
+    const conflicts = [];
+    // Check for resource conflicts
+    const nearbyAgents = state.context.nearbyEntities || [];
+    const agentEntities = nearbyAgents.filter(entity => entity.type === 'player' || entity.type === 'agent');
+    for (const agent of agentEntities) {
+        // Check for competing goals
+        const competingGoals = await identifyCompetingGoals(state, agent);
+        if (competingGoals.length > 0) {
+            conflicts.push({
+                id: `conflict_${Date.now()}_${agent.id}`,
+                type: 'resource_competition',
+                participants: [state.metadata?.agentId || 'unknown', agent.id.toString()],
+                description: `Competing goals detected with ${agent.id}`,
+                severity: 0.6,
+                timestamp: Date.now()
+            });
+        }
+    }
+    return conflicts;
+}
+async function resolveCoordinationConflict(state, conflict, coordinator) {
+    try {
+        // Use negotiation or mediation based on conflict severity
+        if (conflict.severity > 0.7) {
+            // Use mediation for high-severity conflicts
+            const mediationProcess = {
+                id: `mediation_${Date.now()}`,
+                conflictId: conflict.id,
+                mediatorId: state.metadata?.agentId || 'unknown',
+                participants: conflict.participants,
+                issues: [conflict.description],
+                proposedSolutions: [],
+                status: 'initiated',
+                startTime: Date.now(),
+                deadline: Date.now() + 1800000 // 30 minutes
+            };
+            await coordinator.mediateConflict(mediationProcess);
+        }
+        else {
+            // Use negotiation for lower-severity conflicts
+            const negotiationProcess = {
+                id: `negotiation_${Date.now()}`,
+                conflictId: conflict.id,
+                initiatorId: state.metadata?.agentId || 'unknown',
+                participants: conflict.participants,
+                issues: [conflict.description],
+                proposals: [],
+                status: 'initiated',
+                rounds: 0,
+                maxRounds: 5,
+                startTime: Date.now(),
+                deadline: Date.now() + 600000 // 10 minutes
+            };
+            await coordinator.initiateNegotiation(negotiationProcess);
+        }
+        console.log(`[MULTI_AGENT_COORDINATION] Conflict resolution initiated: ${conflict.id}`);
+    }
+    catch (error) {
+        console.error('[MULTI_AGENT_COORDINATION] Error resolving conflict:', error);
+    }
+}
+// Helper functions for collaboration and conflict detection
+async function identifySharedGoals(state, agents) {
+    // Simple implementation - would integrate with goal system
+    return [];
+}
+async function identifySharedResources(state, agents) {
+    // Simple implementation - would integrate with inventory system
+    return [];
+}
+async function identifyCompetingGoals(state, agent) {
+    // Simple implementation - would integrate with goal system and theory of mind
+    return [];
+}
+async function handleCollaborationRequest(state, request, coordinator) {
+    // Handle incoming collaboration requests
+    console.log(`[MULTI_AGENT_COORDINATION] Collaboration request received from ${request.initiatorId}`);
+    // Add to working memory for consideration
+    if (state.cognitive.memory && state.cognitive.memory.working) {
+        state.cognitive.memory.working.activeTasks.push(`evaluate_collaboration_${request.id}`);
+    }
+}
+async function handleTaskDelegation(state, delegation, coordinator) {
+    // Handle task delegation between agents
+    console.log(`[MULTI_AGENT_COORDINATION] Task delegation received: ${delegation.taskId}`);
+    // Add to action queue if appropriate
+    if (state.executive && state.executive.actionQueue) {
+        state.executive.actionQueue.push({
+            id: `delegated_task_${delegation.taskId}`,
+            type: 'delegated_task',
+            priority: delegation.priority || 5,
+            description: delegation.description,
+            status: 'pending',
+            createdAt: Date.now(),
+            startTime: null,
+            endTime: null,
+            result: null
+        });
+    }
+}
+async function handleResourceSharing(state, sharing, coordinator) {
+    // Handle resource sharing between agents
+    console.log(`[MULTI_AGENT_COORDINATION] Resource sharing received: ${sharing.resourceType}`);
+    // Update inventory or resource state
+    // This would integrate with the inventory system
+}
+async function handleCollaborativeGoalFormation(state, formation, coordinator) {
+    // Handle collaborative goal formation
+    console.log(`[MULTI_AGENT_COORDINATION] Collaborative goal formation: ${formation.goalId}`);
+    // Add to goal system
+    if (state.cognitive.goals && state.cognitive.goals.activeGoals) {
+        state.cognitive.goals.activeGoals.push({
+            id: formation.goalId,
+            type: 'collaborative',
+            description: formation.description,
+            priority: formation.priority || 5,
+            status: 'active',
+            memberIds: formation.memberIds || [],
+            resources: formation.resources || [],
+            deadline: formation.deadline,
+            createdAt: Date.now()
+        });
+    }
+}
+async function handleConsensusBuilding(state, consensus, coordinator) {
+    // Handle consensus building processes
+    console.log(`[MULTI_AGENT_COORDINATION] Consensus building: ${consensus.consensusId}`);
+    // Process consensus votes and decisions
+    // This would integrate with voting and consensus algorithms
+}
+// ============================================================================
+// EMERGENCY PROCEDURE NODES
+// ============================================================================
+/**
+ * Emergency communications Node - Handle emergency messages to users
+ */
+export async function emergencyCommunicationsNode(state, agent) {
+    const startTime = Date.now();
+    try {
+        // Get current emergency
+        const emergency = state.reactive.emergencyConditions[0];
+        if (!emergency) {
+            return state;
+        }
+        // Analyze shadow response to determine user state
+        const shadow = agent.shadowExtractor.extractShadow(state);
+        const userState = analyzeUserShadow(shadow);
+        // Route emergency communication based on user state
+        if (userState !== 'alert') {
+            // Use agent's routeEmergencyMessage method to send the response
+            await agent.routeEmergencyMessage(userState, emergency.message);
+        }
+        // Update cognitive processing state
+        state.cognitive.processing.currentPhase = ProcessingPhase.REFLECTION;
+        // Store processing record
+        const processingRecord = {
+            phase: ProcessingPhase.REFLECTION,
+            startTime,
+            endTime: Date.now(),
+            duration: Date.now() - startTime,
+            success: true,
+            details: {
+                emergencType: emergency.type,
+                userState: userState,
+                shadowDetected: userState !== 'alert'
+            }
+        };
+        state.cognitive.processing.processingHistory.push(processingRecord);
+        // Limit processing history to prevent memory buildup
+        if (state.cognitive.processing.processingHistory.length > 100) {
+            state.cognitive.processing.processingHistory = state.cognitive.processing.processingHistory.slice(-100);
+        }
+        return {
+            plural: {
+                ...state.plural,
+                currentEmergency: emergency,
+                urgentMessage: emergency.message,
+                alerts: state.plural.alerts !== undefined ? state.plural.alerts + 1 : 1
+            },
+            cognitive: {
+                ...state.cognitive,
+                processing: state.cognitive.processing,
+                social: state.cognitive.social
+            }
+        };
+    }
+    catch (error) {
+        console.error('[EMERGENCY_COMMUNICATIONS] Error during emergency communications:', error);
+        state.cognitive.processing.processingHistory.push({
+            phase: ProcessingPhase.REFLECTION,
+            startTime,
+            endTime: Date.now(),
+            duration: Date.now() - startTime,
+            success: false,
+            details: { error: error instanceof Error ? error.message : String(error) }
+        });
+        return state;
+    }
+}
+/**
+ * User Assignment Node - distribute users along a surface of the world
+ */
+export async function userAssignmentNode(state) {
+    const startTime = Date.now();
+    try {
+        // First, try to repurpose planners whose assigned users have disconnected
+        for (const planner of state.plural.planners) {
+            const assignedUsers = state.plural.assignedUsers[planner.id];
+            if (!assignedUsers) {
+                planner.assignedUsersCount = 0;
+                planner.requestCount = 0;
+            }
+            else {
+                // Mark users that disconnected as available (not in planner#assignedUsers)
+                // Mark users that blacklisted this agent as available too
+                const stillConnected = assignedUsers.filter(uid => {
+                    const userPresence = state.plural.usersPresence[uid];
+                    if (!userPresence || !userPresence.connected) {
+                        return false;
+                    }
+                    const backlog = state.plural.blacklist[uid];
+                    return !(backlog && backlog.isAttemptingDifferentAgent);
+                });
+                planner.assignedUsersCount = stillConnected.length;
+                // Mark that this planner has blacklisted users to prevent future assignments
+                // Save the list of blacklisted users so we can respect the blacklist
+                planner.blacklistedUsers = assignedUsers.filter(uid => {
+                    const backlog = state.plural.blacklist[uid];
+                    return (backlog && backlog.isAttemptingDifferentAgent);
+                });
+                // Keep track if this planner was previously idle and is now active
+                if (!planner.isIdle && planner.assignedUsersCount === 0) {
+                    planner.wasIdle = true;
+                    planner.isIdle = false; // Mark this planner was assigned at least one user
+                }
+                else {
+                    planner.wasIdle = false;
+                }
+                planner.requestCount = 0; // reset request counter for next cycle
+            }
+        }
+        // Manage planner status based on assigned users
+        const activelyPlanned = state.plural.users.filter(uid => {
+            return (uid && state.plural.planners.find(p => p.assignedUsersCount > 0));
+        });
+        const idlePlanners = state.plural.planners.filter(p => p.assignedUsersCount === 0 && p.metadata?.agentId);
+        const usablePlanners = state.plural.planners.filter(p => (p.assignedUsersCount > 0));
+        if (state.plural.status !== 'shallow' && activelyPlanned.length === 0 && idlePlanners.length > 0) {
+            state.plural.status = 'deep';
+        }
+        // Second, try to assign users to available planners
+        for (const user of state.plural.users) {
+            // Stop if we've reached the target max planners assignment per user
+            if (state.plural.plannerTarget > 0 && state.plural.assignedUsers[user.id]?.length >= state.plural.plannerTarget) continue;
+            // Try initially or repeatedly assign users to available and idle planners
+            if (usablePlanners.some(p => p.requestCount < p.plannerTarget)) {
+                // Try to assign an available planner
+                const planner = usablePlanners.find(p => p.requestCount < p.plannerTarget);
+                // Route user assignment to agent to avoid storing duplicate assignments
+                await agent.routeUserAssignment(user.id, planner.id, { assignmentType: 'agent_assigned' });
+                // Log the assignment
+                console.log(`[USER_ASSIGNMENT] Assigned user (${state.plural.usersInfo[user.id].username}) to planner (${planner.name})`);
+                // Mark that this planner has a user
+                planner.isIdle = false;
+                planner.assignedUsersCount = planner.assignedUsersCount || 0;
+                planner.assignedUsersCount++;
+                planner.requestCount++;
+            }
+            else {
+                // Some agents will give up after a while if the planner is busy and no assignments happen
+                // Provide agentId to apply user/agent blacklist uptime limit matching
+                await agent.routeUserAssignment(user.id, undefined, { assignmentType: 'agent_assign_upptime', metadata: { agentId: state.metadata?.agentId } });
+            }
+        }
+        // finally, monitor plan status
+        // Markverständ after
+    }
+    catch (error) {
+        console.error('[USER_ASSIGNMENT] Error during user assignment:', error);
+        state.cognitive.processing.processingHistory.push({
+            phase: ProcessingPhase.REFLECTION,
+            startTime,
+            endTime: Date.now(),
+            duration: Date.now() - startTime,
+            success: false,
+            details: { error: error instanceof Error ? error.message : String(error) }
+        });
+        return state;
+    }
+}
+
+// ============================================================================
+// EXTENSION NODES - USER ETHICS EVALUATION & SHOPPING COPYRIGHT EVALUATION
+// ============================================================================
+
+/**
+ * User Ethics Evaluation Node - Determine ethical alignment before assignment
+ */
+export async function userEthicsEvaluationNode(state, agent) {
+    const startTime = Date.now();
+    try {
+        // This node is now obsolete and will be removed in future commits
+        return state;
+    }
+    catch (error) {
+        console.error('[USER_ETHICS_EVALUATION] Error during user ethics evaluation:', error);
+        state.cognitive.processing.processingHistory.push({
+            phase: ProcessingPhase.REFLECTION,
+            startTime,
+            endTime: Date.now(),
+            duration: Date.now() - startTime,
+            success: false,
+            details: { error: error instanceof Error ? error.message : String(error) }
+        });
+        return state;
+    }
+}
+
+/**
+ * Extension Node - SHOPPING COPYRIGHT EVALUATION
+ * Determines if assignment for agent involves infringement of copyrights or Trademarks.
+ */
+export async function ShoppingCopyrightEvaluationNode(state, agent) {
+    const startTime = Date.now();
+    try {
+        // This node is now obsolete and will be removed in future commits
+        return state;
+    }
+    catch (error) {
+        console.error('[SHOPPING_COPYRIGHT_EVALUATION_NODE] Error during shopping copyright evaluation:', error);
+        state.cognitive.processing.processingHistory.push({
+            phase: ProcessingPhase.REFLECTION,
+            startTime,
+            endTime: Date.now(),
+            duration: Date.now() - startTime,
+            success: false,
+            details: { error: error instanceof Error ? error.message : String(error) }
+        });
+        return state;
+    }
+}
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+function analyzeUserShadow(shadow) {
+    // Simple user shadow analysis (this would integrate with actual shadow resources)
+    return shadow.impactType === 'user_cognitive' ? 'alert' : 'away';
 }

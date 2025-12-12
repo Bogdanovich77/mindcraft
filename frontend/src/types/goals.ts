@@ -270,7 +270,7 @@ export interface GoalHierarchyState {
   analytics: GoalAnalytics | null;
   conflicts: GoalConflict[];
   selectedGoal: Goal | null;
-  expandedNodes: Set<string>;
+  expandedNodes: string[];
   filterCriteria: GoalFilterCriteria;
   viewMode: 'tree' | 'list' | 'dependency' | 'timeline';
   isLoading: boolean;

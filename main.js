@@ -1,9 +1,13 @@
 import * as Mindcraft from './dist/src/mindcraft/mindcraft.js';
-import settings from './dist/settings.js';
+import settings, { setSettings } from './dist/src/agent/settings.js';
+import settingsConfig from './settings.js';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { readFileSync } from 'fs';
 import { createAgentLoader } from './dist/src/agent/langgraph_agent_loader.js';
+
+// Initialize the global settings object with the configuration from settings.js
+setSettings(settingsConfig);
 
 function parseArguments() {
     return yargs(hideBin(process.argv))
@@ -121,8 +125,9 @@ function fallbackToLegacy() {
     
     for (let profile of settings.profiles) {
         const profile_json = JSON.parse(readFileSync(profile, 'utf8'));
-        settings.profile = profile_json;
-        Mindcraft.createAgent(settings);
+        // Merge global settings with profile-specific settings to ensure host/port are present
+        const agentSettings = { ...settings, profile: profile_json };
+        Mindcraft.createAgent(agentSettings);
     }
 }
 

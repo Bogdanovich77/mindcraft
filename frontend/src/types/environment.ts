@@ -253,7 +253,7 @@ export interface SpatialAnalysisResult {
 
 export interface EnvironmentState {
   // Current data
-  agentPositions: Map<string, AgentPosition>;
+  agentPositions: { [key: string]: AgentPosition };
   environmentData: EnvironmentData | null;
   spatialRegions: SpatialRegion[];
   selectedAgents: string[];

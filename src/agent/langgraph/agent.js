@@ -174,6 +174,8 @@ export class LangGraphAgent {
     async initializeBotConnection() {
         // Import and initialize bot connection
         const { initBot } = await import('../../utils/mcdata.js');
+        const settings = (await import('../../agent/settings.js')).default;
+        console.log(`[${this.name}] Settings before initBot:`, settings);
         this.bot = initBot(this.name);
         
         // Set up bot event handlers
@@ -710,7 +712,7 @@ export class LangGraphAgent {
             if (action.parameters) {
                 context += ` - ${JSON.stringify(action.parameters)}`;
             }
-            context += `\n`;
+            context += "\n";
             
             // Add action progress
             context += `- Action Progress: Status: ${action.status || 'unknown'}`;
@@ -718,7 +720,7 @@ export class LangGraphAgent {
                 const elapsed = Date.now() - action.startTime;
                 context += `, Time elapsed: ${Math.round(elapsed / 1000)}s`;
             }
-            context += `\n`;
+            context += "\n";
         } else {
             context += "- Current Action: No current action\n";
             context += "- Action Progress: No action in progress\n";

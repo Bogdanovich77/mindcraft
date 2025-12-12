@@ -113,9 +113,8 @@ class SocketService {
           
           // Start streaming service if enabled and connected
           if (enableStreaming && this.streamingService) {
-            this.streamingService.initialize().catch(error => {
-              console.error('[SocketService] Failed to start streaming service:', error);
-            });
+            // Streaming service is already initialized, no need to call initialize()
+            console.log('[SocketService] Streaming service ready');
           }
           
           resolve();
@@ -123,11 +122,34 @@ class SocketService {
 
         this.socket.on('connect_error', (error) => {
           console.error(`[SocketService] Connection error on attempt ${this.connectionAttempts}:`, error);
-          this.lastError = `Connection failed: ${error.message || 'Unknown error'}`;
+          
+          // Detailed error analysis
+          let errorMessage = 'Unknown connection error';
+          if (error.message) {
+            if (error.message.includes('ECONNREFUSED')) {
+              errorMessage = 'Backend server is not running or not accessible on port 8080';
+            } else if (error.message.includes('timeout')) {
+              errorMessage = 'Connection timeout - server may be overloaded or network issues';
+            } else if (error.message.includes('WebSocket is closed')) {
+              errorMessage = 'WebSocket connection failed - trying fallback transport';
+            } else {
+              errorMessage = `Connection failed: ${error.message}`;
+            }
+          }
+          
+          this.lastError = errorMessage;
           this.metrics.lastDisconnected = Date.now();
           this.clearReconnectTimeout();
           this.notifyStatusChange();
-          reject(new Error(this.lastError));
+          
+          // Provide helpful troubleshooting information
+          console.error('[SocketService] Troubleshooting tips:');
+          console.error('1. Ensure the MindServer backend is running: npm run dev or node main.js');
+          console.error('2. Check that port 8080 is not blocked by firewall');
+          console.error('3. Verify no other application is using port 8080');
+          console.error('4. Try refreshing the page after starting the backend');
+          
+          reject(new Error(errorMessage));
         });
 
       } catch (error) {
@@ -141,7 +163,7 @@ class SocketService {
 
   disconnect(): void {
     if (this.streamingService) {
-      this.streamingService.disconnect();
+      this.streamingService.destroy();
       this.streamingService = null;
     }
     
@@ -175,7 +197,8 @@ class SocketService {
       
       // Disconnect streaming service
       if (this.streamingService) {
-        this.streamingService.disconnect();
+        this.streamingService.destroy();
+        this.streamingService = null;
       }
     });
 
@@ -185,6 +208,9 @@ class SocketService {
     // Mindcraft specific events (legacy support)
     this.socket.on('agents-status', (data: AgentListEvent) => {
       console.log('[SocketService] Received agents-status:', data);
+      
+      // Emit the raw data directly - let the AgentList component handle transformation
+      // This avoids double transformation and format mismatches
       this.emit('agentList', data);
       this.emit('agents-status', data); // Also emit the original event name
     });
@@ -346,8 +372,8 @@ class SocketService {
    */
   private async initializeStreamingService(): Promise<void> {
     const environment = import.meta.env.MODE === 'development' ? 'development' : 'production';
-    // Create a basic config since DEFAULT_STREAMING_CONFIGS doesn't exist
-    const baseConfig = {
+    // Create a basic config
+    const config = {
       enableAggregation: true,
       aggregationWindow: 1000,
       enableFiltering: true,
@@ -360,18 +386,6 @@ class SocketService {
       maxConcurrentStreams: 50,
       bufferSize: 100,
       flushInterval: 100
-    };
-    
-    // Fix the timeRange null issue
-    const config = {
-      ...baseConfig,
-      config: {
-        ...baseConfig.config,
-        filters: {
-          ...baseConfig.config.filters,
-          timeRange: undefined // Use undefined instead of null
-        }
-      }
     };
     
     this.streamingService = new StreamingService(config);
@@ -395,8 +409,21 @@ class SocketService {
       this.emit('streaming:personality:trait:update', data);
     });
 
-    streamingService.subscribe('memory:semantic:update', (data: any) => {
-      this.emit('streaming:memory:semantic:update', data);
+    // Update memory stream subscriptions to match new stream names
+    streamingService.subscribe('memory:semantic', (data: any) => {
+      this.emit('streaming:memory:semantic', data);
+    });
+
+    streamingService.subscribe('memory:episodic', (data: any) => {
+      this.emit('streaming:memory:episodic', data);
+    });
+
+    streamingService.subscribe('memory:procedural', (data: any) => {
+      this.emit('streaming:memory:procedural', data);
+    });
+
+    streamingService.subscribe('memory:consolidation', (data: any) => {
+      this.emit('streaming:memory:consolidation', data);
     });
 
     streamingService.subscribe('goal:strategic:update', (data: any) => {
