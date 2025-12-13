@@ -104,9 +104,8 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       // Enhanced HMR configuration
       hmr: {
-        port: 5174,
-        host: 'localhost',
         overlay: true,
+        port: 5173, // Use same port as server to avoid WebSocket connection issues
       },
       // Enhanced proxy configuration for development
       proxy: {
@@ -172,7 +171,7 @@ export default defineConfig(({ mode }) => {
     },
     // Experimental features for production
     experimental: {
-      renderBuiltUrl: (filename, { hostType, type }) => {
+      renderBuiltUrl: (filename, { hostType, type: _type }) => {
         if (hostType === 'js' && isProduction && env.VITE_CDN_URL) {
           return { js: `${env.VITE_CDN_URL}/${filename}` }
         }
