@@ -26,6 +26,11 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src'),
+        // Ensure single React instance
+        'react': resolve(__dirname, 'node_modules/react'),
+        'react-dom': resolve(__dirname, 'node_modules/react-dom'),
+        '@emotion/react': resolve(__dirname, 'node_modules/@emotion/react'),
+        '@emotion/styled': resolve(__dirname, 'node_modules/@emotion/styled'),
       },
     },
     build: {
@@ -38,8 +43,9 @@ export default defineConfig(({ mode }) => {
         output: {
           // Advanced code splitting strategy
           manualChunks: (id) => {
-            // Core React ecosystem
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-redux')) {
+            // Core React ecosystem - keep together to prevent multiple instances
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-redux') || 
+                id.includes('@emotion/react') || id.includes('@emotion/styled')) {
               return 'react-vendor'
             }
             // Material-UI components
@@ -78,12 +84,8 @@ export default defineConfig(({ mode }) => {
             ? 'static/assets/[name]-[hash:8].[ext]'
             : 'static/assets/[name].[ext]',
         },
-        // External dependencies for CDN
-        external: isProduction ? [
-          'react',
-          'react-dom',
-          'react-redux'
-        ] : [],
+        // External dependencies for CDN - removed React to prevent conflicts
+        external: isProduction ? [] : [],
       },
       // Reduced chunk size warnings for better mobile performance
       chunkSizeWarningLimit: 500,
@@ -98,8 +100,14 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      host: true,
+      host: '0.0.0.0',
       port: 5173,
+      // Enhanced HMR configuration
+      hmr: {
+        port: 5174,
+        host: 'localhost',
+        overlay: true,
+      },
       // Enhanced proxy configuration for development
       proxy: {
         '/api': {
@@ -115,9 +123,14 @@ export default defineConfig(({ mode }) => {
           timeout: 10000,
         },
       },
+      // CORS configuration
+      cors: {
+        origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+        credentials: true,
+      },
     },
     preview: {
-      host: true,
+      host: '0.0.0.0',
       port: 4173,
       // Production preview optimizations
       headers: {
@@ -142,6 +155,8 @@ export default defineConfig(({ mode }) => {
         'react',
         'react-dom',
         'react-redux',
+        '@emotion/react',
+        '@emotion/styled',
         '@mui/material',
         '@mui/icons-material',
         'd3',
@@ -150,9 +165,10 @@ export default defineConfig(({ mode }) => {
         'axios',
         'lodash',
         'date-fns',
+        'hoist-non-react-statics',
       ],
-      // Pre-bundle dependencies for faster development
-      force: isDevelopment,
+      // Force optimization to prevent duplicate React instances
+      force: true,
     },
     // Experimental features for production
     experimental: {

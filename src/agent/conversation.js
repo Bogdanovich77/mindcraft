@@ -7,10 +7,6 @@ let agent;
 let agent_names = [];
 let agents_in_game = [];
 
-// Set the conversation manager in the server proxy to avoid circular dependency
-const convoManager = new ConversationManager();
-serverProxy.setConversationManager(convoManager);
-
 class Conversation {
     constructor(name) {
         this.name = name;
@@ -325,7 +321,7 @@ function _handleFullInMessage(sender, received) {
     if (received.end) {
         convoManager.endConversation(sender);
         message = `Conversation with ${sender} ended with message: "${message}"`;
-        sender = 'system'; // bot will respond to system instead of the other bot
+        sender = 'system'; // bot will respond to system instead
     }
     else if (received.start)
         agent.shut_up = false;
@@ -344,3 +340,9 @@ async function _resumeSelfPrompter() {
         agent.self_prompter.start();
     }
 }
+
+// Set the conversation manager in the server proxy to avoid circular dependency
+const convoManager = new ConversationManager();
+serverProxy.setConversationManager(convoManager);
+
+export default convoManager;

@@ -819,18 +819,15 @@ const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({ agent, 
         </Paper>
       )}
 
-      {/* Global styles for animations - using inline styles instead */}
-      <Box
-        component="style"
-        dangerouslySetInnerHTML={{
-          __html: `
-            @keyframes spin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-          `,
-        }}
-      />
+      {/* Global styles for animations - using proper style tag */}
+      <style>
+        {`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}
+      </style>
     </Box>
   );
 };

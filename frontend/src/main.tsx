@@ -10,13 +10,35 @@ import './index.css';
 // Enable Immer MapSet plugin to handle Map and Set objects in Redux state
 enableMapSet();
 
-const root = ReactDOM.createRoot(document.getElementById('root')!);
+// Ensure the root element exists
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error('Root element not found. Please ensure <div id="root"></div> exists in your HTML.');
+}
+
+const root = ReactDOM.createRoot(rootElement);
+
+// Render with comprehensive error handling
 root.render(
   <React.StrictMode>
-    <ErrorBoundary>
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        console.error('Application Error:', error, errorInfo);
+        // You can send error reports here
+      }}
+      onRetry={() => {
+        // Clear any cached state and retry
+        window.location.reload();
+      }}
+    >
       <Provider store={store}>
         <App />
       </Provider>
     </ErrorBoundary>
-  </React.StrictMode>,
+  </React.StrictMode>
 );
+
+// Handle hot module replacement
+if (import.meta.hot) {
+  import.meta.hot.accept();
+}

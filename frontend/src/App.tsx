@@ -25,6 +25,53 @@ import { initializeSkillsSocket } from './store/slices/skillsSlice';
 import { initializePerformanceSocket } from './store/slices/performanceSlice';
 import { initializeAgentsSocket } from './store/slices/agentsSlice';
 
+// React Context Validator Component
+const ReactContextValidator: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Validate that we're in a proper React context
+  const isReactContextValid = React.useContext(React.createContext(null));
+  
+  if (isReactContextValid === undefined) {
+    console.error('React context is not properly initialized');
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="h6" color="error">
+          React Context Error
+        </Typography>
+        <Typography variant="body1">
+          The application is unable to initialize React context properly. Please refresh the page.
+        </Typography>
+      </Box>
+    );
+  }
+  
+  return <>{children}</>;
+};
+
+// Redux Context Validator Component  
+const ReduxContextValidator: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  try {
+    // Try to use Redux hooks to validate context
+    const dispatch = useDispatch<AppDispatch>();
+    const loading = useAppSelector(selectGlobalLoading);
+    const error = useAppSelector(selectGlobalError);
+    
+    // If we get here, Redux context is working
+    return <>{children}</>;
+  } catch (err) {
+    console.error('Redux context validation failed:', err);
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="h6" color="error">
+          Redux Context Error
+        </Typography>
+        <Typography variant="body1">
+          The application is unable to connect to the Redux store. Please refresh the page.
+        </Typography>
+      </Box>
+    );
+  }
+};
+
 const theme = createTheme({
   palette: {
     mode: 'dark',
@@ -125,55 +172,59 @@ const AppContent: React.FC = () => {
   }, [dispatch]);
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <Box sx={{ flexGrow: 1 }}>
-          <AppBar position="static" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-            <Toolbar>
-              <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-                Mindcraft Cognitive Dashboard
-              </Typography>
-            </Toolbar>
-          </AppBar>
+    <ReactContextValidator>
+      <ReduxContextValidator>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Box sx={{ flexGrow: 1 }}>
+              <AppBar position="static" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+                <Toolbar>
+                  <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+                    Mindcraft Cognitive Dashboard
+                  </Typography>
+                </Toolbar>
+              </AppBar>
 
-          <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-            {loading && (
-              <Loading
-                overlay={true}
-                message="Initializing dashboard..."
-                size={60}
-              />
-            )}
+              <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+                {loading && (
+                  <Loading
+                    overlay={true}
+                    message="Initializing dashboard..."
+                    size={60}
+                  />
+                )}
 
-            {error && (
-              <Box
-                sx={{
-                  p: 3,
-                  mb: 2,
-                  bgcolor: 'error.dark',
-                  color: 'error.contrastText',
-                  borderRadius: 1,
-                }}
-              >
-                <Typography variant="h6" gutterBottom>
-                  Application Error
-                </Typography>
-                <Typography variant="body1">
-                  {error}
-                </Typography>
+                {error && (
+                  <Box
+                    sx={{
+                      p: 3,
+                      mb: 2,
+                      bgcolor: 'error.dark',
+                      color: 'error.contrastText',
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography variant="h6" gutterBottom>
+                      Application Error
+                    </Typography>
+                    <Typography variant="body1">
+                      {error}
+                    </Typography>
+                  </Box>
+                )}
+
+                {!loading && !error && (
+                  <Container maxWidth="xl">
+                    <CognitiveDashboard />
+                  </Container>
+                )}
               </Box>
-            )}
-
-            {!loading && !error && (
-              <Container maxWidth="xl">
-                <CognitiveDashboard />
-              </Container>
-            )}
-          </Box>
-        </Box>
-      </Router>
-    </ThemeProvider>
+            </Box>
+          </Router>
+        </ThemeProvider>
+      </ReduxContextValidator>
+    </ReactContextValidator>
   );
 };
 

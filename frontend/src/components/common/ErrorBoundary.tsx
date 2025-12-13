@@ -1,10 +1,12 @@
-import React, { Component, ReactNode, useCallback } from 'react';
+import React, { useCallback } from 'react';
+import type { ReactNode } from 'react';
 
 // Define ErrorInfo interface locally to avoid import issues
 interface ErrorInfo {
   componentStack?: string;
   errorBoundary?: boolean;
 }
+
 import {
   Box,
   Typography,
@@ -93,11 +95,18 @@ const ErrorBoundary: React.FC<ErrorBoundaryProps> = ({
     
     // Call custom error handler if provided
     onError?.(error, errorInfo);
-  }, [onRetry]);
+  }, [onError]);
 
   const getErrorSeverity = (error: Error): 'error' | 'warning' | 'info' => {
     // Determine error severity based on error properties
     if (error.name === 'ChunkLoadError' || error.message.includes('Loading chunk')) {
+      return 'error';
+    }
+    
+    // React hook/context errors are critical
+    if (error.message.includes('Invalid hook call') || 
+        error.message.includes('useContext') ||
+        error.message.includes('Cannot read properties of null')) {
       return 'error';
     }
     
@@ -114,6 +123,8 @@ const ErrorBoundary: React.FC<ErrorBoundaryProps> = ({
     if (error.message.includes('Socket')) return 'socket';
     if (error.message.includes('Render')) return 'rendering';
     if (error.message.includes('API')) return 'api';
+    if (error.message.includes('hook') || error.message.includes('useContext')) return 'react-context';
+    if (error.message.includes('Cannot read properties of null')) return 'null-reference';
     return 'general';
   };
 
@@ -129,6 +140,10 @@ const ErrorBoundary: React.FC<ErrorBoundaryProps> = ({
         return 'Try refreshing the page or clearing browser cache';
       case 'api':
         return 'Server may be temporarily unavailable. Please try again later';
+      case 'react-context':
+        return 'React context error detected. This usually indicates a Provider wrapping issue. Try refreshing the page.';
+      case 'null-reference':
+        return 'Null reference error detected. This may be a temporary state issue. Try refreshing the page.';
       default:
         return 'Try refreshing the page or contact support if the issue persists';
     }
@@ -141,7 +156,6 @@ const ErrorBoundary: React.FC<ErrorBoundaryProps> = ({
       handleError(event.error, {
         componentStack: 'No stack available',
         errorBoundary: false,
-        error: event.error
       });
     };
 
@@ -150,7 +164,6 @@ const ErrorBoundary: React.FC<ErrorBoundaryProps> = ({
       handleError(new Error(event.reason as string), {
         componentStack: 'No stack available',
         errorBoundary: false,
-        error: new Error(event.reason as string)
       });
     };
 
@@ -187,7 +200,10 @@ const ErrorBoundary: React.FC<ErrorBoundaryProps> = ({
                 Something went wrong
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {category === 'network' ? 'Network Error' : category === 'socket' ? 'Connection Error' : 'Application Error'}
+                {category === 'react-context' ? 'React Context Error' : 
+                 category === 'null-reference' ? 'Null Reference Error' :
+                 category === 'network' ? 'Network Error' : 
+                 category === 'socket' ? 'Connection Error' : 'Application Error'}
               </Typography>
             </Box>
           </Box>
