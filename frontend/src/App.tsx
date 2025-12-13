@@ -23,6 +23,7 @@ import { initializeGoalsSocket } from './store/slices/goalsSlice';
 import { initializeSocialSocket } from './store/slices/socialSlice';
 import { initializeSkillsSocket } from './store/slices/skillsSlice';
 import { initializePerformanceSocket } from './store/slices/performanceSlice';
+import { initializeAgentsSocket } from './store/slices/agentsSlice';
 
 const theme = createTheme({
   palette: {
@@ -93,7 +94,8 @@ const AppContent: React.FC = () => {
           dispatch(initializeGoalsSocket()).unwrap(),
           dispatch(initializeSocialSocket()).unwrap(),
           dispatch(initializeSkillsSocket()).unwrap(),
-          dispatch(initializePerformanceSocket('default')).unwrap()
+          dispatch(initializePerformanceSocket('default')).unwrap(),
+          dispatch(initializeAgentsSocket()).unwrap(),
         ];
         
         // Wait for all to complete with error handling

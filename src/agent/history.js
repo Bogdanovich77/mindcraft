@@ -73,6 +73,7 @@ export class History {
             let chunk = this.turns.splice(0, this.summary_chunk_size);
             while (this.turns.length > 0 && this.turns[0].role === 'assistant')
                 chunk.push(this.turns.shift()); // remove until turns starts with system/user message
+            ;
 
             await this.summarizeMemories(chunk);
             await this.appendFullHistory(chunk);

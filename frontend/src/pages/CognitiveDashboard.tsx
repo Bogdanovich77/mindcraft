@@ -53,6 +53,7 @@ import {
   selectAllAgents,
   selectAgentsLoading,
   selectAgentsError,
+  setAgents,
 } from '../store/slices/agentsSlice';
 import {
   selectGlobalLoading,
@@ -124,6 +125,67 @@ const CognitiveDashboard: React.FC<CognitiveDashboardProps> = ({ agentId }) => {
 
   // Socket service
   const socketService = getSocketService();
+
+  // Set up socket event listeners for agent list
+  useEffect(() => {
+    const socketService = getSocketService();
+    
+    if (!socketService) {
+      console.error('[CognitiveDashboard] Socket service not available');
+      return;
+    }
+
+    console.log('[CognitiveDashboard] Setting up socket event listeners for agents');
+
+    // Handle agent list updates
+    const handleAgentList = (data: any) => {
+      console.log('[CognitiveDashboard] Received agent list:', data);
+      
+      // Handle both formats: direct array and { agents: [...] }
+      const agentsArray = Array.isArray(data) ? data : (data.agents || []);
+      
+      if (agentsArray.length === 0) {
+        console.log('[CognitiveDashboard] No agents found, clearing agent list');
+        dispatch(setAgents([]));
+        return;
+      }
+      
+      // Transform backend data format to frontend format
+      const agentSummaries = agentsArray.map((agent: any) => ({
+        id: agent.name,
+        name: agent.name,
+        profile: 'default',
+        status: agent.in_game ? 'online' : 'offline',
+        position: { x: 0, y: 64, z: 0 },
+        health: 20,
+        level: 1,
+        lastUpdate: Date.now(),
+      }));
+      
+      console.log('[CognitiveDashboard] Dispatching agents to Redux:', agentSummaries);
+      dispatch(setAgents(agentSummaries));
+    };
+
+    // Register event listeners
+    socketService.on('agentList', handleAgentList);
+    socketService.on('agents-status', handleAgentList);
+
+    // Request agents immediately if already connected
+    if (socketService.getStatus().isConnected) {
+      console.log('[CognitiveDashboard] Already connected, requesting agents immediately');
+      setTimeout(() => {
+        socketService.requestAgentList();
+        socketService.send('getAgents', {});
+        socketService.send('listen-to-agents', {});
+      }, 100);
+    }
+
+    return () => {
+      console.log('[CognitiveDashboard] Cleaning up socket listeners');
+      socketService.off('agentList', handleAgentList);
+      socketService.off('agents-status', handleAgentList);
+    };
+  }, [dispatch]);
 
   // Get current agent data
   const currentAgent = useMemo(() => {
@@ -760,6 +822,13 @@ const CognitiveDashboard: React.FC<CognitiveDashboardProps> = ({ agentId }) => {
           </Typography>
           <Typography variant="body2" gutterBottom>
             Mobile: {isMobile ? 'Yes' : 'No'}
+          </Typography>
+          
+          <Typography variant="body2" gutterBottom>
+            Agents: {agents.length}
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            Agent Names: {agents.map(a => a.name).join(', ') || 'None'}
           </Typography>
           
           <Box sx={{ mt: 2 }}>

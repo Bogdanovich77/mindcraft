@@ -1,9 +1,9 @@
-import type { 
-  ProceduralSkill, 
-  ProceduralStep, 
+import type {
+  ProceduralSkill,
+  ProceduralStep,
   ProceduralAdaptation,
   MemoryQuery,
-  WorldContext 
+  WorldContext
 } from '../langgraph/interfaces.js';
 import type { ExtendedEpisodicEvent } from './episodic_memory.js';
 
@@ -111,10 +111,7 @@ export class ProceduralMemory {
     ];
     
     for (const skill of basicSkills) {
-      this.skills.set(skill.id, {
-        ...skill,
-        adaptations: []
-      });
+      this.skills.set(skill.id, skill as ExtendedProceduralSkill);
     }
   }
   
@@ -180,7 +177,7 @@ export class ProceduralMemory {
           weather: 'clear',
           nearbyEntities: [],
           nearbyBlocks: [],
-          inventory: [],
+          inventory: [] as any,
           equipment: {
             helmet: undefined,
             chestplate: undefined,
@@ -204,9 +201,9 @@ export class ProceduralMemory {
    */
   async query(query: MemoryQuery): Promise<ProceduralSkill[]> {
     const results: ProceduralSkill[] = [];
-    const queryLower = query.query.toLowerCase();
+    const queryLower = (query.query || '').toLowerCase();
     
-    for (const skill of this.skills.values()) {
+    for (const skill of Array.from(this.skills.values())) {
       // Apply type filter
       if (query.filters?.type && skill.type !== query.filters.type) {
         continue;
@@ -329,8 +326,8 @@ export class ProceduralMemory {
     return {
       success: true,
       sequence,
-      adaptation: adaptation?.context,
-      estimatedDuration: sequence.reduce((sum, step) => sum + step.duration, 0)
+      adaptation: adaptation?.context || '',
+      estimatedDuration: sequence.reduce((sum: number, step: any) => sum + (step.duration || 0), 0)
     };
   }
   
@@ -394,8 +391,13 @@ export class ProceduralMemory {
   private async createAdaptation(skill: ExtendedProceduralSkill, event: ExtendedEpisodicEvent): Promise<void> {
     const adaptation: ProceduralAdaptation = {
       context: JSON.stringify(event.location),
-      modification: skill.sequence, // Start with current sequence
-      performance: event.importance,
+      modification: [...skill.sequence], // Start with current sequence
+      performance: {
+        successRate: event.success ? 1.0 : 0.5,
+        executionTime: event.duration || 1000,
+        errorRate: event.success ? 0.0 : 0.5
+      },
+      successRate: event.success ? 1.0 : 0.5,
       timestamp: event.timestamp
     };
     
@@ -406,7 +408,7 @@ export class ProceduralMemory {
     
     // Limit adaptations per skill
     if (skill.adaptations.length > 10) {
-      skill.adaptations.sort((a, b) => b.performance - a.performance);
+      skill.adaptations.sort((a, b) => (b.successRate || 0) - (a.successRate || 0));
       skill.adaptations = skill.adaptations.slice(0, 10);
     }
   }
@@ -416,9 +418,11 @@ export class ProceduralMemory {
     
     if (existingIndex >= 0) {
       const existing = skill.adaptations[existingIndex];
-      // Keep the better performing adaptation
-      if (newAdaptation.performance > existing.performance) {
-        skill.adaptations[existingIndex] = newAdaptation;
+      if (existing && newAdaptation.successRate) {
+        // Keep the better performing adaptation
+        if ((newAdaptation.successRate || 0) > (existing.successRate || 0)) {
+          skill.adaptations[existingIndex] = newAdaptation;
+        }
       }
     } else {
       skill.adaptations.push(newAdaptation);
@@ -449,9 +453,11 @@ export class ProceduralMemory {
     
     // For now, return the best performing adaptation
     // In real implementation, this would consider context matching
-    return skill.adaptations.reduce((best, current) => 
-      current.performance > best.performance ? current : best
-    );
+    return skill.adaptations.reduce((best, current) => {
+      const bestScore = best.successRate || 0;
+      const currentScore = current.successRate || 0;
+      return currentScore > bestScore ? current : best;
+    });
   }
   
   private calculateSkillScore(skill: ProceduralSkill, context: WorldContext): number {
@@ -478,7 +484,7 @@ export class ProceduralMemory {
   }
   
   private calculateRelevanceScore(skill: ProceduralSkill, query: MemoryQuery): number {
-    const queryLower = query.query.toLowerCase();
+    const queryLower = (query.query || '').toLowerCase();
     let score = 0;
     
     if (skill.name.toLowerCase().includes(queryLower)) score += 0.8;
@@ -506,8 +512,11 @@ export class ProceduralMemory {
     
     const toRemove = Math.floor(sorted.length * 0.2);
     for (let i = 0; i < toRemove; i++) {
-      this.skills.delete(sorted[i][0]);
-      this.performanceHistory.delete(sorted[i][0]);
+      const id = sorted[i]?.[0];
+      if (id !== undefined) {
+        this.skills.delete(id);
+        this.performanceHistory.delete(id);
+      }
     }
   }
   
@@ -519,14 +528,17 @@ export class ProceduralMemory {
     
     const toRemove = Math.floor(sorted.length * 0.2);
     for (let i = 0; i < toRemove; i++) {
-      this.routines.delete(sorted[i][0]);
+      const id = sorted[i]?.[0];
+      if (id !== undefined) {
+        this.routines.delete(id);
+      }
     }
   }
   
   private async cleanupPoorAdaptations(): Promise<void> {
-    for (const skill of this.skills.values()) {
+    for (const skill of Array.from(this.skills.values())) {
       skill.adaptations = skill.adaptations.filter(adaptation => 
-        adaptation.performance >= this.adaptationThreshold
+        (adaptation.successRate || 0) >= this.adaptationThreshold
       );
     }
   }

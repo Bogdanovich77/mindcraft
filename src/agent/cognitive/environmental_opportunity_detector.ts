@@ -192,8 +192,8 @@ export class EnvironmentalOpportunityDetector {
     // Filter valuable resources
     const valuableBlocks = nearbyBlocks.filter(block => 
       this.isValuableResource(block.type) && 
-      block.accessible && 
-      block.distance <= this.config.scanRadius
+      (block.accessible !== false) && 
+      (block.distance !== undefined && block.distance <= this.config.scanRadius)
     );
 
     valuableBlocks.forEach(block => {
@@ -210,15 +210,15 @@ export class EnvironmentalOpportunityDetector {
         requirements: this.getResourceRequirements(block.type),
         estimatedValue: value,
         timeWindow: 60000, // 1 minute
-        confidence: this.calculateResourceConfidence(block),
+        confidence: this.calculateResourceConfidence(block as BlockInfo),
         personalityAlignment: this.calculatePersonalityAlignment(
           OpportunityType.RESOURCE, 
           personality
         ),
         context: {
           blockType: block.type,
-          distance: block.distance,
-          accessibility: block.accessible
+          distance: block.distance || 0,
+          accessibility: block.accessible !== false
         }
       });
     });
@@ -326,20 +326,21 @@ export class EnvironmentalOpportunityDetector {
     );
 
     socialEntities.forEach(entity => {
-      const value = this.calculateSocialValue(entity, personality);
+      const entityInfo = entity as EntityInfo;
+      const value = this.calculateSocialValue(entityInfo, personality);
       const priority = value > this.config.valueThresholds.social ? 
         OpportunityPriority.HIGH : OpportunityPriority.MEDIUM;
       
       opportunities.push({
-        id: `social_${entity.id}`,
+        id: `social_${entity.id || entity.type}_${entity.position.x}_${entity.position.z}`,
         type: OpportunityType.SOCIAL,
         priority,
         description: `Interact with ${entity.type} at ${entity.position}`,
         location: entity.position,
-        requirements: this.getSocialRequirements(entity),
+        requirements: this.getSocialRequirements(entityInfo),
         estimatedValue: value,
         timeWindow: 120000, // 2 minutes
-        confidence: this.calculateSocialConfidence(entity),
+        confidence: this.calculateSocialConfidence(entityInfo),
         personalityAlignment: this.calculatePersonalityAlignment(
           OpportunityType.SOCIAL, 
           personality
@@ -347,7 +348,7 @@ export class EnvironmentalOpportunityDetector {
         context: {
           entityType: entity.type,
           relationship: 'unknown',
-          interactionType: this.suggestSocialInteraction(entity, personality)
+          interactionType: this.suggestSocialInteraction(entityInfo, personality)
         }
       });
     });
@@ -410,27 +411,28 @@ export class EnvironmentalOpportunityDetector {
     
     // Find hostile entities
     const hostileEntities = nearbyEntities.filter(entity => 
-      entity.hostile && entity.distance <= this.config.scanRadius
+      entity.hostile === true && entity.distance !== undefined && entity.distance <= this.config.scanRadius
     );
 
     hostileEntities.forEach(entity => {
-      const value = this.calculateDangerValue(entity, personality);
+      const entityInfo = entity as EntityInfo;
+      const value = this.calculateDangerValue(entityInfo, personality);
       const priority = OpportunityPriority.CRITICAL; // Always high priority
       
       opportunities.push({
-        id: `danger_${entity.id}`,
+        id: `danger_${entity.id || entity.type}_${entity.position.x}_${entity.position.z}`,
         type: OpportunityType.DANGER,
         priority,
         description: `Address ${entity.type} threat at ${entity.position}`,
         location: entity.position,
-        requirements: this.getDangerRequirements(entity),
+        requirements: this.getDangerRequirements(entityInfo),
         estimatedValue: value,
         timeWindow: 5000, // 5 seconds - immediate response needed
-        confidence: this.calculateDangerConfidence(entity),
+        confidence: this.calculateDangerConfidence(entityInfo),
         personalityAlignment: 1.0, // Always aligned regardless of personality
         context: {
           threatType: entity.type,
-          threatLevel: entity.health || 'unknown',
+          threatLevel: entity.health?.toString() || 'unknown',
           escapeRoutes: this.identifyEscapeRoutes(agentState, entity.position)
         }
       });
@@ -779,6 +781,10 @@ export class EnvironmentalOpportunityDetector {
       agreeableness: 0.5,
       neuroticism: 0.5,
       riskTolerance: 0.5,
+      creativity: 0.5,
+      patience: 0.5,
+      competitiveness: 0.5,
+      curiosity: 0.5,
       explorationDrive: 0.5,
       socialTendency: 0.5,
       buildingCreativity: 0.5,

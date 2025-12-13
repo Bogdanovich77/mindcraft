@@ -105,7 +105,7 @@ export class AntiIdleGoalGenerator {
             goals.push(this.createGoalRequest('exploration', 'Explore new areas and discover resources', GoalLevel.TACTICAL, 'Systematically explore unvisited regions', ['areas_explored'], GoalPriority.MEDIUM, 'exploration'));
         }
         // Memory-based exploration
-        const unexploredAreas = []; // Placeholder - would be implemented in memory system
+        const unexploredAreas = []; // Explicit type annotation
         if (unexploredAreas.length > 0) {
             goals.push(this.createGoalRequest('area_discovery', `Explore ${unexploredAreas.length} unexplored regions`, GoalLevel.TACTICAL, 'Visit and map unexplored areas', unexploredAreas.map(area => `explored_${area}`), GoalPriority.LOW, 'exploration'));
         }

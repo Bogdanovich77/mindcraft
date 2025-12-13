@@ -11,16 +11,10 @@ export interface Position {
     y: number;
     z: number;
 }
-export interface Inventory {
-    items: InventoryItem[];
-    slots: number;
-    usedSlots: number;
-    find?(predicate: (item: InventoryItem) => boolean): InventoryItem | undefined;
-    length?: number;
-}
 export interface InventoryItem {
-    name: string;
+    type: string;
     count: number;
+    name?: string;
     metadata?: any;
 }
 export interface Entity {
@@ -38,28 +32,37 @@ export interface Block {
     distance?: number;
     accessible?: boolean;
 }
+export interface Inventory {
+    items: InventoryItem[];
+    slots: number;
+    usedSlots: number;
+    filter?: (item: InventoryItem) => boolean;
+    length: number;
+}
 export interface Equipment {
-    helmet?: InventoryItem;
-    chestplate?: InventoryItem;
-    leggings?: InventoryItem;
-    boots?: InventoryItem;
-    weapon?: InventoryItem;
+    helmet?: InventoryItem | undefined;
+    chestplate?: InventoryItem | undefined;
+    leggings?: InventoryItem | undefined;
+    boots?: InventoryItem | undefined;
+    weapon?: InventoryItem | undefined;
     tool?: InventoryItem;
 }
 export interface WorldContext {
-    position: Position;
+    position: Vector3D;
     health: number;
     food: number;
-    dimension: string;
-    time: number;
+    experience: number;
+    nearbyEntities: EntityInfo[];
+    nearbyBlocks: BlockInfo[];
     inventory: Inventory;
-    nearbyEntities: Entity[];
-    nearbyBlocks: Block[];
-    environmentalFactors: any;
-    lastMessage?: MessageInfo;
-    weather?: string;
-    timeOfDay?: number;
-    equipment?: Equipment;
+    equipment: Equipment;
+    timeOfDay: number;
+    weather: string;
+    dimension: string;
+    biome?: string;
+    lightLevel?: number;
+    temperature?: number;
+    dangerLevel?: number;
 }
 export interface MessageInfo {
     source: string;
@@ -67,6 +70,11 @@ export interface MessageInfo {
     timestamp: number;
     type: string;
     priority: number;
+}
+export interface Vector3D {
+    x: number;
+    y: number;
+    z: number;
 }
 export interface PersonalityTraits {
     openness: number;
@@ -90,6 +98,10 @@ export interface Motivation {
     strength: number;
     satisfaction: number;
     priority: number;
+}
+export interface MotivationState {
+    motivations: Motivation[];
+    primaryMotivation: string;
 }
 export interface Value {
     id: string;
@@ -115,6 +127,70 @@ export interface PurposeState {
         purity: number;
     };
 }
+export interface LearningMetrics {
+    totalSessions: number;
+    averageDuration: number;
+    successRate: number;
+    recentGains: number;
+    plateauRisk: number;
+}
+export interface LearningState {
+    currentSession?: LearningSession;
+    history: LearningSession[];
+    metrics: LearningMetrics;
+    learningRate: number;
+    adaptiveFactor: number;
+}
+export interface SkillProgression {
+    level: number;
+    experience: number;
+    progressToNext: number;
+    totalExperience: number;
+    lastLevelUp: number;
+}
+export interface SkillGain {
+    skillType: SkillType;
+    amount: number;
+    source: ExperienceSource;
+    timestamp: number;
+}
+export interface AdaptiveLearningState {
+    personalityInfluence: number;
+    socialInfluence: number;
+    environmentalInfluence: number;
+    recentAdaptations: string[];
+}
+export interface SkillsState {
+    skills: Map<string, Skill>;
+    learning: LearningState;
+    progression: SkillProgression;
+    totalExperience: number;
+    recentGains: SkillGain[];
+    skillSynergies: Map<string, string[]>;
+    adaptiveLearning: AdaptiveLearningState;
+}
+export interface FeasibilityFactor {
+    factor: string;
+    score: number;
+    weight: number;
+    description: string;
+    impact: 'positive' | 'negative' | 'neutral';
+    improvements?: string[];
+    criticalFactors?: string[];
+}
+export interface GoalPerformanceMetrics {
+    completionRate: number;
+    averageCompletionTime: number;
+    successRate: number;
+    totalGoals: number;
+    activeGoals: number;
+}
+export interface LearningOutcome {
+    type: string;
+    effectiveness: number;
+    retention: number;
+    transferability: number;
+}
 export interface Skill {
     type: string;
     proficiency: {
@@ -139,6 +215,10 @@ export interface Skill {
         frequency: number;
         success: number;
         efficiency: number;
+        recentUses?: number[];
+        totalUses?: number;
+        successfulUses?: number;
+        averageExecutionTime?: number;
     };
 }
 export interface Goal {
@@ -155,6 +235,8 @@ export interface Goal {
         allocated: ResourceRequirement[];
         items?: ResourceRequirement[];
         tools?: ResourceRequirement[];
+        assistance?: ResourceRequirement[];
+        location?: Position;
     };
     progress: {
         current: number;
@@ -162,26 +244,31 @@ export interface Goal {
         percentage: number;
         completedSteps?: number;
     };
-    deadline?: string;
+    deadline?: number;
     memberIds?: string[];
     isAntiIdle?: boolean;
+}
+export interface SkillRequirement {
+    type: string;
+    minProficiency: number;
+    importance?: number;
 }
 export interface ResourceRequirement {
     type: string;
     amount: number;
-    priority: number;
+    priority?: number;
 }
 export interface SemanticConcept {
     id: string;
     name: string;
-    type?: string;
-    category: string;
-    properties: Map<string, any>;
-    relationships: string[];
-    importance: number;
+    type: 'context' | 'location' | 'entity' | 'property' | 'schema' | 'procedure' | 'temporal' | string;
+    activation: number;
+    attributes: Record<string, any>;
+    relationships: SemanticRelationship[];
     lastAccessed: number;
-    activation?: number;
-    attributes?: any;
+    importance: number;
+    category?: string;
+    properties?: Record<string, any>;
 }
 export interface SemanticRelationship {
     sourceId: string;
@@ -271,22 +358,38 @@ export interface MemoryQuery {
     importance?: number;
 }
 export interface MemoryRetrieval {
-    results: any[];
+    results: {
+        semantic?: SemanticConcept[];
+        episodic?: EpisodicEvent[];
+        procedural?: ProceduralSkill[];
+        working?: WorkingMemoryItem[];
+    };
     confidence: number;
     processingTime: number;
     query: MemoryQuery;
-    semantic?: any[];
-    episodic?: any[];
-    procedural?: any[];
-    working?: any[];
+    semantic?: {
+        concepts: SemanticConcept[];
+        confidence: number;
+    };
+    episodic?: {
+        events: EpisodicEvent[];
+        confidence: number;
+    };
+    procedural?: {
+        skills: ProceduralSkill[];
+        confidence: number;
+    };
+    working?: {
+        items: WorkingMemoryItem[];
+        confidence: number;
+    };
 }
 export interface MemoryStatistics {
-    totalEpisodicEvents: number;
-    totalSemanticConcepts: number;
-    totalProceduralSkills: number;
-    workingMemoryUtilization: number;
-    consolidationQueue: number;
-    lastCleanup: number;
+    totalMemories: number;
+    memoryTypes: Record<string, number>;
+    averageActivation: number;
+    lastConsolidation: number;
+    episodic: number;
     semantic?: any;
 }
 export interface MemoryState {
@@ -379,6 +482,7 @@ export interface ExecutiveState {
     lastResponse?: ResponseRecord;
     responseHistory: ResponseRecord[];
     processingMode: 'conversational' | 'action';
+    decisionContext?: DecisionContext;
 }
 export interface Action {
     id: string;
@@ -437,6 +541,7 @@ export interface Relationship {
     interactionHistory: InteractionEvent[];
     lastInteraction: number;
     status: 'stranger' | 'acquaintance' | 'friend' | 'close_friend' | 'ally' | 'enemy';
+    reputationScore?: number;
 }
 export interface Reputation {
     globalScore: number;
@@ -491,21 +596,32 @@ export interface EmotionalState {
 }
 export interface Plan {
     id: string;
-    goalId: string;
+    name: string;
     description: string;
-    priority: number;
-    status: 'pending' | 'active' | 'completed' | 'failed';
+    goalId: string;
     steps: PlanStep[];
+    dependencies: string[];
     estimatedDuration: number;
-    resourceAllocation: ResourceAllocation;
-    blockingFactors: BlockingFactor[];
+    requiredResources: ResourceRequirement[];
+    requiredSkills: SkillRequirement[];
+    feasibilityScore: number;
+    priority: number;
+    status: PlanStatus;
     createdAt: number;
     updatedAt: number;
     type?: string;
-    deadline?: string;
+    deadline?: number;
     dependencies?: string[];
-    requiredResources?: ResourceRequirement[];
-    resourceRequirements?: ResourceRequirement[];
+    resourceRequirements?: {
+        items: Record<string, number>;
+    };
+    feasibilityLevel?: FeasibilityLevel;
+    riskLevel?: RiskLevel;
+    riskAnalysis?: RiskAnalysis;
+    resourceAssessment?: ResourceAssessment;
+    timeEstimate?: TimeEstimate;
+    costEstimate?: CostEstimate;
+    alternativePlans?: AlternativePlan[];
 }
 export interface PlanStep {
     id: string;
@@ -515,7 +631,7 @@ export interface PlanStep {
     resourceRequirements: ResourceRequirement[];
     dependencies: string[];
     status: 'pending' | 'active' | 'completed' | 'failed';
-    requiredSkills?: string[];
+    requiredSkills?: SkillRequirement[];
     requiredResources?: ResourceRequirement[];
 }
 export interface ResourceAllocation {
@@ -525,29 +641,24 @@ export interface ResourceAllocation {
     skills: SkillRequirement[];
     assistance: Map<string, number>;
 }
-export interface SkillRequirement {
-    type: string;
-    minimumLevel: number;
-    importance: number;
-}
 export interface BlockingFactor {
     type: string;
     description: string;
-    severity: number;
+    severity: number | 'critical' | 'high' | 'medium' | 'low';
     mitigation?: string;
+    estimatedDelay?: number;
+    mitigationStrategies?: string[];
 }
 export interface FeasibilityAnalysisResult {
-    feasibilityScore: number;
-    feasibilityLevel: FeasibilityLevel;
-    riskLevel: RiskLevel;
-    riskAnalysis: RiskAnalysis;
-    resourceAssessment: ResourceAssessment;
-    timeEstimate: TimeEstimate;
-    costEstimate: CostEstimate;
-    alternativePlans: AlternativePlan[];
+    feasible: boolean;
+    score: number;
     confidence: number;
-    analysisTime?: number;
+    factors: FeasibilityFactor[];
+    risks: RiskAssessment[];
+    recommendations: string[];
+    alternatives?: AlternativePlan[];
     planId?: string;
+    analysisTime?: number;
 }
 export declare enum FeasibilityLevel {
     IMPOSSIBLE = "impossible",
@@ -562,33 +673,45 @@ export declare enum FeasibilityLevel {
     LOW = "low",
     VERY_LOW = "very_low"
 }
-export declare enum RiskLevel {
-    EXTREME = "extreme",
-    HIGH = "high",
-    MODERATE = "moderate",
-    LOW = "low",
-    MINIMAL = "minimal",
-    CRITICAL = "critical",
-    MEDIUM = "medium"
+export declare enum PlanStatus {
+    PENDING = "pending",
+    ACTIVE = "active",
+    COMPLETED = "completed",
+    FAILED = "failed",
+    CANCELLED = "cancelled"
+}
+export declare enum DelegationStatus {
+    PENDING = "pending",
+    ACCEPTED = "accepted",
+    REJECTED = "rejected",
+    COMPLETED = "completed",
+    FAILED = "failed"
+}
+export type RiskLevel = 'low' | 'medium' | 'high' | 'critical' | number;
+export interface RiskAssessment {
+    type: string;
+    level: RiskLevel;
+    description: string;
+    mitigation?: string;
 }
 export interface RiskAnalysis {
     overallRisk: number;
-    riskFactors: RiskFactor[];
-    mitigationStrategies: MitigationStrategy[];
+    criticalRisks: RiskFactor[];
+    mitigatedRisks: RiskFactor[];
     residualRisk: number;
 }
 export interface RiskFactor {
-    type: string;
-    description: string;
+    factor: string;
     probability: number;
     impact: number;
-    severity: number;
+    description: string;
+    mitigation: MitigationStrategy;
 }
 export interface MitigationStrategy {
-    riskId: string;
     strategy: string;
     effectiveness: number;
     cost: number;
+    description: string;
 }
 export interface ResourceAssessment {
     availableResources: Map<string, number>;
@@ -598,42 +721,32 @@ export interface ResourceAssessment {
     accessibility: number;
 }
 export interface TimeEstimate {
-    minimumTime: number;
-    maximumTime: number;
-    expectedTime: number;
-    confidence: number;
-    factors: string[];
+    min?: number;
+    max?: number;
+    confidence?: number;
+    minimumTime?: number;
+    maximumTime?: number;
+    expectedTime?: number;
+    factors?: string[];
 }
 export interface CostEstimate {
-    resourceCost: number;
-    timeCost: number;
-    opportunityCost: number;
-    totalCost: number;
-    currency: string;
+    min?: number;
+    max?: number;
+    confidence?: number;
+    resourceCost?: number;
+    timeCost?: number;
+    opportunityCost?: number;
+    totalCost?: number;
+    currency?: string;
 }
 export interface AlternativePlan {
     id: string;
     description: string;
     feasibilityScore: number;
     riskLevel: RiskLevel;
-    costDifference: number;
-    timeDifference: number;
-    advantages: string[];
-    disadvantages: string[];
-}
-export interface FeasibilityResult {
-    result: FeasibilityAnalysisResult;
-    processingTime: number;
-    confidence: number;
-    recommendations: string[];
-    planId?: string;
-}
-export interface FeasibilityFactor {
-    name: string;
-    weight: number;
-    value: number;
-    impact: number;
-    factor?: string;
+    timeEstimation: number;
+    cost: number;
+    blockingFactors: BlockingFactor[];
 }
 export interface PlanningEngineConfig {
     maxActivePlans: number;
@@ -645,6 +758,28 @@ export interface PlanningEngineConfig {
     enableResourceSharing: boolean;
     enableCollaborativePlanning: boolean;
     performanceTracking: boolean;
+}
+export interface FeasibilityAnalyzerConfig {
+    analysisTimeout: number;
+    maxHistorySize: number;
+    enableRiskAnalysis: boolean;
+    enableAlternativeGeneration: boolean;
+    confidenceThreshold: number;
+    riskTolerance: number;
+    timeBuffer: number;
+    costBuffer: number;
+    minSuccessProbability: number;
+    skillWeight: number;
+    resourceWeight: number;
+    complexityWeight: number;
+    riskWeight: number;
+    riskFactors: {
+        resource: number;
+        time: number;
+        skill: number;
+        environmental: number;
+        social: number;
+    };
 }
 export interface AgentMetadata {
     agentId: string;
@@ -665,7 +800,7 @@ export interface AgentState {
             activeGoals: Goal[];
             goalHistory: Goal[];
         };
-        skills: Map<string, Skill>;
+        skills: SkillsState;
         memory: MemoryState;
         processing: ProcessingState;
         planning?: PlanningEngine;
@@ -692,16 +827,8 @@ export interface ExtendedEpisodicEvent extends EpisodicEvent {
     duration: number;
 }
 export interface ExtendedProceduralSkill extends ProceduralSkill {
-    proficiency: number;
-    usageCount: number;
-    lastUsed: number;
-    type: string;
-    name: string;
     id: string;
     sequence: ProceduralStep[];
-    conditions: any[];
-    outcomes: any[];
-    adaptations: ProceduralAdaptation[];
 }
 export interface AgentAction {
     id: string;
@@ -729,6 +856,11 @@ export interface DecisionContext {
     options: DecisionOption[];
     constraints: any;
     priorities: any;
+    urgency?: number;
+}
+export interface GoalPrioritizationContext {
+    agentState: AgentState;
+    decisionContext: DecisionContext;
 }
 export interface MessageType {
     id: string;
@@ -769,9 +901,20 @@ export interface TaskDelegation {
     id: string;
     delegatorId: string;
     delegateeId: string;
-    task: any;
-    deadline: number;
-    status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'failed';
+    taskId: string;
+    title: string;
+    description: string;
+    priority: MessagePriority;
+    requirements: {
+        skills: string[];
+        resources: string[];
+        trustLevel: number;
+        timeEstimate: number;
+    };
+    status: DelegationStatus;
+    deadline: number | undefined;
+    createdAt: number;
+    updatedAt: number;
 }
 export interface ConflictDetection {
     conflicts: any[];
@@ -872,12 +1015,172 @@ export interface GoalState {
     completedGoals: Goal[];
     failedGoals: Goal[];
     currentGoal?: Goal;
+    strategicGoals: Goal[];
+    tacticalGoals: Goal[];
+    operationalGoals: Goal[];
 }
 export interface GoalProgress {
     current: number;
     target: number;
     percentage: number;
     completedSteps?: number;
+}
+export interface BlockInfo {
+    type: string;
+    position: Position;
+    distance: number;
+    accessible: boolean;
+}
+export interface EntityInfo {
+    id: string;
+    type: string;
+    position: Position;
+    distance: number;
+    health?: number;
+    hostile?: boolean;
+}
+export interface SkillProgress {
+}
+export interface SMProgress {
+}
+export interface TEDraft {
+}
+export interface CommandDraft {
+}
+export declare enum SkillType {
+    COMBAT = "combat",
+    MINING = "mining",
+    BUILDING = "building",
+    CRAFTING = "crafting",
+    FARMING = "farming",
+    EXPLORATION = "exploration",
+    SOCIAL = "social",
+    TRADING = "trading",
+    MAGIC = "magic",
+    SURVIVAL = "survival"
+}
+export declare enum ExperienceSource {
+    PRACTICE = "practice",
+    SUCCESS = "success",
+    FAILURE = "failure",
+    TEACHING = "teaching",
+    OBSERVATION = "observation",
+    EXPERIMENTATION = "experimentation",
+    SOCIAL = "social",
+    BREAKTHROUGH = "breakthrough"
+}
+export interface ExperienceContext {
+    situation: string;
+    location: Position;
+    participants: string[];
+    difficulty: number;
+    success: boolean;
+    quality: number;
+}
+export interface LearningSession {
+    id: string;
+    skillType: SkillType;
+    startTime: number;
+    endTime?: number;
+    duration: number;
+    experienceGained: number;
+    methods: LearningMethod[];
+    context: ExperienceContext;
+    outcomes: LearningOutcome[];
+    insights: string[];
+}
+export declare enum LearningMethod {
+    PRACTICE = "practice",
+    INSTRUCTION = "instruction",
+    OBSERVATION = "observation",
+    EXPERIMENTATION = "experimentation",
+    SOCIAL_LEARNING = "social_learning",
+    TRIAL_AND_ERROR = "trial_and_error"
+}
+export interface ExperienceEvent {
+    id: string;
+    skillType: SkillType;
+    amount: number;
+    source: ExperienceSource;
+    context: ExperienceContext;
+    timestamp: number;
+    impact: number;
+    success: boolean;
+    quality: number;
+}
+export interface FeasibilityResult {
+    planId?: string;
+    overallFeasibility: number;
+    successProbability: number;
+    isFeasible: boolean;
+    timeEstimate: TimeEstimate;
+    costEstimate: CostEstimate;
+    riskAnalysis: RiskAnalysis;
+    skillFeasibility: FeasibilityFactor;
+    resourceFeasibility: FeasibilityFactor;
+    complexityFeasibility: FeasibilityFactor;
+    recommendations: string[];
+    analyzedAt: number;
+    analysisTime: number;
+}
+export interface ValueHierarchy {
+    coreValues: Value[];
+    priorityMap: Map<string, number>;
+}
+export interface EthicalFramework {
+    principles: string[];
+    rules: string[];
+    filters: Map<string, number>;
+}
+export interface ProficiencyMetrics {
+    averageProficiency: number;
+    highestProficiency: number;
+    lowestProficiency: number;
+}
+export interface UsageStatistics {
+    totalUsage: number;
+    recentUsage: number;
+    successRate: number;
+    errorRate: number;
+}
+export interface GoalExecutionContext {
+    currentStep: number;
+    status: 'running' | 'paused' | 'error';
+    startTime: number;
+    lastUpdate: number;
+    agentState: AgentState;
+    decisionContext: DecisionContext;
+}
+export interface GoalDependency {
+    goalId: string;
+    status: 'pending' | 'completed';
+}
+export interface RankedGoal extends Goal {
+    priorityScore: number;
+    factors: PrioritizationFactors;
+}
+export interface PrioritizationFactors {
+    urgency: number;
+    valueAlignment: number;
+    feasibility: number;
+    socialImpact: number;
+    skillAlignment: number;
+    urgencyWeight?: number;
+    importanceWeight?: number;
+    feasibilityWeight?: number;
+    resourceWeight?: number;
+    alignmentWeight?: number;
+}
+export declare enum GoalType {
+    STRATEGIC = "strategic",
+    TACTICAL = "tactical",
+    OPERATIONAL = "operational",
+    SOCIAL = "social",
+    COLLABORATIVE = "collaborative"
+}
+export interface GoalPrioritizationResult {
+    rankedGoals: RankedGoal[];
+    processingTime: number;
 }
 export declare const AgentStateAnnotation: import("@langchain/langgraph").AnnotationRoot<{
     context: {

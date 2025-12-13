@@ -1,10 +1,15 @@
 import settings from './settings.js';
 import { containsCommand } from './commands/index.js';
 import { sendBotChatToServer } from './mindserver_proxy.js';
+import { serverProxy } from './mindserver_proxy.js';
 
 let agent;
 let agent_names = [];
 let agents_in_game = [];
+
+// Set the conversation manager in the server proxy to avoid circular dependency
+const convoManager = new ConversationManager();
+serverProxy.setConversationManager(convoManager);
 
 class Conversation {
     constructor(name) {
@@ -255,18 +260,6 @@ class ConversationManager {
     }
 }
 
-const convoManager = new ConversationManager();
-export default convoManager;
-
-/*
-This function controls conversation flow by deciding when the bot responds.
-The logic is as follows:
-- If neither bot is busy, respond quickly with a small delay.
-- If only the other bot is busy, respond with a long delay to allow it to finish short actions (ex check inventory)
-- If I'm busy but other bot isn't, let LLM decide whether to respond
-- If both bots are busy, don't respond until someone is done, excluding a few actions that allow fast responses
-- New messages received during the delay will reset the delay following this logic, and be queued to respond in bulk
-*/
 const talkOverActions = ['stay', 'followPlayer', 'mode:']; // all mode actions
 const fastDelay = 200;
 const longDelay = 5000;
@@ -281,7 +274,7 @@ async function _scheduleProcessInMessage(sender, received, convo) {
         // both are busy
         let canTalkOver = talkOverActions.some(a => agent.actions.currentActionLabel.includes(a));
         if (canTalkOver)
-            scheduleResponse(fastDelay)
+            scheduleResponse(fastDelay);
         // otherwise don't respond
     }
     else if (otherAgentBusy)

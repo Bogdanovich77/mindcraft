@@ -1,5 +1,4 @@
 import { io } from 'socket.io-client';
-import convoManager from './conversation.js';
 import { setSettings } from './settings.js';
 import { getFullState } from './library/full_state.js';
 
@@ -15,7 +14,13 @@ class MindServerProxy {
         this.socket = null;
         this.connected = false;
         this.agents = [];
+        this.convoManager = null; // Will be set later to avoid circular dependency
         MindServerProxy.instance = this;
+    }
+
+    // Set conversation manager to avoid circular dependency
+    setConversationManager(convoManager) {
+        this.convoManager = convoManager;
     }
 
     async connect(name, port) {
@@ -44,12 +49,16 @@ class MindServerProxy {
         });
 
         this.socket.on('chat-message', (agentName, json) => {
-            convoManager.receiveFromBot(agentName, json);
+            if (this.convoManager) {
+                this.convoManager.receiveFromBot(agentName, json);
+            }
         });
 
         this.socket.on('agents-status', (agents) => {
             this.agents = agents;
-            convoManager.updateAgents(agents);
+            if (this.convoManager) {
+                this.convoManager.updateAgents(agents);
+            }
             if (this.agent?.task) {
                 console.log(this.agent.name, 'updating available agents');
                 this.agent.task.updateAvailableAgents(agents);
@@ -58,12 +67,16 @@ class MindServerProxy {
 
         this.socket.on('restart-agent', (agentName) => {
             console.log(`Restarting agent: ${agentName}`);
-            this.agent.cleanKill();
+            if (this.agent) {
+                this.agent.cleanKill();
+            }
         });
 		
         this.socket.on('send-message', (data) => {
             try {
-                this.agent.respondFunc(data.from, data.message);
+                if (this.agent) {
+                    this.agent.respondFunc(data.from, data.message);
+                }
             } catch (error) {
                 console.error('Error: ', JSON.stringify(error, Object.getOwnPropertyNames(error)));
             }
@@ -71,7 +84,7 @@ class MindServerProxy {
 
         this.socket.on('get-full-state', (callback) => {
             try {
-                const state = getFullState(this.agent);
+                const state = this.agent ? getFullState(this.agent) : null;
                 callback(state);
             } catch (error) {
                 console.error('Error getting full state:', error);
@@ -110,11 +123,15 @@ class MindServerProxy {
     }
 
     login() {
-        this.socket.emit('login-agent', this.agent.name);
+        if (this.agent && this.socket) {
+            this.socket.emit('login-agent', this.agent.name);
+        }
     }
 
     shutdown() {
-        this.socket.emit('shutdown');
+        if (this.socket) {
+            this.socket.emit('shutdown');
+        }
     }
 
     getSocket() {
@@ -127,10 +144,16 @@ export const serverProxy = new MindServerProxy();
 
 // for chatting with other bots
 export function sendBotChatToServer(agentName, json) {
-    serverProxy.getSocket().emit('chat-message', agentName, json);
+    const socket = serverProxy.getSocket();
+    if (socket) {
+        socket.emit('chat-message', agentName, json);
+    }
 }
 
 // for sending general output to server for display
 export function sendOutputToServer(agentName, message) {
-    serverProxy.getSocket().emit('bot-output', agentName, message);
+    const socket = serverProxy.getSocket();
+    if (socket) {
+        socket.emit('bot-output', agentName, message);
+    }
 }

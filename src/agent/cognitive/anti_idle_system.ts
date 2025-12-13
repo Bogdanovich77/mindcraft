@@ -77,13 +77,13 @@ export class AntiIdleSystem {
   private lastUpdateTime: number = 0;
   private updateInterval: number = 5000; // 5 seconds
 
-  // Component instances
-  private goalGenerator: AntiIdleGoalGenerator;
-  private idleDetector: IdleDetectionSystem;
-  private opportunityDetector: EnvironmentalOpportunityDetector;
-  private activityGenerator: PersonalityActivityGenerator;
-  private configManager: AntiIdleConfigManager;
-  private monitoring: AntiIdleMonitoringSystem;
+  // Component instances - properly initialize to avoid TypeScript errors
+  private goalGenerator: AntiIdleGoalGenerator | undefined;
+  private idleDetector: IdleDetectionSystem | undefined;
+  private opportunityDetector: EnvironmentalOpportunityDetector | undefined;
+  private activityGenerator: PersonalityActivityGenerator | undefined;
+  private configManager: AntiIdleConfigManager | undefined;
+  private monitoring: AntiIdleMonitoringSystem | undefined;
 
   constructor(
     private agentId: string,
@@ -130,6 +130,13 @@ export class AntiIdleSystem {
     memorySystem: any
   ): void {
     try {
+      // Initialize configuration manager first
+      this.configManager = new AntiIdleConfigManager(
+        agentId,
+        undefined, // Use default config path
+        undefined // Use default config
+      );
+
       // Initialize goal generator
       if (this.config.integration.goalSystem) {
         this.goalGenerator = new AntiIdleGoalGenerator(
@@ -164,21 +171,14 @@ export class AntiIdleSystem {
         );
       }
 
-      // Initialize configuration manager
-      this.configManager = new AntiIdleConfigManager(
-        agentId,
-        undefined, // Use default config path
-        this.configManager?.getConfig()
-      );
-
       // Initialize monitoring system
       if (this.config.integration.monitoring) {
         this.monitoring = new AntiIdleMonitoringSystem(
           agentId,
-          this.idleDetector,
-          this.goalGenerator,
-          this.opportunityDetector,
-          this.activityGenerator,
+          this.idleDetector!, // Non-null assertion since we check integration.monitoring
+          this.goalGenerator!, // Non-null assertion since we check integration.monitoring
+          this.opportunityDetector!, // Non-null assertion since we check integration.monitoring
+          this.activityGenerator!, // Non-null assertion since we check integration.monitoring
           this.configManager?.getConfig()?.global.monitoringEnabled ? {} : undefined
         );
       }
@@ -712,6 +712,10 @@ export class AntiIdleSystem {
       agreeableness: 0.5,
       neuroticism: 0.5,
       riskTolerance: 0.5,
+      creativity: 0.5,
+      patience: 0.5,
+      competitiveness: 0.5,
+      curiosity: 0.5,
       explorationDrive: 0.5,
       socialTendency: 0.5,
       buildingCreativity: 0.5,

@@ -1,10 +1,55 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import type { AgentState, AgentSummary } from '../../types/agent';
 import type { 
   AgentStateUpdateEvent, 
   AgentConnectionEvent, 
   AgentDisconnectionEvent 
 } from '../../types/socketEvents';
+
+// Socket.IO initialization thunk
+export const initializeAgentsSocket = createAsyncThunk(
+  'agents/initializeAgentsSocket',
+  async (_, { rejectWithValue, dispatch }) => {
+    try {
+      // Import socketService dynamically to avoid circular dependencies
+      const { getSocketService } = await import('../../services/socketService');
+      const socketService = getSocketService();
+      
+      if (!socketService) {
+        throw new Error('Socket service not initialized');
+      }
+
+      // Set up listener for the agentList event
+      socketService.on('agentList', (data: any) => {
+        console.log('[AgentsSlice] Received agentList:', data);
+        
+        // Extract the agents array from either format
+        let agentsArray = Array.isArray(data) ? data : data.agents || [];
+        
+        // Transform the backend agent format to frontend AgentSummary format
+        const agentSummaries: AgentSummary[] = agentsArray.map((agent: any) => ({
+          id: agent.name,
+          name: agent.name,
+          profile: 'default', // Use 'default' as a placeholder profile
+          status: agent.in_game ? 'online' : 'offline',
+          position: { x: 0, y: 64, z: 0 }, // Use default position
+          health: 20, // Use default health
+          level: 1, // Use default level
+          lastUpdate: Date.now(),
+        }));
+        
+        // Dispatch the setAgents action with the transformed data
+        dispatch(setAgents(agentSummaries));
+      });
+
+      console.log('✅ Agents socket initialization completed');
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to initialize agents socket:', error);
+      return rejectWithValue(error instanceof Error ? error.message : 'Failed to initialize agents socket');
+    }
+  }
+);
 
 export interface AgentsState {
   agents: Record<string, AgentState>;

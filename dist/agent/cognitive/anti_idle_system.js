@@ -27,7 +27,7 @@ export class AntiIdleSystem {
     status;
     lastUpdateTime = 0;
     updateInterval = 5000; // 5 seconds
-    // Component instances
+    // Component instances - properly initialize to avoid TypeScript errors
     goalGenerator;
     idleDetector;
     opportunityDetector;
@@ -68,6 +68,10 @@ export class AntiIdleSystem {
      */
     initializeComponents(agentId, purposeCore, skillsSystem, memorySystem) {
         try {
+            // Initialize configuration manager first
+            this.configManager = new AntiIdleConfigManager(agentId, undefined, // Use default config path
+            undefined // Use default config
+            );
             // Initialize goal generator
             if (this.config.integration.goalSystem) {
                 this.goalGenerator = new AntiIdleGoalGenerator(purposeCore, skillsSystem, memorySystem, this.configManager?.getConfig()?.goalGeneration);
@@ -84,12 +88,13 @@ export class AntiIdleSystem {
             if (this.config.integration.activityGeneration) {
                 this.activityGenerator = new PersonalityActivityGenerator(agentId, this.configManager?.getConfig()?.activityGeneration);
             }
-            // Initialize configuration manager
-            this.configManager = new AntiIdleConfigManager(agentId, undefined, // Use default config path
-            this.configManager?.getConfig());
             // Initialize monitoring system
             if (this.config.integration.monitoring) {
-                this.monitoring = new AntiIdleMonitoringSystem(agentId, this.idleDetector, this.goalGenerator, this.opportunityDetector, this.activityGenerator, this.configManager?.getConfig()?.global.monitoringEnabled ? {} : undefined);
+                this.monitoring = new AntiIdleMonitoringSystem(agentId, this.idleDetector, // Non-null assertion since we check integration.monitoring
+                this.goalGenerator, // Non-null assertion since we check integration.monitoring
+                this.opportunityDetector, // Non-null assertion since we check integration.monitoring
+                this.activityGenerator, // Non-null assertion since we check integration.monitoring
+                this.configManager?.getConfig()?.global.monitoringEnabled ? {} : undefined);
             }
         }
         catch (error) {

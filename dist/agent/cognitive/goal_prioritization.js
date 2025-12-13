@@ -195,9 +195,10 @@ export class GoalPrioritizationEngine {
     calculateTemporalFactor(goal, agentState) {
         let temporalScore = 0.5;
         // Deadline considerations
-        if (goal.deadline) {
-            const now = Date.now();
-            const timeRemaining = goal.deadline - now;
+        const now = Date.now();
+        if ((goal.deadline || 0) > now) {
+            // Goal has a deadline and it's in the future
+            const timeRemaining = (goal.deadline - now);
             const timeRatio = timeRemaining / (goal.deadline - goal.createdAt);
             if (timeRatio < 0.1) {
                 temporalScore = 1.0; // Very urgent
@@ -419,7 +420,7 @@ export class GoalPrioritizationEngine {
             confidence += 0.1;
         }
         // Lower confidence in high-stress situations
-        if (context.urgency > 0.8) {
+        if ((context.urgency || 0) > 0.8) {
             confidence -= 0.2;
         }
         // Higher confidence with more complete information
@@ -501,6 +502,26 @@ export class GoalPrioritizationEngine {
      */
     getFactors() {
         return {
+            urgencyWeight: this.temporalWeight,
+            importanceWeight: this.strategicWeight + this.tacticalWeight,
+            feasibilityWeight: 0.2, // Weight for feasibility assessment
+            resourceWeight: this.environmentalWeight,
+            alignmentWeight: this.personalWeight + this.socialWeight
+        };
+    }
+    calculatePrioritizationFactors(goal, agentState, context) {
+        // Calculate individual factors
+        const urgency = this.calculateUrgencyFactor(goal, agentState.executive.decisionContext);
+        const valueAlignment = this.calculateValueAlignment(goal, agentState.cognitive.purpose.values);
+        const feasibility = this.calculateFeasibilityScore(goal, agentState, context);
+        const socialImpact = this.calculateSocialPriorityFactor(goal, agentState.cognitive.social);
+        const skillAlignment = this.calculateSkillAlignmentFactor(goal, agentState.cognitive.skills);
+        return {
+            urgency,
+            valueAlignment,
+            feasibility,
+            socialImpact,
+            skillAlignment,
             urgencyWeight: this.temporalWeight,
             importanceWeight: this.strategicWeight + this.tacticalWeight,
             feasibilityWeight: 0.2, // Weight for feasibility assessment
@@ -645,9 +666,9 @@ export class GoalPrioritizationEngine {
             ? skill.usage.successfulUses / skill.usage.totalUses
             : 0.5;
         const avgExecutionTime = skill.usage.averageExecutionTime;
-        const timeEfficiency = avgExecutionTime > 0
-            ? Math.max(0.1, 1 - (avgExecutionTime / 10000)) // Normalize to 10 seconds
-            : 0.5;
+        const timeEfficiency = (avgExecutionTime || 0) > 0
+            ? Math.max(0.1, 1 - ((avgExecutionTime || 0) / 10000)) // Normalize to 10 seconds
+            : 0.5; // Neutral if no data
         return (successRate * 0.7) + (timeEfficiency * 0.3);
     }
     /**
@@ -693,8 +714,9 @@ export class GoalPrioritizationEngine {
      */
     calculateTimeFeasibility(goal, agentState) {
         let feasibilityScore = 0.7; // Base feasibility
-        if (goal.deadline) {
-            const now = Date.now();
+        const now = Date.now();
+        if ((goal.deadline || 0) > now) {
+            // Goal has a deadline and it's in the future
             const timeRemaining = goal.deadline - now;
             const timeSinceCreation = now - goal.createdAt;
             const totalTime = timeSinceCreation + timeRemaining;

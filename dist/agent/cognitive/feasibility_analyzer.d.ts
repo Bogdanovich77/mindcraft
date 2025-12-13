@@ -58,6 +58,10 @@ export declare class FeasibilityAnalyzer {
      */
     private assessRiskLevel;
     /**
+     * Determine Risk Level
+     */
+    private determineRiskLevel;
+    /**
      * Calculate risk score
      */
     private calculateRiskScore;
@@ -123,9 +127,6 @@ export declare class FeasibilityAnalyzer {
     private calculateOverallRisk;
     private calculateResidualRisk;
 }
-/**
- * Feasibility analyzer configuration
- */
 export interface FeasibilityAnalyzerConfig {
     analysisTimeout: number;
     maxHistorySize: number;

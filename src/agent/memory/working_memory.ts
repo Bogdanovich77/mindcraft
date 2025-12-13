@@ -93,6 +93,10 @@ export class WorkingMemory {
    * Add new item to working memory
    */
   async addItem(item: Omit<WorkingMemoryItem, 'timestamp'>): Promise<void> {
+    if (!item.id) {
+      throw new Error('Working memory item must have an ID');
+    }
+    
     const workingItem: WorkingMemoryItem = {
       ...item,
       timestamp: Date.now()
@@ -143,9 +147,9 @@ export class WorkingMemory {
    */
   query(query: MemoryQuery): WorkingMemoryItem[] {
     const results: WorkingMemoryItem[] = [];
-    const queryLower = query.query.toLowerCase();
+    const queryLower = query.query?.toLowerCase() || '';
     
-    for (const item of this.items.values()) {
+    for (const item of Array.from(this.items.values())) {
       // Apply type filter
       if (query.filters?.type && item.type !== query.filters.type) {
         continue;
@@ -163,7 +167,7 @@ export class WorkingMemory {
         relevance += 0.8;
       }
       
-      if (item.id.toLowerCase().includes(queryLower)) {
+      if (item.id?.toLowerCase().includes(queryLower)) {
         relevance += 0.4;
       }
       
@@ -192,9 +196,8 @@ export class WorkingMemory {
     return {
       items: Array.from(this.items.values()),
       currentFocus: this.currentFocus,
-      capacity: this.capacity,
-      attentionLevel: this.attentionLevel
-    };
+      capacity: this.capacity
+    } as WorkingMemoryState;
   }
   
   /**
@@ -237,7 +240,7 @@ export class WorkingMemory {
   applyDecay(deltaTimeSeconds: number): void {
     const currentTime = Date.now();
     
-    for (const item of this.items.values()) {
+    for (const item of Array.from(this.items.values())) {
       const timeSinceCreation = (currentTime - item.timestamp) / 1000;
       const decayFactor = Math.exp(-item.decayRate * timeSinceCreation);
       
@@ -245,7 +248,9 @@ export class WorkingMemory {
       
       // Remove items that have decayed too much
       if (item.priority < 0.05) {
-        this.items.delete(item.id);
+        if (item.id) {
+          this.items.delete(item.id);
+        }
       }
     }
   }
@@ -286,7 +291,7 @@ export class WorkingMemory {
    */
   cleanup(): void {
     // Remove low priority items
-    for (const [id, item] of this.items.entries()) {
+    for (const [id, item] of Array.from(this.items.entries())) {
       if (item.priority < 0.1) {
         this.items.delete(id);
       }
@@ -299,7 +304,10 @@ export class WorkingMemory {
       
       const toRemove = sorted.length - this.capacity;
       for (let i = 0; i < toRemove; i++) {
-        this.items.delete(sorted[i][0]);
+        const entry = sorted[i];
+        if (entry) {
+          this.items.delete(entry[0]);
+        }
       }
     }
     
@@ -352,7 +360,7 @@ export class WorkingMemory {
     }
     
     // Update inventory status
-    const criticalItems = context.inventory.filter(item => item.count < 2);
+    const criticalItems = Array.from(context.inventory.items || []).filter((item: any) => item.count < 2);
     if (criticalItems.length > 0) {
       this.addItem({
         id: 'low_resources',
@@ -405,8 +413,11 @@ export class WorkingMemory {
     let bestItem: WorkingMemoryItem | null = null;
     let bestScore = 0;
     
-    for (const item of this.items.values()) {
-      const score = item.priority * this.attentionWeights[item.type] * this.attentionLevel;
+    for (const item of Array.from(this.items.values())) {
+      if (!item.id || !item.type) continue;
+      
+      const weight = this.attentionWeights[item.type] || 0.1; // Default weight if type not found
+      const score = item.priority * weight * this.attentionLevel;
       if (score > bestScore) {
         bestScore = score;
         bestItem = item;
@@ -421,10 +432,14 @@ export class WorkingMemory {
   }
   
   private async replaceLowestPriority(newItem: WorkingMemoryItem): Promise<void> {
+    if (!newItem.id) {
+      throw new Error('New item must have an ID');
+    }
+    
     let lowestId: string | null = null;
     let lowestPriority = 1.0;
     
-    for (const [id, item] of this.items.entries()) {
+    for (const [id, item] of Array.from(this.items.entries())) {
       if (item.priority < lowestPriority) {
         lowestPriority = item.priority;
         lowestId = id;
@@ -438,13 +453,16 @@ export class WorkingMemory {
   }
   
   private calculateRelevanceScore(item: WorkingMemoryItem, query: MemoryQuery): number {
-    const queryLower = query.query.toLowerCase();
+    const queryLower = query.query?.toLowerCase() || '';
     let score = 0;
+    
+    if (!item.id || !item.type) return 0;
     
     const contentStr = JSON.stringify(item.content).toLowerCase();
     if (contentStr.includes(queryLower)) score += 0.8;
     if (item.id.toLowerCase().includes(queryLower)) score += 0.4;
     
-    return score * item.priority * this.attentionWeights[item.type];
+    const weight = this.attentionWeights[item.type] || 0.1; // Default weight if type not found
+    return score * item.priority * weight;
   }
 }

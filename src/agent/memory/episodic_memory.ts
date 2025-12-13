@@ -136,7 +136,7 @@ export class EpisodicMemory {
     const queryLower = query.query.toLowerCase();
     const currentTime = Date.now();
     
-    for (const event of this.events.values()) {
+    for (const event of Array.from(this.events.values())) {
       // Apply time filter
       if (query.timeRange) {
         if (event.timestamp < query.timeRange.start || event.timestamp > query.timeRange.end) {
@@ -205,7 +205,7 @@ export class EpisodicMemory {
     const cutoff = Date.now() - timeWindowMs;
     const recent: ExtendedEpisodicEvent[] = [];
     
-    for (const event of this.events.values()) {
+    for (const event of Array.from(this.events.values())) {
       if (event.timestamp >= cutoff) {
         recent.push(event);
       }
@@ -227,7 +227,7 @@ export class EpisodicMemory {
   async applyDecay(deltaTimeMs: number): Promise<void> {
     const deltaTimeDays = deltaTimeMs / (1000 * 60 * 60 * 24);
     
-    for (const event of this.events.values()) {
+    for (const event of Array.from(this.events.values())) {
       const timeSinceEvent = (Date.now() - event.timestamp) / (1000 * 60 * 60 * 24);
       const adjustedImportance = this.forgettingCurve.calculateAdjustedImportance(
         event.importance,
@@ -269,7 +269,7 @@ export class EpisodicMemory {
   getEventsByEmotion(emotionType: 'positive' | 'negative' | 'high_arousal' | 'low_arousal'): ExtendedEpisodicEvent[] {
     const results: ExtendedEpisodicEvent[] = [];
     
-    for (const event of this.events.values()) {
+    for (const event of Array.from(this.events.values())) {
       if (!event.emotional) continue;
       
       switch (emotionType) {
@@ -308,7 +308,7 @@ export class EpisodicMemory {
       chain.push(event);
       
       // Find causally related events
-      for (const otherEvent of this.events.values()) {
+      for (const otherEvent of Array.from(this.events.values())) {
         if (this.isCausallyRelated(otherEvent, event) && !visited.has(otherEvent.id)) {
           explore(otherEvent.id, depth - 1);
         }
@@ -445,7 +445,7 @@ export class EpisodicMemory {
       patterns.push({
         type: 'emergency_response',
         trigger: event.type,
-        response: event.action,
+        response: event.action || 'no_action',
         emotional: event.emotional,
         confidence: event.importance
       });
@@ -488,14 +488,17 @@ export class EpisodicMemory {
     
     const toRemove = Math.floor(sorted.length * 0.2);
     for (let i = 0; i < toRemove; i++) {
-      this.events.delete(sorted[i][0]);
+      const id = sorted[i]?.[0];
+      if (id !== undefined) {
+        this.events.delete(id);
+      }
     }
   }
   
   private async cleanupOldTimelines(): Promise<void> {
     const cutoff = Date.now() - (7 * 24 * 60 * 60 * 1000); // 7 days ago
     
-    for (const [id, timeline] of this.timelines.entries()) {
+    for (const [id, timeline] of Array.from(this.timelines.entries())) {
       if (timeline.endTime < cutoff) {
         this.timelines.delete(id);
       }

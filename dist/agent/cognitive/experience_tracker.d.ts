@@ -4,7 +4,7 @@
  * Collects, analyzes, and manages experience events across all skills.
  * Provides comprehensive experience analytics and learning insights.
  */
-import { SkillType, ExperienceEvent, ExperienceSource, LearningSession } from './skill_types.js';
+import { SkillType, ExperienceEvent, ExperienceSource, LearningSession } from '../langgraph/interfaces';
 export interface ExperienceTrackerConfig {
     maxHistorySize: number;
     collectionInterval: number;

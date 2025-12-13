@@ -2,10 +2,10 @@
 
 /**
  * Mindcraft Real-time Debug Monitor
- * 
+ *
  * This script monitors frontend and backend logs in real-time,
  * detects common issues, and provides automated debugging feedback.
- * 
+ *
  * Usage: node debug-monitor.js [options]
  */
 
@@ -26,7 +26,8 @@ const CONFIG = {
     command: 'npm',
     args: ['run', 'dev'],
     cwd: path.join(process.cwd(), 'frontend'),
-    env: { ...process.env }
+    env: { ...process.env },
+    shell: true // Use shell to ensure 'npm' command is found on Windows
   },
   monitoring: {
     enabled: true,
@@ -69,6 +70,7 @@ class DebugMonitor {
     this.errorCount = { backend: 0, frontend: 0 };
     this.websocketStatus = { connected: false, lastCheck: 0 };
     this.apiStatus = { reachable: false, lastCheck: 0 };
+    this.frontendDevServerStatus = { reachable: false, lastCheck: 0 };
     this.logBuffer = { backend: [], frontend: [] };
     this.isRunning = false;
     this.alerts = [];
@@ -79,11 +81,22 @@ class DebugMonitor {
     
     this.isRunning = true;
     
-    // Start backend monitoring
-    this.startBackendMonitoring();
+    // Check if processes are already running before starting monitoring
+    this.checkExistingProcesses();
     
-    // Start frontend monitoring
-    this.startFrontendMonitoring();
+    // Start backend monitoring (only if not already running)
+    if (!this.backendProcess) {
+      this.startBackendMonitoring();
+    } else {
+      console.log(`${COLORS.green}✅ Backend process already detected, monitoring only${COLORS.reset}`);
+    }
+    
+    // Start frontend monitoring (only if not already running)
+    if (!this.frontendProcess) {
+      this.startFrontendMonitoring();
+    } else {
+      console.log(`${COLORS.green}✅ Frontend process already detected, monitoring only${COLORS.reset}`);
+    }
     
     // Start health checks
     this.startHealthChecks();
@@ -101,270 +114,114 @@ class DebugMonitor {
     console.log(`${COLORS.cyan}📊 Monitoring logs and detecting issues automatically...${COLORS.reset}`);
   }
 
-  startBackendMonitoring() {
-    console.log(`${COLORS.blue}🔧 Starting backend monitoring...${COLORS.reset}`);
-    
-    this.backendProcess = spawn(CONFIG.backend.command, CONFIG.backend.args, {
-      cwd: CONFIG.backend.cwd,
-      env: CONFIG.backend.env,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-
-    const stdout = readline.createInterface({
-      input: this.backendProcess.stdout,
-      crlfDelay: Infinity
-    });
-
-    const stderr = readline.createInterface({
-      input: this.backendProcess.stderr,
-      crlfDelay: Infinity
-    });
-
-    stdout.on('line', (line) => {
-      this.processBackendLog('stdout', line);
-    });
-
-    stderr.on('line', (line) => {
-      this.processBackendLog('stderr', line);
-    });
-
-    this.backendProcess.on('error', (error) => {
-      console.error(`${COLORS.brightRed}❌ Backend process error:${COLORS.reset}`, error.message);
-      this.handleError('backend', `Process error: ${error.message}`);
-    });
-
-    this.backendProcess.on('exit', (code) => {
-      console.log(`${COLORS.yellow}📤 Backend process exited with code ${code}${COLORS.reset}`);
-      if (code !== 0 && this.isRunning) {
-        this.handleError('backend', `Process exited with code ${code}`);
-      }
-    });
-  }
-
-  startFrontendMonitoring() {
-    console.log(`${COLORS.blue}🎨 Starting frontend monitoring...${COLORS.reset}`);
-    
-    this.frontendProcess = spawn(CONFIG.frontend.command, CONFIG.frontend.args, {
-      cwd: CONFIG.frontend.cwd,
-      env: CONFIG.frontend.env,
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-
-    const stdout = readline.createInterface({
-      input: this.frontendProcess.stdout,
-      crlfDelay: Infinity
-    });
-
-    const stderr = readline.createInterface({
-      input: this.frontendProcess.stderr,
-      crlfDelay: Infinity
-    });
-
-    stdout.on('line', (line) => {
-      this.processFrontendLog('stdout', line);
-    });
-
-    stderr.on('line', (line) => {
-      this.processFrontendLog('stderr', line);
-    });
-
-    this.frontendProcess.on('error', (error) => {
-      console.error(`${COLORS.brightRed}❌ Frontend process error:${COLORS.reset}`, error.message);
-      this.handleError('frontend', `Process error: ${error.message}`);
-    });
-
-    this.frontendProcess.on('exit', (code) => {
-      console.log(`${COLORS.yellow}📤 Frontend process exited with code ${code}${COLORS.reset}`);
-      if (code !== 0 && this.isRunning) {
-        this.handleError('frontend', `Process exited with code ${code}`);
-      }
-    });
-  }
-
-  processBackendLog(source, line) {
-    const timestamp = new Date().toISOString();
-    this.logBuffer.backend.push({ timestamp, source, line });
-    
-    // Keep buffer size manageable
-    if (this.logBuffer.backend.length > 1000) {
-      this.logBuffer.backend = this.logBuffer.backend.slice(-500);
-    }
-
-    // Check for error patterns
-    const errorDetection = this.detectErrorPatterns(line, 'backend');
-    if (!errorDetection.matched) {
-      // Check for common backend issues
-      this.detectBackendIssues(line);
-    }
-    
-    // Display log with color coding
-    if (source === 'stderr') {
-      console.log(`${COLORS.red}[BACKEND ERROR]${COLORS.reset} ${line}`);
-    } else {
-      console.log(`${COLORS.green}[BACKEND]${COLORS.reset} ${line}`);
-    }
-  }
-
-  processFrontendLog(source, line) {
-    const timestamp = new Date().toISOString();
-    this.logBuffer.frontend.push({ timestamp, source, line });
-    
-    // Keep buffer size manageable
-    if (this.logBuffer.frontend.length > 1000) {
-      this.logBuffer.frontend = this.logBuffer.frontend.slice(-500);
-    }
-
-    // Check for error patterns
-    const errorDetection = this.detectErrorPatterns(line, 'frontend');
-    if (!errorDetection.matched) {
-      // Check for common frontend issues
-      this.detectFrontendIssues(line);
-    }
-    
-    // Display log with color coding
-    if (source === 'stderr') {
-      console.log(`${COLORS.red}[FRONTEND ERROR]${COLORS.reset} ${line}`);
-    } else {
-      console.log(`${COLORS.cyan}[FRONTEND]${COLORS.reset} ${line}`);
-    }
-  }
-
-  detectBackendIssues(line) {
-    const lowerLine = line.toLowerCase();
-    
-    // WebSocket connection issues
-    if (lowerLine.includes('websocket') || lowerLine.includes('socket.io')) {
-      if (lowerLine.includes('error') || lowerLine.includes('failed') || lowerLine.includes('closed')) {
-        this.handleWebSocketIssue('backend', line);
-      }
-    }
-    
-    // Port binding issues
-    if (lowerLine.includes('eaddrinuse') || lowerLine.includes('port') && lowerLine.includes('already in use')) {
-      this.handlePortIssue('backend', line);
-    }
-    
-    // Agent loading issues
-    if (lowerLine.includes('agent') && (lowerLine.includes('error') || lowerLine.includes('failed'))) {
-      this.handleAgentIssue('backend', line);
-    }
-    
-    // Memory issues
-    if (lowerLine.includes('memory') && (lowerLine.includes('leak') || lowerLine.includes('out of memory'))) {
-      this.handleMemoryIssue('backend', line);
-    }
-  }
-
-  detectFrontendIssues(line) {
-    const lowerLine = line.toLowerCase();
-    
-    // WebSocket connection issues
-    if (lowerLine.includes('websocket') || lowerLine.includes('socket.io')) {
-      if (lowerLine.includes('failed') || lowerLine.includes('closed') || lowerLine.includes('error')) {
-        this.handleWebSocketIssue('frontend', line);
-      }
-    }
-    
-    // Build/compilation issues
-    if (lowerLine.includes('build error') || lowerLine.includes('compilation failed')) {
-      this.handleBuildIssue('frontend', line);
-    }
-    
-    // Module resolution issues
-    if (lowerLine.includes('module not found') || lowerLine.includes('cannot resolve')) {
-      this.handleModuleIssue('frontend', line);
-    }
-    
-    // React errors
-    if (lowerLine.includes('react') && lowerLine.includes('error')) {
-      this.handleReactIssue('frontend', line);
-    }
-  }
-
-  handleError(source, error) {
-    this.errorCount[source]++;
-    
-    if (this.errorCount[source] >= CONFIG.monitoring.alertThreshold) {
-      console.log(`${COLORS.brightRed}🚨 ALERT: ${this.errorCount[source]} errors detected in ${source}!${COLORS.reset}`);
-      console.log(`${COLORS.brightRed}   Consider restarting the ${source} process${COLORS.reset}`);
-      
-      // Auto-suggest restart
-      this.suggestRestart(source);
-    }
-  }
-
-  suggestRestart(source) {
-    console.log(`${COLORS.brightCyan}🔄 Auto-restart suggestion for ${source}:${COLORS.reset}`);
-    
-    if (source === 'backend') {
-      console.log(`${COLORS.cyan}   Press Ctrl+C to stop, then run: node main.js${COLORS.reset}`);
-    } else if (source === 'frontend') {
-      console.log(`${COLORS.cyan}   Press Ctrl+C to stop, then run: cd frontend && npm run dev${COLORS.reset}`);
-    }
-  }
-
-  startHealthChecks() {
-    console.log(`${COLORS.blue}🏥 Starting health checks...${COLORS.reset}`);
-    
-    // Check WebSocket connection every 10 seconds
-    setInterval(() => {
-      this.checkWebSocketConnection();
-    }, 10000);
-    
-    // Check API endpoint every 15 seconds
-    setInterval(() => {
-      this.checkApiEndpoint();
-    }, 15000);
-    
-    // Report status every 30 seconds
-    setInterval(() => {
-      this.reportStatus();
-    }, 30000);
-  }
-
-  checkWebSocketConnection() {
-    const curlCommand = 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/socket.io/';
-    
-    exec(curlCommand, (error, stdout, stderr) => {
+  checkExistingProcesses() {
+    // Check for existing backend process by testing the HTTP endpoint
+    exec('curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/', (error, stdout, stderr) => {
       const statusCode = stdout.trim();
-      const wasConnected = this.websocketStatus.connected;
-      this.websocketStatus.connected = statusCode === '400' || statusCode === '200'; // Socket.IO returns 400 for bad requests
-      this.websocketStatus.lastCheck = Date.now();
-      
-      if (wasConnected && !this.websocketStatus.connected) {
-        console.log(`${COLORS.brightRed}❌ WebSocket connection lost!${COLORS.reset}`);
-        this.handleWebSocketIssue('health-check', `HTTP ${statusCode} from Socket.IO endpoint`);
-      } else if (!wasConnected && this.websocketStatus.connected) {
-        console.log(`${COLORS.green}✅ WebSocket connection restored!${COLORS.reset}`);
+      if (statusCode === '200') {
+        console.log(`${COLORS.green}✅ Backend HTTP server detected on port 8080${COLORS.reset}`);
+        this.apiStatus.reachable = true;
+        this.apiStatus.lastCheck = Date.now();
+        // Set a dummy backend process to prevent spawning
+        this.backendProcess = { existing: true, killed: false, exitCode: null };
       }
     });
-  }
 
-  checkApiEndpoint() {
-    const curlCommand = 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/agents';
-    
-    exec(curlCommand, (error, stdout, stderr) => {
+    // Check for existing frontend dev server
+    exec('curl -s -o /dev/null -w "%{http_code}" http://localhost:5173/', (error, stdout, stderr) => {
       const statusCode = stdout.trim();
-      const wasReachable = this.apiStatus.reachable;
-      this.apiStatus.reachable = statusCode === '200';
-      this.apiStatus.lastCheck = Date.now();
-      
-      if (wasReachable && !this.apiStatus.reachable) {
-        console.log(`${COLORS.brightRed}❌ API endpoint unreachable!${COLORS.reset}`);
-        console.log(`${COLORS.yellow}   HTTP ${statusCode} from /api/agents${COLORS.reset}`);
-      } else if (!wasReachable && this.apiStatus.reachable) {
-        console.log(`${COLORS.green}✅ API endpoint restored!${COLORS.reset}`);
+      if (statusCode === '200') {
+        console.log(`${COLORS.green}✅ Frontend dev server detected on port 5173${COLORS.reset}`);
+        this.frontendDevServerStatus.reachable = true;
+        this.frontendDevServerStatus.lastCheck = Date.now();
+        // Set a dummy frontend process to prevent spawning
+        this.frontendProcess = { existing: true, killed: false, exitCode: null };
       }
     });
   }
 
-  reportStatus() {
-    console.log(`\n${COLORS.brightCyan}📊 Status Report (${new Date().toLocaleTimeString()}):${COLORS.reset}`);
-    console.log(`${COLORS.green}  Backend: ${this.backendProcess ? 'Running' : 'Stopped'} | Errors: ${this.errorCount.backend}${COLORS.reset}`);
-    console.log(`${COLORS.cyan}  Frontend: ${this.frontendProcess ? 'Running' : 'Stopped'} | Errors: ${this.errorCount.frontend}${COLORS.reset}`);
-    console.log(`${COLORS.blue}  WebSocket: ${this.websocketStatus.connected ? 'Connected' : 'Disconnected'}${COLORS.reset}`);
-    console.log(`${COLORS.blue}  API: ${this.apiStatus.reachable ? 'Reachable' : 'Unreachable'}${COLORS.reset}`);
-    console.log(`${COLORS.magenta}  Log Buffer: Backend(${this.logBuffer.backend.length}) Frontend(${this.logBuffer.frontend.length})${COLORS.reset}\n`);
+  checkProcessHealth() {
+    // Check backend process
+    if (this.backendProcess) {
+      // Skip health check for existing processes (they're managed externally)
+      if (this.backendProcess.existing) {
+        // Just check if the HTTP endpoint is still reachable
+        exec('curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/', (error, stdout, stderr) => {
+          const statusCode = stdout.trim();
+          if (statusCode !== '200') {
+            this.apiStatus.reachable = false;
+            console.log(`${COLORS.brightRed}❌ Backend HTTP server no longer reachable!${COLORS.reset}`);
+            this.handleProcessFailure('backend');
+          } else {
+            this.apiStatus.reachable = true;
+            this.apiStatus.lastCheck = Date.now();
+          }
+        });
+        return;
+      }
+      
+      // Only flag as failed if the process has actually exited or was killed
+      // and we haven't already handled it as stopped
+      if ((this.backendProcess.killed || this.backendProcess.exitCode !== null) && 
+          this.backendProcess.exitCode !== undefined) {
+        console.log(`${COLORS.brightRed}❌ Backend process is not running!${COLORS.reset}`);
+        this.handleProcessFailure('backend');
+      }
+    }
+
+    // Check frontend process
+    if (this.frontendProcess) {
+      // Skip health check for existing processes (they're managed externally)
+      if (this.frontendProcess.existing) {
+        // Just check if the dev server is still reachable
+        exec('curl -s -o /dev/null -w "%{http_code}" http://localhost:5173/', (error, stdout, stderr) => {
+          const statusCode = stdout.trim();
+          if (statusCode !== '200') {
+            this.frontendDevServerStatus.reachable = false;
+            console.log(`${COLORS.brightRed}❌ Frontend dev server no longer reachable!${COLORS.reset}`);
+            this.handleProcessFailure('frontend');
+          } else {
+            this.frontendDevServerStatus.reachable = true;
+            this.frontendDevServerStatus.lastCheck = Date.now();
+          }
+        });
+        return;
+      }
+      
+      // Only flag as failed if the process has actually exited or was killed
+      // and we haven't already handled it as stopped
+      if ((this.frontendProcess.killed || this.frontendProcess.exitCode !== null) && 
+          this.frontendProcess.exitCode !== undefined) {
+        console.log(`${COLORS.brightRed}❌ Frontend process is not running!${COLORS.reset}`);
+        this.handleProcessFailure('frontend');
+      }
+    }
+  }
+
+  setupGracefulShutdown() {
+    const shutdown = () => {
+      console.log(`\n${COLORS.yellow}🛑 Shutting down Debug Monitor...${COLORS.reset}`);
+      
+      this.isRunning = false;
+      
+      // Only kill processes we started, not existing ones
+      if (this.backendProcess && !this.backendProcess.existing) {
+        this.backendProcess.kill('SIGTERM');
+      }
+      
+      if (this.frontendProcess && !this.frontendProcess.existing) {
+        this.frontendProcess.kill('SIGTERM');
+      }
+      
+      // Save log buffer to file for analysis
+      this.saveLogBuffer();
+      
+      console.log(`${COLORS.green}✅ Debug Monitor shut down complete${COLORS.reset}`);
+      process.exit(0);
+    };
+    
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
   }
 
   // Enhanced WebSocket connection monitoring
@@ -666,6 +523,324 @@ class DebugMonitor {
         });
       }
     });
+  }
+
+  startBackendMonitoring() {
+    console.log(`${COLORS.blue}🔧 Starting backend monitoring...${COLORS.reset}`);
+    
+    this.backendProcess = spawn(CONFIG.backend.command, CONFIG.backend.args, {
+      cwd: CONFIG.backend.cwd,
+      env: CONFIG.backend.env,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    const stdout = readline.createInterface({
+      input: this.backendProcess.stdout,
+      crlfDelay: Infinity
+    });
+
+    const stderr = readline.createInterface({
+      input: this.backendProcess.stderr,
+      crlfDelay: Infinity
+    });
+
+    stdout.on('line', (line) => {
+      this.processBackendLog('stdout', line);
+    });
+
+    stderr.on('line', (line) => {
+      this.processBackendLog('stderr', line);
+    });
+
+    this.backendProcess.on('error', (error) => {
+      console.error(`${COLORS.brightRed}❌ Backend process error:${COLORS.reset}`, error.message);
+      this.handleError('backend', `Process error: ${error.message}`);
+    });
+
+    this.backendProcess.on('exit', (code) => {
+      console.log(`${COLORS.yellow}📤 Backend process exited with code ${code}${COLORS.reset}`);
+      if (code !== 0 && this.isRunning) {
+        this.handleError('backend', `Process exited with code ${code}`);
+      }
+    });
+  }
+
+  startFrontendMonitoring() {
+    console.log(`${COLORS.blue}🎨 Starting frontend monitoring...${COLORS.reset}`);
+    
+    this.frontendProcess = spawn(CONFIG.frontend.command, CONFIG.frontend.args, {
+      cwd: CONFIG.frontend.cwd,
+      env: CONFIG.frontend.env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: true // Use shell to ensure 'npm' command is found on Windows
+    });
+
+    const stdout = readline.createInterface({
+      input: this.frontendProcess.stdout,
+      crlfDelay: Infinity
+    });
+
+    const stderr = readline.createInterface({
+      input: this.frontendProcess.stderr,
+      crlfDelay: Infinity
+    });
+
+    stdout.on('line', (line) => {
+      this.processFrontendLog('stdout', line);
+    });
+
+    stderr.on('line', (line) => {
+      this.processFrontendLog('stderr', line);
+    });
+
+    this.frontendProcess.on('error', (error) => {
+      console.error(`${COLORS.brightRed}❌ Frontend process error:${COLORS.reset}`, error.message);
+      this.handleError('frontend', `Process error: ${error.message}`);
+    });
+
+    this.frontendProcess.on('exit', (code) => {
+      console.log(`${COLORS.yellow}📤 Frontend process exited with code ${code}${COLORS.reset}`);
+      if (code !== 0 && this.isRunning) {
+        this.handleError('frontend', `Process exited with code ${code}`);
+      }
+    });
+  }
+
+  processBackendLog(source, line) {
+    const timestamp = new Date().toISOString();
+    this.logBuffer.backend.push({ timestamp, source, line });
+    
+    // Keep buffer size manageable
+    if (this.logBuffer.backend.length > 1000) {
+      this.logBuffer.backend = this.logBuffer.backend.slice(-500);
+    }
+
+    // Check for error patterns
+    const errorDetection = this.detectErrorPatterns(line, 'backend');
+    if (!errorDetection.matched) {
+      // Check for common backend issues
+      this.detectBackendIssues(line);
+    }
+    
+    // Display log with color coding
+    if (source === 'stderr') {
+      console.log(`${COLORS.red}[BACKEND ERROR]${COLORS.reset} ${line}`);
+    } else {
+      console.log(`${COLORS.green}[BACKEND]${COLORS.reset} ${line}`);
+    }
+  }
+
+  processFrontendLog(source, line) {
+    const timestamp = new Date().toISOString();
+    this.logBuffer.frontend.push({ timestamp, source, line });
+    
+    // Keep buffer size manageable
+    if (this.logBuffer.frontend.length > 1000) {
+      this.logBuffer.frontend = this.logBuffer.frontend.slice(-500);
+    }
+
+    // Check for error patterns
+    const errorDetection = this.detectErrorPatterns(line, 'frontend');
+    if (!errorDetection.matched) {
+      // Check for common frontend issues
+      this.detectFrontendIssues(line);
+    }
+    
+    // Display log with color coding
+    if (source === 'stderr') {
+      console.log(`${COLORS.red}[FRONTEND ERROR]${COLORS.reset} ${line}`);
+    } else {
+      console.log(`${COLORS.cyan}[FRONTEND]${COLORS.reset} ${line}`);
+    }
+  }
+
+  detectBackendIssues(line) {
+    const lowerLine = line.toLowerCase();
+    
+    // WebSocket connection issues
+    if (lowerLine.includes('websocket') || lowerLine.includes('socket.io')) {
+      if (lowerLine.includes('error') || lowerLine.includes('failed') || lowerLine.includes('closed')) {
+        this.handleWebSocketIssue('backend', line);
+      }
+    }
+    
+    // Port binding issues
+    if (lowerLine.includes('eaddrinuse') || lowerLine.includes('port') && lowerLine.includes('already in use')) {
+      this.handlePortIssue('backend', line);
+    }
+    
+    // Agent loading issues
+    if (lowerLine.includes('agent') && (lowerLine.includes('error') || lowerLine.includes('failed'))) {
+      this.handleAgentIssue('backend', line);
+    }
+    
+    // Memory issues
+    if (lowerLine.includes('memory') && (lowerLine.includes('leak') || lowerLine.includes('out of memory'))) {
+      this.handleMemoryIssue('backend', line);
+    }
+  }
+
+  detectFrontendIssues(line) {
+    const lowerLine = line.toLowerCase();
+    
+    // WebSocket connection issues
+    if (lowerLine.includes('websocket') || lowerLine.includes('socket.io')) {
+      if (lowerLine.includes('failed') || lowerLine.includes('closed') || lowerLine.includes('error')) {
+        this.handleWebSocketIssue('frontend', line);
+      }
+    }
+    
+    // Build/compilation issues
+    if (lowerLine.includes('build error') || lowerLine.includes('compilation failed')) {
+      this.handleBuildIssue('frontend', line);
+    }
+    
+    // Module resolution issues
+    if (lowerLine.includes('module not found') || lowerLine.includes('cannot resolve')) {
+      this.handleModuleIssue('frontend', line);
+    }
+    
+    // React errors
+    if (lowerLine.includes('react') && lowerLine.includes('error')) {
+      this.handleReactIssue('frontend', line);
+    }
+    
+    // React performance violations (e.g., 'message' handler took 163ms)
+    if (lowerLine.includes('[violation]') && (lowerLine.includes('handler took') || lowerLine.includes('long task'))) {
+      this.handleReactPerformanceIssue('frontend', line);
+    }
+  }
+
+  handleError(source, error) {
+    this.errorCount[source]++;
+    
+    if (this.errorCount[source] >= CONFIG.monitoring.alertThreshold) {
+      console.log(`${COLORS.brightRed}🚨 ALERT: ${this.errorCount[source]} errors detected in ${source}!${COLORS.reset}`);
+      console.log(`${COLORS.brightRed}   Consider restarting the ${source} process${COLORS.reset}`);
+      
+      // Auto-suggest restart
+      this.suggestRestart(source);
+    }
+  }
+
+  suggestRestart(source) {
+    console.log(`${COLORS.brightCyan}🔄 Auto-restart suggestion for ${source}:${COLORS.reset}`);
+    
+    if (source === 'backend') {
+      console.log(`${COLORS.cyan}   Press Ctrl+C to stop, then run: node main.js${COLORS.reset}`);
+    } else if (source === 'frontend') {
+      console.log(`${COLORS.cyan}   Press Ctrl+C to stop, then run: cd frontend && npm run dev${COLORS.reset}`);
+    }
+  }
+
+  startHealthChecks() {
+    console.log(`${COLORS.blue}🏥 Starting health checks...${COLORS.reset}`);
+    
+    // Check WebSocket connection every 10 seconds
+    setInterval(() => {
+      this.checkWebSocketConnection();
+    }, 10000);
+    
+    // Check backend HTTP/Web server every 15 seconds
+    setInterval(() => {
+      this.checkApiEndpoint();
+    }, 15000);
+    
+    // Check frontend development server every 15 seconds
+    setInterval(() => {
+      this.checkFrontendDevServer();
+    }, 15000);
+    
+    // Report status every 30 seconds
+    setInterval(() => {
+      this.reportStatus();
+    }, 30000);
+  }
+
+  checkWebSocketConnection() {
+    const curlCommand = 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/socket.io/';
+    
+    exec(curlCommand, (error, stdout, stderr) => {
+      const statusCode = stdout.trim();
+      const wasConnected = this.websocketStatus.connected;
+      this.websocketStatus.connected = statusCode === '400' || statusCode === '200'; // Socket.IO returns 400 for bad requests
+      this.websocketStatus.lastCheck = Date.now();
+      
+      if (wasConnected && !this.websocketStatus.connected) {
+        console.log(`${COLORS.brightRed}❌ WebSocket connection lost!${COLORS.reset}`);
+        this.handleWebSocketIssue('health-check', `HTTP ${statusCode} from Socket.IO endpoint`);
+      } else if (!wasConnected && this.websocketStatus.connected) {
+        console.log(`${COLORS.green}✅ WebSocket connection restored!${COLORS.reset}`);
+      }
+    });
+  }
+
+  checkApiEndpoint() {
+    // Since MindServer only serves Socket.IO and static files, check the root path instead
+    const curlCommand = 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/';
+    
+    exec(curlCommand, (error, stdout, stderr) => {
+      const statusCode = stdout.trim();
+      const wasReachable = this.apiStatus.reachable;
+      this.apiStatus.reachable = statusCode === '200';
+      this.apiStatus.lastCheck = Date.now();
+      
+      if (wasReachable && !this.apiStatus.reachable) {
+        console.log(`${COLORS.brightRed}❌ HTTP/Web server unreachable!${COLORS.reset}`);
+        console.log(`${COLORS.yellow}   HTTP ${statusCode} from root path${COLORS.reset}`);
+      } else if (!wasReachable && this.apiStatus.reachable) {
+        console.log(`${COLORS.green}✅ HTTP/Web server restored!${COLORS.reset}`);
+      }
+    });
+  }
+
+  checkFrontendDevServer() {
+    // Check the frontend development server on port 5173
+    const curlCommand = 'curl -s -o /dev/null -w "%{http_code}" http://localhost:5173/';
+    
+    exec(curlCommand, (error, stdout, stderr) => {
+      const statusCode = stdout.trim();
+      const wasReachable = this.frontendDevServerStatus.reachable;
+      this.frontendDevServerStatus.reachable = statusCode === '200';
+      this.frontendDevServerStatus.lastCheck = Date.now();
+      
+      if (wasReachable && !this.frontendDevServerStatus.reachable) {
+        console.log(`${COLORS.brightRed}❌ Frontend dev server (5173) unreachable!${COLORS.reset}`);
+        console.log(`${COLORS.yellow}   HTTP ${statusCode} from Vite dev server${COLORS.reset}`);
+      } else if (!wasReachable && this.frontendDevServerStatus.reachable) {
+        console.log(`${COLORS.green}✅ Frontend dev server (5173) restored!${COLORS.reset}`);
+      }
+    });
+  }
+
+  reportStatus() {
+    console.log(`\n${COLORS.brightCyan}📊 Status Report (${new Date().toLocaleTimeString()}):${COLORS.reset}`);
+    console.log(`${COLORS.green}  Backend: ${this.backendProcess ? 'Running' : 'Stopped'} | Errors: ${this.errorCount.backend}${COLORS.reset}`);
+    console.log(`${COLORS.cyan}  Frontend: ${this.frontendProcess ? 'Running' : 'Stopped'} | Errors: ${this.errorCount.frontend}${COLORS.reset}`);
+    console.log(`${COLORS.blue}  WebSocket: ${this.websocketStatus.connected ? 'Connected' : 'Disconnected'}${COLORS.reset}`);
+    console.log(`${COLORS.blue}  Backend HTTP (8080): ${this.apiStatus.reachable ? 'Reachable' : 'Unreachable'}${COLORS.reset}`);
+    console.log(`${COLORS.blue}  Frontend Dev (5173): ${this.frontendDevServerStatus.reachable ? 'Reachable' : 'Unreachable'}${COLORS.reset}`);
+    console.log(`${COLORS.magenta}  Log Buffer: Backend(${this.logBuffer.backend.length}) Frontend(${this.logBuffer.frontend.length})${COLORS.reset}\n`);
+  }
+
+  saveLogBuffer() {
+    const logData = {
+      timestamp: new Date().toISOString(),
+      errorCounts: this.errorCount,
+      websocketStatus: this.websocketStatus,
+      apiStatus: this.apiStatus,
+      backendLogs: this.logBuffer.backend,
+      frontendLogs: this.logBuffer.frontend
+    };
+    
+    const filename = `debug-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    
+    try {
+      fs.writeFileSync(filename, JSON.stringify(logData, null, 2));
+      console.log(`${COLORS.green}📝 Logs saved to ${filename}${COLORS.reset}`);
+    } catch (error) {
+      console.error(`${COLORS.red}Failed to save logs:${COLORS.reset}`, error.message);
+    }
   }
 
   // Enhanced error detection and alerting system
@@ -974,95 +1149,108 @@ class DebugMonitor {
   handleWebSocketIssue(source, line) {
     console.log(`${COLORS.brightYellow}⚠️  WebSocket Issue Detected (${source}):${COLORS.reset}`);
     console.log(`${COLORS.yellow}   ${line}${COLORS.reset}`);
-    
+
     this.websocketStatus.connected = false;
     this.websocketStatus.lastCheck = Date.now();
-    
+
     // Provide debugging suggestions
     console.log(`${COLORS.magenta}💡 Debugging Suggestions:${COLORS.reset}`);
     console.log(`${COLORS.magenta}   1. Check if backend is running on port 8080${COLORS.reset}`);
     console.log(`${COLORS.magenta}   2. Verify firewall settings${COLORS.reset}`);
     console.log(`${COLORS.magenta}   3. Check for CORS configuration issues${COLORS.reset}`);
     console.log(`${COLORS.magenta}   4. Test with: curl http://localhost:8080${COLORS.reset}`);
-    
+
     this.handleError(source, `WebSocket issue: ${line}`);
   }
 
   handlePortIssue(source, line) {
     console.log(`${COLORS.brightYellow}⚠️  Port Issue Detected (${source}):${COLORS.reset}`);
     console.log(`${COLORS.yellow}   ${line}${COLORS.reset}`);
-    
+
     console.log(`${COLORS.magenta}💡 Debugging Suggestions:${COLORS.reset}`);
     console.log(`${COLORS.magenta}   1. Kill existing processes: npx kill-port 8080${COLORS.reset}`);
     console.log(`${COLORS.magenta}   2. Check for other services using the port${COLORS.reset}`);
     console.log(`${COLORS.magenta}   3. Wait a few seconds and retry${COLORS.reset}`);
-    
+
     this.handleError(source, `Port issue: ${line}`);
   }
 
   handleAgentIssue(source, line) {
     console.log(`${COLORS.brightYellow}⚠️  Agent Issue Detected (${source}):${COLORS.reset}`);
     console.log(`${COLORS.yellow}   ${line}${COLORS.reset}`);
-    
+
     console.log(`${COLORS.magenta}💡 Debugging Suggestions:${COLORS.reset}`);
     console.log(`${COLORS.magenta}   1. Check profile file syntax${COLORS.reset}`);
     console.log(`${COLORS.magenta}   2. Verify API keys in keys.json${COLORS.reset}`);
     console.log(`${COLORS.magenta}   3. Check Minecraft server connection${COLORS.reset}`);
     console.log(`${COLORS.magenta}   4. Validate agent configuration${COLORS.reset}`);
-    
+
     this.handleError(source, `Agent issue: ${line}`);
   }
 
   handleMemoryIssue(source, line) {
     console.log(`${COLORS.brightYellow}⚠️  Memory Issue Detected (${source}):${COLORS.reset}`);
     console.log(`${COLORS.yellow}   ${line}${COLORS.reset}`);
-    
+
     console.log(`${COLORS.magenta}💡 Debugging Suggestions:${COLORS.reset}`);
     console.log(`${COLORS.magenta}   1. Monitor memory usage: node --inspect main.js${COLORS.reset}`);
     console.log(`${COLORS.magenta}   2. Check for memory leaks in agent loops${COLORS.reset}`);
     console.log(`${COLORS.magenta}   3. Reduce number of concurrent agents${COLORS.reset}`);
     console.log(`${COLORS.magenta}   4. Clear agent cache and restart${COLORS.reset}`);
-    
+
     this.handleError(source, `Memory issue: ${line}`);
   }
 
   handleBuildIssue(source, line) {
     console.log(`${COLORS.brightYellow}⚠️  Build Issue Detected (${source}):${COLORS.reset}`);
     console.log(`${COLORS.yellow}   ${line}${COLORS.reset}`);
-    
+
     console.log(`${COLORS.magenta}💡 Debugging Suggestions:${COLORS.reset}`);
     console.log(`${COLORS.magenta}   1. Clear build cache: rm -rf frontend/dist frontend/node_modules/.cache${COLORS.reset}`);
     console.log(`${COLORS.magenta}   2. Reinstall dependencies: cd frontend && npm install${COLORS.reset}`);
     console.log(`${COLORS.magenta}   3. Check TypeScript configuration${COLORS.reset}`);
     console.log(`${COLORS.magenta}   4. Verify import paths and syntax${COLORS.reset}`);
-    
+
     this.handleError(source, `Build issue: ${line}`);
   }
 
   handleModuleIssue(source, line) {
     console.log(`${COLORS.brightYellow}⚠️  Module Issue Detected (${source}):${COLORS.reset}`);
     console.log(`${COLORS.yellow}   ${line}${COLORS.reset}`);
-    
+
     console.log(`${COLORS.magenta}💡 Debugging Suggestions:${COLORS.reset}`);
     console.log(`${COLORS.magenta}   1. Install missing module: npm install <module-name>${COLORS.reset}`);
     console.log(`${COLORS.magenta}   2. Check import statement syntax${COLORS.reset}`);
     console.log(`${COLORS.magenta}   3. Verify module exists in node_modules${COLORS.reset}`);
     console.log(`${COLORS.magenta}   4. Check TypeScript path mapping${COLORS.reset}`);
-    
+
     this.handleError(source, `Module issue: ${line}`);
   }
 
   handleReactIssue(source, line) {
     console.log(`${COLORS.brightYellow}⚠️  React Issue Detected (${source}):${COLORS.reset}`);
     console.log(`${COLORS.yellow}   ${line}${COLORS.reset}`);
-    
+
     console.log(`${COLORS.magenta}💡 Debugging Suggestions:${COLORS.reset}`);
     console.log(`${COLORS.magenta}   1. Check React component syntax${COLORS.reset}`);
     console.log(`${COLORS.magenta}   2. Verify props and state usage${COLORS.reset}`);
     console.log(`${COLORS.magenta}   3. Check for infinite re-renders${COLORS.reset}`);
     console.log(`${COLORS.magenta}   4. Enable React DevTools for debugging${COLORS.reset}`);
-    
+
     this.handleError(source, `React issue: ${line}`);
+  }
+
+  handleReactPerformanceIssue(source, line) {
+    console.log(`${COLORS.brightYellow}⚠️  React Performance Violation Detected (${source}):${COLORS.reset}`);
+    console.log(`${COLORS.yellow}   ${line}${COLORS.reset}`);
+
+    console.log(`${COLORS.magenta}💡 Debugging Suggestions (React DevTools):${COLORS.reset}`);
+    console.log(`${COLORS.magenta}   1. Open the 'Profiler' tab in React DevTools${COLORS.reset}`);
+    console.log(`${COLORS.magenta}   2. Record a session to identify slow components${COLORS.reset}`);
+    console.log(`${COLORS.magenta}   3. Look for long render times or excessive re-renders${COLORS.reset}`);
+    console.log(`${COLORS.magenta}   4. Consider using React.memo or useMemo for optimization${COLORS.reset}`);
+
+    this.handleError(source, `React performance violation: ${line}`);
   }
 
   // Public method to get current status
@@ -1078,7 +1266,8 @@ class DebugMonitor {
         errors: this.errorCount.frontend
       },
       websocket: this.websocketStatus,
-      api: this.apiStatus
+      api: this.apiStatus,
+      frontendDevServer: this.frontendDevServerStatus
     };
   }
 
@@ -1093,24 +1282,6 @@ class DebugMonitor {
     setInterval(() => {
       this.checkSystemResources();
     }, 10000);
-  }
-
-  checkProcessHealth() {
-    // Check backend process
-    if (this.backendProcess) {
-      if (this.backendProcess.killed || this.backendProcess.exitCode !== null) {
-        console.log(`${COLORS.brightRed}❌ Backend process is not running!${COLORS.reset}`);
-        this.handleProcessFailure('backend');
-      }
-    }
-
-    // Check frontend process
-    if (this.frontendProcess) {
-      if (this.frontendProcess.killed || this.frontendProcess.exitCode !== null) {
-        console.log(`${COLORS.brightRed}❌ Frontend process is not running!${COLORS.reset}`);
-        this.handleProcessFailure('frontend');
-      }
-    }
   }
 
   checkSystemResources() {
@@ -1153,48 +1324,18 @@ class DebugMonitor {
     }
   }
 
-  setupGracefulShutdown() {
-    const shutdown = () => {
-      console.log(`\n${COLORS.yellow}🛑 Shutting down Debug Monitor...${COLORS.reset}`);
-      
-      this.isRunning = false;
-      
-      if (this.backendProcess) {
-        this.backendProcess.kill('SIGTERM');
-      }
-      
-      if (this.frontendProcess) {
-        this.frontendProcess.kill('SIGTERM');
-      }
-      
-      // Save log buffer to file for analysis
-      this.saveLogBuffer();
-      
-      console.log(`${COLORS.green}✅ Debug Monitor shut down complete${COLORS.reset}`);
-      process.exit(0);
-    };
-    
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
-  }
+  monitorConnectionQuality() {
+    // Placeholder for connection quality monitoring logic
+    // This would typically involve tracking latency, packet loss, and throughput
+    // based on the results from performWebSocketDiagnostics.
+    const history = this.websocketMonitor.connectionHistory;
+    if (history.length === 0) return;
 
-  saveLogBuffer() {
-    const logData = {
-      timestamp: new Date().toISOString(),
-      errorCounts: this.errorCount,
-      websocketStatus: this.websocketStatus,
-      apiStatus: this.apiStatus,
-      backendLogs: this.logBuffer.backend,
-      frontendLogs: this.logBuffer.frontend
-    };
-    
-    const filename = `debug-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-    
-    try {
-      fs.writeFileSync(filename, JSON.stringify(logData, null, 2));
-      console.log(`${COLORS.green}📝 Logs saved to ${filename}${COLORS.reset}`);
-    } catch (error) {
-      console.error(`${COLORS.red}Failed to save logs:${COLORS.reset}`, error.message);
+    const recentSuccessRates = history.slice(-5).map(h => h.successRate);
+    const averageSuccessRate = recentSuccessRates.reduce((a, b) => a + b, 0) / recentSuccessRates.length;
+
+    if (averageSuccessRate < 50) {
+      this.triggerAlert('websocket', 'warning', `Connection quality degraded: Average success rate is ${averageSuccessRate.toFixed(2)}%`, /connection.*quality/i);
     }
   }
 }

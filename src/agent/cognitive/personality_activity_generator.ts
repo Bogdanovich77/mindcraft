@@ -162,7 +162,7 @@ export class PersonalityActivityGenerator {
       health: agentState.context.health,
       food: agentState.context.food,
       nearbyEntities: agentState.context.nearbyEntities?.length || 0,
-      inventoryLoad: this.calculateInventoryLoad(agentState.context.inventory || []),
+      inventoryLoad: this.calculateInventoryLoad(agentState.context.inventory?.items || []),
       terrainType: this.estimateTerrainType(agentState),
       dangerLevel: this.assessDangerLevel(agentState),
       socialContext: this.analyzeSocialContext(agentState)
@@ -589,7 +589,10 @@ export class PersonalityActivityGenerator {
 
     const slotsRemaining = this.config.maxActivities - diverse.length;
     for (let i = 0; i < slotsRemaining && i < remaining.length; i++) {
-      diverse.push(remaining[i]);
+      const activity = remaining[i];
+      if (activity) {
+        diverse.push(activity);
+      }
     }
 
     return diverse;
@@ -670,7 +673,10 @@ export class PersonalityActivityGenerator {
     // Personality-based confidence
     const relevantTraits = this.getRelevantTraits(activityType);
     relevantTraits.forEach(trait => {
-      confidence += (personality[trait as keyof PersonalityTraits] as number) * 0.1;
+      if (trait in personality) {
+        const traitValue = personality[trait as keyof PersonalityTraits] as number;
+        confidence += traitValue * 0.1;
+      }
     });
 
     // Context-based confidence
@@ -754,6 +760,10 @@ export class PersonalityActivityGenerator {
       agreeableness: 0.5,
       neuroticism: 0.5,
       riskTolerance: 0.5,
+      creativity: 0.5,
+      patience: 0.5,
+      competitiveness: 0.5,
+      curiosity: 0.5,
       explorationDrive: 0.5,
       socialTendency: 0.5,
       buildingCreativity: 0.5,

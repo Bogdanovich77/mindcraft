@@ -6,7 +6,7 @@ import { initModes } from './modes.js';
 import { initBot } from '../utils/mcdata.js';
 import { containsCommand, commandExists, executeCommand, truncCommandMessage, isAction, blacklistCommands } from './commands/index.js';
 import { ActionManager } from './action_manager.js';
-import { NPCContoller } from './npc/controller.js';
+import { NPCController } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
 import { SelfPrompter } from './self_prompter.js';
 import convoManager from './conversation.js';
@@ -29,7 +29,7 @@ export class Agent {
         console.log(`Initializing agent ${this.name}...`);
         this.history = new History(this);
         this.coder = new Coder(this);
-        this.npc = new NPCContoller(this);
+        this.npc = new NPCController(this);
         this.memory_bank = new MemoryBank();
         this.self_prompter = new SelfPrompter(this);
         convoManager.initAgent(this);
@@ -546,7 +546,7 @@ export class Agent {
 
     cleanKill(msg='Killing agent process...', code=1) {
         this.history.add('system', msg);
-        this.bot.chat(code > 1 ? 'Restarting.': 'Exiting.');
+        this.bot.chat(code > 1 ? 'Restarting.' : 'Exiting.');
         this.history.save();
         process.exit(code);
     }

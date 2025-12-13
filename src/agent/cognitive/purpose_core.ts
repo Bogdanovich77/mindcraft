@@ -10,7 +10,20 @@ import { MotivationSystem, MotivationEvent } from './motivations.js';
 import { ValueSystem, ValueEvent } from './values.js';
 import { EthicsSystem } from './ethics.js';
 import { PurposeDrivenDecisionMaker, ActionOption, DecisionContext, UtilityBreakdown } from './decision_maker.js';
-import { SocialState, RelationshipManagerState, TheoryOfMindState, SocialContextState } from '../langgraph/interfaces.js';
+import {
+  AgentState,
+  ProcessingState, 
+  Goal, 
+  Plan, 
+  MemoryState, 
+  SkillState, 
+  ReactiveState, 
+  ExecutiveState, 
+  WorldContext, 
+  SocialState, 
+  SocialContext,
+  Motivation
+} from '../langgraph/interfaces.js';
 
 export interface PurposeCoreState {
   personality: any;
@@ -24,7 +37,7 @@ export interface PurposeCoreState {
     utility: number;
     timestamp: number;
     outcome?: 'success' | 'failure' | 'partial';
-  }>;
+  }>
 }
 
 export interface PurposeCoreConfig {
@@ -482,7 +495,7 @@ export class PurposeCore {
       };
     }
     
-    const { relationships, theoryOfMind, socialContext, socialLearning } = this.socialState;
+    const { relationships, theoryOfMind, socialContext } = this.socialState;
     
     // Calculate trust-based influence
     let trustInfluence = 0;
@@ -496,26 +509,31 @@ export class PurposeCore {
     ];
     
     if (nearbyAgents.length > 0) {
-      const agentTrustLevels = nearbyAgents.map(agentId =>
-        relationships.trustLevels[agentId] || 0.5
-      );
+      const agentTrustLevels = nearbyAgents.map(agentId => {
+        const relationship = relationships.get(agentId || '');
+        return relationship?.trustLevel || 0.5;
+      });
       trustInfluence = agentTrustLevels.reduce((sum, trust) => sum + trust, 0) / agentTrustLevels.length;
       
       // Find most trusted relationship for context
-      const mostTrustedAgent = nearbyAgents.reduce((best, agentId) =>
-        (relationships.trustLevels[agentId] || 0) > (relationships.trustLevels[best] || 0) ? agentId : best
-      , nearbyAgents[0]);
+      const mostTrustedAgent = nearbyAgents.reduce((best, agentId) => {
+        if (!best || !agentId) return agentId || best || '';
+        const bestTrust = relationships.get(best)?.trustLevel || 0;
+        const currentTrust = relationships.get(agentId)?.trustLevel || 0;
+        return currentTrust > bestTrust ? agentId : best;
+      }, '');
       
+      const mostTrustedRelationship = relationships.get(mostTrustedAgent || '');
       relationshipContext = {
-        agentId: mostTrustedAgent,
-        trustLevel: relationships.trustLevels[mostTrustedAgent] || 0.5,
-        friendshipLevel: relationships.friendshipLevels[mostTrustedAgent] || 0.5,
+        agentId: mostTrustedAgent || '',
+        trustLevel: mostTrustedRelationship?.trustLevel || 0.5,
+        friendshipLevel: mostTrustedRelationship?.friendshipScore || 0.5,
         status: 'active'
       };
     }
     
     // Calculate reputation influence
-    const reputationInfluence = relationships.reputationScore || 0.5;
+    const reputationInfluence = this.socialState.reputation?.globalScore || 0.5;
     
     // Calculate group pressure from social context
     let groupPressure = 0;
@@ -523,14 +541,15 @@ export class PurposeCore {
     
     if (socialContext.groupDynamics && socialContext.groupDynamics.cohesion > 0.7) {
       groupPressure = socialContext.groupDynamics.cohesion * 0.3;
-      socialNorms.push(...socialContext.socialNorms.map(norm => norm.name));
+      socialNorms.push(...socialContext.socialNorms);
     }
     
     // Apply theory of mind insights
     let tomInfluence = 0;
-    if (theoryOfMind.activePredictions && theoryOfMind.activePredictions.length > 0) {
-      const avgPredictionConfidence = theoryOfMind.activePredictions.reduce((sum, pred) =>
-        sum + pred.confidence, 0) / theoryOfMind.activePredictions.length;
+    if (theoryOfMind.size > 0) {
+      const mentalModels = Array.from(theoryOfMind.values());
+      const avgPredictionConfidence = mentalModels.reduce((sum: number, model: any) =>
+        sum + (model.confidence || 0.5), 0) / mentalModels.length;
       tomInfluence = avgPredictionConfidence * 0.2;
     }
     
@@ -540,7 +559,7 @@ export class PurposeCore {
       groupPressure: groupPressure + tomInfluence,
       socialNorms,
       relationshipContext,
-      socialLearningInfluence: this.calculateSocialLearningInfluence(socialLearning)
+      socialLearningInfluence: 0 // Placeholder for social learning influence
     };
   }
   
@@ -605,17 +624,18 @@ export class PurposeCore {
       return this.generateGoals();
     }
     
-    const { relationships, socialContext, socialLearning } = this.socialState;
+    const { relationships, socialContext } = this.socialState;
     const goals: string[] = [];
     
     // Relationship maintenance goals
-    if (relationships.activeRelationships.length > 0) {
+    if (relationships.size > 0) {
       goals.push('maintain_relationships');
       
       // Check for relationships needing attention
-      const neglectedRelationships = relationships.activeRelationships.filter(agentId => {
-        const trustLevel = relationships.trustLevels[agentId] || 0.5;
-        const friendshipLevel = relationships.friendshipLevels[agentId] || 0.5;
+      const relationshipArray = Array.from(relationships.entries());
+      const neglectedRelationships = relationshipArray.filter(([agentId, relationship]) => {
+        const trustLevel = relationship.trustLevel || 0.5;
+        const friendshipLevel = relationship.friendshipScore || 0.5;
         return trustLevel < 0.3 || friendshipLevel < 0.3;
       });
       
@@ -624,24 +644,90 @@ export class PurposeCore {
       }
     }
     
-    // Social learning goals
-    if (socialLearning && socialLearning.observedBehaviors.length > 5) {
-      goals.push('learn_from_social_interactions');
-    }
-    
     // Group participation goals
     if (socialContext.groupDynamics && socialContext.groupDynamics.cohesion > 0.6) {
       goals.push('participate_in_group_activities');
     }
     
     // Reputation management goals
-    if (relationships.reputationScore < 0.4) {
+    const reputationScore = this.socialState.reputation?.globalScore || 0.5;
+    if (reputationScore < 0.4) {
       goals.push('improve_reputation');
     }
     
     return goals;
   }
   
+  /**
+   * Generate social relationship goals
+   */
+  private generateSocialRelationshipGoals(input: CognitiveInput): Goal[] {
+    if (!this.socialState) {
+      return [];
+    }
+    
+    const { relationships, socialContext } = this.socialState;
+    const goals: Goal[] = [];
+    
+    // Check for relationship maintenance opportunities
+    if (relationships.size > 0) {
+      const relationshipArray = Array.from(relationships.entries());
+      const neglectedRelationships = relationshipArray.filter(([agentId, relationship]) => {
+        const trustLevel = relationship.trustLevel || 0.5;
+        const friendshipLevel = relationship.friendshipScore || 0.5;
+        return trustLevel < 0.6 || friendshipLevel < 0.6;
+      });
+      
+      for (const [agentId, relationship] of neglectedRelationships) {
+        goals.push({
+          id: `improve_relationship_${agentId}`,
+          type: 'social',
+          priority: 'medium',
+          status: 'pending',
+          description: `Improve relationship with ${agentId} - Trust: ${relationship.trustLevel}, Friendship: ${relationship.friendshipScore}`,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          dependencies: [],
+          resources: {
+            required: [],
+            allocated: []
+          },
+          progress: {
+            current: 0,
+            target: 100,
+            percentage: 0
+          }
+        });
+      }
+    }
+    
+    // Check reputation status
+    const reputationScore = this.socialState.reputation?.globalScore || 0.5;
+    if (reputationScore < 0.4) {
+      goals.push({
+        id: 'improve_reputation',
+        type: 'social',
+        priority: 'high',
+        status: 'pending',
+        description: `Improve community reputation - Current reputation: ${reputationScore}`,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        dependencies: [],
+        resources: {
+          required: [],
+          allocated: []
+        },
+        progress: {
+          current: 0,
+          target: 100,
+          percentage: 0
+        }
+      });
+    }
+    
+    return goals;
+  }
+
   /**
    * Export to legacy profile format
    */

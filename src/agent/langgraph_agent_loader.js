@@ -1,6 +1,6 @@
 /**
  * LangGraph Agent Loader
- * 
+ *
  * Handles loading and initialization of both legacy and new LangGraph agent types.
  * Provides backward compatibility while enabling the new cognitive architecture.
  */
@@ -8,7 +8,7 @@
 import { Agent } from './agent.js';
 import { LangGraphAgent } from './langgraph/agent.js';
 import { ProfileAdapter } from './langgraph/profile_adapter.js';
-import settings from '../../settings.js';
+import settings from '../settings.js';
 
 export class LangGraphAgentLoader {
     constructor() {

@@ -110,7 +110,8 @@ export const {
   handleAgentConnectionStream,
   handleAgentDisconnectionStream,
   updateConnectionStatus,
-  handleStreamingError: handleAgentsStreamingError
+  handleStreamingError: handleAgentsStreamingError,
+  initializeAgentsSocket
 } = AgentsSliceActions;
 
 // --- Connection Slice ---

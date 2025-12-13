@@ -8,7 +8,7 @@ import * as world from '../library/world.js';
 import * as mc from '../../utils/mcdata.js';
 
 
-export class NPCContoller {
+export class NPCController {
     constructor(agent) {
         this.agent = agent;
         this.data = NPCData.fromObject(agent.prompter.profile.npc);

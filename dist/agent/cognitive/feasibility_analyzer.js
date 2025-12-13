@@ -4,7 +4,9 @@
  * Provides comprehensive plan viability assessment, risk analysis,
  * and success probability calculation for the Mindcraft LangGraph planning system.
  */
-import { FeasibilityLevel, RiskLevel } from '../langgraph/interfaces.js';
+import { FeasibilityLevel } from '../langgraph/interfaces.js';
+// ** currently disabled **
+// import { Logger } from "../../utils/logger";
 /**
  * Feasibility Analyzer class
  */
@@ -48,7 +50,7 @@ export class FeasibilityAnalyzer {
             // Check if we have a recent analysis
             if (this.analysisHistory.has(cacheKey)) {
                 const cached = this.analysisHistory.get(cacheKey);
-                if (Date.now() - cached.analysisTime < 60000) { // 1 minute cache
+                if (Date.now() - (cached.analysisTime || 0) < 60000) { // 1 minute cache
                     return cached;
                 }
             }
@@ -63,18 +65,20 @@ export class FeasibilityAnalyzer {
             const timeEstimation = await this.estimateTime(plan, agentState);
             const costEstimation = await this.estimateCost(plan, agentState);
             const successProbability = this.calculateSuccessProbability(feasibilityScore, riskLevel, confidence);
+            // Calculate individual feasibility factors for the result object
+            const skillFeasibility = await this.analyzeSkillFeasibility(plan, agentState);
+            const resourceFeasibility = await this.analyzeResourceFeasibility(plan, agentState);
+            const complexityFeasibility = await this.analyzeComplexityFeasibility(plan, agentState);
+            const overallFeasibility = this.calculateOverallFeasibility(skillFeasibility, resourceFeasibility, complexityFeasibility, { overallRisk: await this.calculateRiskScore(plan, agentState), criticalRisks: [], mitigatedRisks: [], residualRisk: 0 });
             const result = {
-                planId: plan.id,
-                feasibilityLevel,
-                feasibilityScore,
+                feasible: overallFeasibility >= this.config.confidenceThreshold,
+                score: overallFeasibility,
                 confidence,
-                riskLevel,
-                blockingFactors,
-                alternativePlans,
-                timeEstimation,
-                costEstimation,
-                successProbability,
-                analysisTime: Date.now() - startTime
+                factors: [skillFeasibility, resourceFeasibility, complexityFeasibility],
+                risks: blockingFactors.map(f => ({ type: f.type, level: f.severity, description: f.description })),
+                recommendations: alternativePlans.map(p => `Alternative Plan: ${p.description}`),
+                planId: plan.id,
+                analysisTime: Date.now(),
             };
             // Cache the result
             this.analysisHistory.set(cacheKey, result);
@@ -139,6 +143,8 @@ export class FeasibilityAnalyzer {
             this.calculateEnvironmentalFeasibility(plan, agentState),
             this.calculateSocialFeasibility(plan, agentState)
         ]);
+        if (!factors)
+            return 0;
         // Weighted average based on configuration
         const weights = [
             this.config.skillWeight,
@@ -147,6 +153,8 @@ export class FeasibilityAnalyzer {
             this.config.riskFactors.environmental,
             this.config.riskFactors.social
         ];
+        if (factors.length !== weights.length)
+            return 0;
         const weightedSum = factors.reduce((sum, factor, index) => sum + factor * weights[index], 0);
         const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
         return totalWeight > 0 ? weightedSum / totalWeight : 0;
@@ -167,7 +175,7 @@ export class FeasibilityAnalyzer {
             }
             let stepSkillScore = 0;
             for (const skillReq of step.requiredSkills) {
-                const skill = agentState.cognitive.skills.skills[skillReq.type];
+                const skill = agentState.cognitive.skills.skills.get(skillReq.type);
                 if (skill) {
                     const proficiencyRatio = skill.proficiency.overall / skillReq.minProficiency;
                     stepSkillScore += Math.min(1.0, proficiencyRatio);
@@ -185,16 +193,18 @@ export class FeasibilityAnalyzer {
      * Calculate resource feasibility
      */
     async calculateResourceFeasibility(plan, agentState) {
-        const inventory = agentState.context.inventory;
+        const inventory = agentState.context.inventory?.items || [];
         let totalResourceScore = 0;
         let resourceCount = 0;
         // Check plan resource requirements
-        for (const [resourceType, amount] of Object.entries(plan.resourceRequirements.items)) {
-            const available = inventory.find(item => item.type === resourceType);
-            const availableAmount = available ? available.count : 0;
-            const score = Math.min(1.0, availableAmount / amount);
-            totalResourceScore += score;
-            resourceCount++;
+        if (plan.resourceRequirements?.items) {
+            for (const [resourceType, amount] of Object.entries(plan.resourceRequirements.items)) {
+                const available = inventory.find(item => item.type === resourceType);
+                const availableAmount = available ? available.count : 0;
+                const score = Math.min(1.0, availableAmount / amount);
+                totalResourceScore += score;
+                resourceCount++;
+            }
         }
         // Check step-specific resource requirements
         for (const step of plan.steps) {
@@ -292,7 +302,7 @@ export class FeasibilityAnalyzer {
         // Adjust based on plan completeness
         if (plan.steps.length === 0)
             confidence -= 0.3;
-        if (plan.resourceRequirements.items && Object.keys(plan.resourceRequirements.items).length === 0)
+        if (plan.resourceRequirements?.items && Object.keys(plan.resourceRequirements.items).length === 0)
             confidence -= 0.2;
         // Adjust based on agent state completeness
         if (agentState.context.inventory.length === 0)
@@ -310,14 +320,29 @@ export class FeasibilityAnalyzer {
     async assessRiskLevel(plan, agentState) {
         const riskScore = await this.calculateRiskScore(plan, agentState);
         if (riskScore >= 0.8)
-            return RiskLevel.CRITICAL;
+            return 'CRITICAL';
         if (riskScore >= 0.6)
-            return RiskLevel.HIGH;
+            return 'HIGH';
         if (riskScore >= 0.4)
-            return RiskLevel.MEDIUM;
+            return 'MEDIUM';
         if (riskScore >= 0.2)
-            return RiskLevel.LOW;
-        return RiskLevel.CRITICAL; // Very low feasibility is critical risk
+            return 'LOW';
+        return 'CRITICAL'; // Very low feasibility is critical risk
+    }
+    /**
+     * Determine Risk Level
+     */
+    determineRiskLevel(riskScore) {
+        // Determine RiskLevel based on riskScore
+        if (riskScore >= 0.8)
+            return 'CRITICAL';
+        if (riskScore >= 0.6)
+            return 'HIGH';
+        if (riskScore >= 0.4)
+            return 'MEDIUM';
+        if (riskScore >= 0.2)
+            return 'LOW';
+        return 'CRITICAL'; // Very low feasibility is critical risk
     }
     /**
      * Calculate risk score
@@ -330,6 +355,8 @@ export class FeasibilityAnalyzer {
             this.calculateEnvironmentalRisk(plan, agentState),
             this.calculateSocialRisk(plan, agentState)
         ]);
+        if (!riskFactors)
+            return 0;
         const weights = [
             this.config.riskFactors.resource,
             this.config.riskFactors.time,
@@ -337,6 +364,8 @@ export class FeasibilityAnalyzer {
             this.config.riskFactors.environmental,
             this.config.riskFactors.social
         ];
+        if (riskFactors.length !== weights.length)
+            return 0;
         const weightedSum = riskFactors.reduce((sum, factor, index) => sum + factor * weights[index], 0);
         const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
         return totalWeight > 0 ? weightedSum / totalWeight : 0.5;
@@ -347,8 +376,8 @@ export class FeasibilityAnalyzer {
     async identifyBlockingFactors(plan, agentState) {
         const blockingFactors = [];
         // Resource blocking factors
-        for (const [resourceType, amount] of Object.entries(plan.resourceRequirements.items)) {
-            const available = agentState.context.inventory.find(item => item.type === resourceType);
+        for (const [resourceType, amount] of Object.entries(plan.resourceRequirements?.items || {})) {
+            const available = agentState.context.inventory?.items?.find(item => item.type === resourceType);
             if (!available || available.count < amount) {
                 blockingFactors.push({
                     type: 'resource',
@@ -364,7 +393,7 @@ export class FeasibilityAnalyzer {
             if (!step.requiredSkills)
                 continue;
             for (const skillReq of step.requiredSkills) {
-                const skill = agentState.cognitive.skills.skills[skillReq.type];
+                const skill = agentState.cognitive.skills.skills.get(skillReq.type);
                 if (!skill || skill.proficiency.overall < skillReq.minProficiency) {
                     blockingFactors.push({
                         type: 'skill',
@@ -476,7 +505,7 @@ export class FeasibilityAnalyzer {
             if (!step.requiredSkills)
                 continue;
             for (const skillReq of step.requiredSkills) {
-                const skill = agentState.cognitive.skills.skills[skillReq.type];
+                const skill = agentState.cognitive.skills.skills.get(skillReq.type);
                 if (!skill || skill.proficiency.overall < skillReq.minProficiency) {
                     criticalFactors.push(`${skillReq.type} skill gap`);
                     improvements.push(`Practice ${skillReq.type} to level ${skillReq.minProficiency}`);
@@ -484,11 +513,13 @@ export class FeasibilityAnalyzer {
             }
         }
         return {
-            factor: 'skill_feasibility',
-            score,
+            factor: 'skill',
+            score: score,
             description: `Skill feasibility assessment based on required vs available skills`,
-            criticalFactors,
-            improvements
+            criticalFactors: criticalFactors,
+            improvements: improvements,
+            weight: this.config.skillWeight, // Added missing property
+            impact: score >= 0.5 ? 'positive' : 'negative', // Added missing property
         };
     }
     /**
@@ -499,19 +530,21 @@ export class FeasibilityAnalyzer {
         const criticalFactors = [];
         const improvements = [];
         // Identify critical resource gaps
-        for (const [resourceType, amount] of Object.entries(plan.resourceRequirements.items)) {
-            const available = agentState.context.inventory.find(item => item.type === resourceType);
+        for (const [resourceType, amount] of Object.entries(plan.resourceRequirements?.items || {})) {
+            const available = agentState.context.inventory?.items?.find(item => item.type === resourceType);
             if (!available || available.count < amount) {
                 criticalFactors.push(`${resourceType} shortage`);
                 improvements.push(`Gather ${amount - (available?.count || 0)} more ${resourceType}`);
             }
         }
         return {
-            factor: 'resource_feasibility',
-            score,
+            factor: 'resource',
+            score: score,
             description: `Resource feasibility assessment based on required vs available resources`,
-            criticalFactors,
-            improvements
+            criticalFactors: criticalFactors,
+            improvements: improvements,
+            weight: this.config.resourceWeight, // Added missing property
+            impact: score >= 0.5 ? 'positive' : 'negative', // Added missing property
         };
     }
     /**
@@ -530,11 +563,13 @@ export class FeasibilityAnalyzer {
             improvements.push('Reduce dependencies or parallelize independent tasks');
         }
         return {
-            factor: 'complexity_feasibility',
-            score,
+            factor: 'complexity',
+            score: score,
             description: `Complexity feasibility assessment based on plan structure and dependencies`,
-            criticalFactors,
-            improvements
+            criticalFactors: criticalFactors,
+            improvements: improvements,
+            weight: this.config.complexityWeight, // Added missing property
+            impact: score >= 0.5 ? 'negative' : 'positive', // Added missing property
         };
     }
     /**
@@ -563,8 +598,8 @@ export class FeasibilityAnalyzer {
     async analyzeResourceRisks(plan, agentState) {
         const critical = [];
         const mitigated = [];
-        for (const [resourceType, amount] of Object.entries(plan.resourceRequirements.items)) {
-            const available = agentState.context.inventory.find(item => item.type === resourceType);
+        for (const [resourceType, amount] of Object.entries(plan.resourceRequirements?.items || {})) {
+            const available = agentState.context.inventory?.items?.find(item => item.type === resourceType);
             const shortage = amount - (available?.count || 0);
             if (shortage > 0) {
                 critical.push({
@@ -610,7 +645,7 @@ export class FeasibilityAnalyzer {
             if (!step.requiredSkills)
                 continue;
             for (const skillReq of step.requiredSkills) {
-                const skill = agentState.cognitive.skills.skills[skillReq.type];
+                const skill = agentState.cognitive.skills.skills.get(skillReq.type);
                 if (!skill || skill.proficiency.overall < skillReq.minProficiency) {
                     const gap = skillReq.minProficiency - (skill?.proficiency.overall || 0);
                     critical.push({
@@ -660,7 +695,7 @@ export class FeasibilityAnalyzer {
     cleanupHistory() {
         if (this.analysisHistory.size > this.config.maxHistorySize) {
             const entries = Array.from(this.analysisHistory.entries());
-            entries.sort((a, b) => a[1].analysisTime - b[1].analysisTime);
+            entries.sort((a, b) => (a[1].analysisTime || 0) - (b[1].analysisTime || 0));
             const toRemove = entries.slice(0, this.analysisHistory.size - this.config.maxHistorySize);
             toRemove.forEach(([key]) => this.analysisHistory.delete(key));
         }
@@ -689,10 +724,10 @@ export class FeasibilityAnalyzer {
     }
     getRiskPenalty(riskLevel) {
         switch (riskLevel) {
-            case RiskLevel.CRITICAL: return 0.4;
-            case RiskLevel.HIGH: return 0.3;
-            case RiskLevel.MEDIUM: return 0.2;
-            case RiskLevel.LOW: return 0.1;
+            case 'critical': return 0.4;
+            case 'high': return 0.3;
+            case 'medium': return 0.2;
+            case 'low': return 0.1;
             default: return 0.2;
         }
     }
@@ -731,9 +766,11 @@ export class FeasibilityAnalyzer {
     }
     generateFeasibilityRecommendations(skillFeasibility, resourceFeasibility, complexityFeasibility, riskAnalysis) {
         const recommendations = [];
+        // Collect recommendations from feasibility factors
         recommendations.push(...skillFeasibility.improvements);
         recommendations.push(...resourceFeasibility.improvements);
         recommendations.push(...complexityFeasibility.improvements);
+        // Collect risks
         if (riskAnalysis.overallRisk > 0.7) {
             recommendations.push('Consider reducing plan scope to lower risk');
         }
@@ -745,9 +782,9 @@ export class FeasibilityAnalyzer {
             id: plan.id + '_simpler',
             description: 'Simplified version with fewer steps',
             feasibilityScore: plan.feasibilityScore * 1.1,
-            riskLevel: RiskLevel.MEDIUM,
-            timeEstimation: plan.estimatedDuration * 0.8,
-            cost: plan.estimatedDuration * 0.9,
+            riskLevel: 'medium',
+            timeEstimation: plan.estimatedDuration * 1.1,
+            cost: plan.costEstimate?.totalCost || 0,
             blockingFactors: []
         };
     }
@@ -757,9 +794,9 @@ export class FeasibilityAnalyzer {
             id: plan.id + '_efficient',
             description: 'Resource-efficient version',
             feasibilityScore: plan.feasibilityScore * 1.05,
-            riskLevel: RiskLevel.MEDIUM,
-            timeEstimation: plan.estimatedDuration * 1.1,
-            cost: plan.estimatedDuration * 0.7,
+            riskLevel: 'medium',
+            timeEstimation: plan.estimatedDuration * 1.05,
+            cost: plan.costEstimate?.totalCost || 0,
             blockingFactors: []
         };
     }
@@ -769,9 +806,9 @@ export class FeasibilityAnalyzer {
             id: plan.id + '_faster',
             description: 'Faster execution version',
             feasibilityScore: plan.feasibilityScore * 0.95,
-            riskLevel: RiskLevel.HIGH,
-            timeEstimation: plan.estimatedDuration * 0.6,
-            cost: plan.estimatedDuration * 1.2,
+            riskLevel: 'high',
+            timeEstimation: plan.estimatedDuration * 0.95,
+            cost: plan.costEstimate?.totalCost || 0,
             blockingFactors: []
         };
     }

@@ -1,6 +1,10 @@
 @echo off
 echo Starting Mindcraft with Backend and Frontend...
 
+echo Checking for processes using port 8080...
+FOR /F "tokens=5" %%i IN ('netstat -ano ^| findstr :8080') DO (IF NOT "%%i"=="" taskkill /PID %%i /F)
+echo Port 8080 cleanup completed.
+
 echo Starting Backend Server...
 start "Mindcraft Backend" cmd /k "node main.js --profiles "./profiles/MasterChief.json" "./profiles/SlaveOne.json" "./profiles/Loner.json""
 

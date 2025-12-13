@@ -1,0 +1,245 @@
+{
+  "timestamp": "2025-12-12T15:47:53.673Z",
+  "reason": "critical",
+  "source": "backend",
+  "system_status": {
+    "isRunning": true,
+    "backend": {
+      "running": true,
+      "errors": 53
+    },
+    "frontend": {
+      "running": true,
+      "errors": 0
+    },
+    "websocket": {
+      "connected": false,
+      "lastCheck": 1765554468525,
+      "successRate": 75
+    },
+    "api": {
+      "reachable": false,
+      "lastCheck": 1765554468511
+    },
+    "frontendDevServer": {
+      "reachable": false,
+      "lastCheck": 1765554468511
+    }
+  },
+  "recent_alerts": [
+    {
+      "timestamp": "2025-12-12T15:45:53.514Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554353514.7583
+    },
+    {
+      "timestamp": "2025-12-12T15:45:58.495Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554358495.1335
+    },
+    {
+      "timestamp": "2025-12-12T15:46:03.527Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554363527.4536
+    },
+    {
+      "timestamp": "2025-12-12T15:46:08.538Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554368538.6519
+    },
+    {
+      "timestamp": "2025-12-12T15:46:13.537Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554373537.609
+    },
+    {
+      "timestamp": "2025-12-12T15:46:18.561Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554378561.359
+    },
+    {
+      "timestamp": "2025-12-12T15:46:23.565Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554383565.691
+    },
+    {
+      "timestamp": "2025-12-12T15:46:28.567Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554388567.4038
+    },
+    {
+      "timestamp": "2025-12-12T15:46:33.567Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554393567.3008
+    },
+    {
+      "timestamp": "2025-12-12T15:46:38.569Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554398569.5142
+    },
+    {
+      "timestamp": "2025-12-12T15:46:43.556Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554403556.6355
+    },
+    {
+      "timestamp": "2025-12-12T15:46:48.572Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554408572.9963
+    },
+    {
+      "timestamp": "2025-12-12T15:46:53.576Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554413576.6282
+    },
+    {
+      "timestamp": "2025-12-12T15:46:58.584Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554418584.8833
+    },
+    {
+      "timestamp": "2025-12-12T15:47:03.590Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554423590.8975
+    },
+    {
+      "timestamp": "2025-12-12T15:47:08.601Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554428601.305
+    },
+    {
+      "timestamp": "2025-12-12T15:47:13.604Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554433604.1846
+    },
+    {
+      "timestamp": "2025-12-12T15:47:18.633Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554438633.2175
+    },
+    {
+      "timestamp": "2025-12-12T15:47:23.618Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554443618.0469
+    },
+    {
+      "timestamp": "2025-12-12T15:47:28.637Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554448637.5166
+    },
+    {
+      "timestamp": "2025-12-12T15:47:33.640Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554453640.725
+    },
+    {
+      "timestamp": "2025-12-12T15:47:38.654Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554458654.7817
+    },
+    {
+      "timestamp": "2025-12-12T15:47:43.667Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554463667.4106
+    },
+    {
+      "timestamp": "2025-12-12T15:47:48.634Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554468634.7512
+    },
+    {
+      "timestamp": "2025-12-12T15:47:53.672Z",
+      "source": "backend",
+      "severity": "critical",
+      "message": "Process failure detected: backend process stopped",
+      "pattern": "/process.*failure/i",
+      "id": 1765554473672.6816
+    }
+  ],
+  "error_counts": {
+    "backend": 53,
+    "frontend": 0,
+    "health-check": null
+  },
+  "recommendations": [
+    "Immediate restart of the backend process",
+    "Review recent code changes for breaking modifications",
+    "Check system resources (memory, CPU, disk space)",
+    "Verify external dependencies and services",
+    "Consider reducing system load or agent count",
+    "Enable debug mode for detailed logging",
+    "Monitor for memory leaks or resource exhaustion"
+  ]
+}

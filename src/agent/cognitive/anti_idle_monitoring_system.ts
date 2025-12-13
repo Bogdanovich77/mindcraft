@@ -190,13 +190,13 @@ export class AntiIdleMonitoringSystem {
       // Clean up old data
       this.cleanupOldData(now);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('[ANTI_IDLE_MONITORING] Error updating monitoring:', error);
       this.createAlert(
         AlertType.SYSTEM_PERFORMANCE,
         AlertSeverity.ERROR,
-        `Monitoring update error: ${error.message}`,
-        { error: error.message, stack: error.stack }
+        `Monitoring update error: ${error?.message || 'Unknown error'}`,
+        { error: error?.message || 'Unknown error', stack: error?.stack || 'No stack trace' }
       );
     }
   }
@@ -357,7 +357,22 @@ export class AntiIdleMonitoringSystem {
     this.config.alerting.channels.forEach(channel => {
       switch (channel) {
         case 'console':
-          console[alert.severity](logMessage);
+          // Use proper console methods based on severity
+          switch (alert.severity) {
+            case AlertSeverity.INFO:
+              console.info(logMessage);
+              break;
+            case AlertSeverity.WARNING:
+              console.warn(logMessage);
+              break;
+            case AlertSeverity.ERROR:
+            case AlertSeverity.CRITICAL:
+              console.error(logMessage);
+              break;
+            default:
+              console.log(logMessage);
+              break;
+          }
           break;
         case 'log':
           // In real implementation, would write to log file
@@ -575,13 +590,16 @@ export class AntiIdleMonitoringSystem {
     const recent = this.performanceHistory.slice(-3);
     const scores = recent.map(h => this.calculatePerformanceScore());
     
-    if (scores[2] > scores[1] && scores[1] > scores[0]) {
-      return 'improving';
-    } else if (scores[2] < scores[1] && scores[1] < scores[0]) {
-      return 'degrading';
-    } else {
-      return 'stable';
+    // Add proper null checks for array access
+    if (scores[0] !== undefined && scores[1] !== undefined && scores[2] !== undefined) {
+      if (scores[2] > scores[1] && scores[1] > scores[0]) {
+        return 'improving';
+      } else if (scores[2] < scores[1] && scores[1] < scores[0]) {
+        return 'degrading';
+      }
     }
+    
+    return 'stable';
   }
 
   /**

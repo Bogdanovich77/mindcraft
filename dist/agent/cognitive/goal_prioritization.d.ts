@@ -1,6 +1,4 @@
-import { Goal, AgentState, DecisionContext } from '../langgraph/interfaces.js';
-import { Goal as GoalType, // Rename to avoid conflicts
-GoalExecutionContext, PrioritizationFactors, GoalPrioritizationResult } from './goal_types.js';
+import { Goal, GoalExecutionContext, PrioritizationFactors, GoalType, AgentState, DecisionContext } from '../langgraph/interfaces.js';
 /**
  * Goal Prioritization Engine for LangGraph v2
  *
@@ -128,6 +126,7 @@ export declare class GoalPrioritizationEngine {
      * Get current prioritization factors and weights
      */
     getFactors(): PrioritizationFactors;
+    private calculatePrioritizationFactors;
     /**
      * Helper method to calculate distance between two positions
      */

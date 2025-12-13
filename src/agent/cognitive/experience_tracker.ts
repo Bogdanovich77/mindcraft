@@ -14,7 +14,7 @@ import {
   LearningSession,
   SkillProgress,
   LearningMethod
-} from './skill_types.js';
+} from '../langgraph/interfaces';
 
 export interface ExperienceTrackerConfig {
   // Collection settings
@@ -246,7 +246,6 @@ export class ExperienceTracker {
         id: sessionId,
         skillType: event.skillType,
         startTime: event.timestamp,
-        endTime: undefined,
         duration: 0,
         experienceGained: 0,
         methods: [],
@@ -263,9 +262,9 @@ export class ExperienceTracker {
     session.duration = event.timestamp - session.startTime;
     
     if (event.success) {
-      session.outcomes.push('success');
+      session.outcomes.push({ type: 'success', effectiveness: 1.0, retention: 0.8, transferability: 0.5 });
     } else {
-      session.outcomes.push('failure');
+      session.outcomes.push({ type: 'failure', effectiveness: 0.2, retention: 0.1, transferability: 0.1 });
     }
     
     // Check if session should be closed
@@ -424,12 +423,12 @@ export class ExperienceTracker {
   private updateTimeBasedAnalytics(events: ExperienceEvent[]): void {
     if (events.length === 0) return;
     
-    const timeSpan = events[events.length - 1].timestamp - events[0].timestamp;
+    const timeSpan = (events[events.length - 1]?.timestamp || events[0]?.timestamp || Date.now()) - (events[0]?.timestamp || Date.now());
     const hours = timeSpan / (1000 * 60 * 60);
     const days = timeSpan / (1000 * 60 * 60 * 24);
     
-    this.analytics.experiencePerHour = hours > 0 ? this.analytics.totalExperience / hours : 0;
-    this.analytics.experiencePerDay = days > 0 ? this.analytics.totalExperience / days : 0;
+    this.analytics.experiencePerHour = timeSpan > 0 ? this.analytics.totalExperience / hours : 0;
+    this.analytics.experiencePerDay = timeSpan > 0 ? this.analytics.totalExperience / days : 0;
     
     // Calculate average session length
     if (this.completedSessions.length > 0) {
@@ -643,8 +642,8 @@ export class ExperienceTracker {
     });
     
     Object.entries(contextPerformance).forEach(([context, data]) => {
-      const avgExperience = data.total / data.count;
-      const avgQuality = data.quality / data.count;
+      const avgExperience = data.count > 0 ? data.total / data.count : 0;
+      const avgQuality = data.count > 0 ? data.quality / data.count : 0;
       
       if (avgExperience > 50 && avgQuality > 0.7) {
         patterns.push({
@@ -686,7 +685,7 @@ export class ExperienceTracker {
    */
   private analyzeCompletedSession(session: LearningSession): void {
     // Generate session-specific insights
-    const successRate = session.outcomes.filter(o => o === 'success').length / session.outcomes.length;
+    const successRate = session.outcomes.filter(o => (o as any).type === 'success').length / session.outcomes.length;
     const experiencePerHour = (session.experienceGained / session.duration) * (1000 * 60 * 60);
     
     if (successRate > 0.9 && experiencePerHour > 100) {

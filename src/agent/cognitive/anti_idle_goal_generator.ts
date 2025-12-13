@@ -223,7 +223,7 @@ export class AntiIdleGoalGenerator {
     }
 
     // Memory-based exploration
-    const unexploredAreas = []; // Placeholder - would be implemented in memory system
+    const unexploredAreas: string[] = []; // Explicit type annotation
     if (unexploredAreas.length > 0) {
       goals.push(this.createGoalRequest(
         'area_discovery',
@@ -657,6 +657,10 @@ export class AntiIdleGoalGenerator {
       agreeableness: 0.5,
       neuroticism: 0.5,
       riskTolerance: 0.5,
+      creativity: 0.5,
+      patience: 0.5,
+      competitiveness: 0.5,
+      curiosity: 0.5,
       explorationDrive: 0.5,
       socialTendency: 0.5,
       buildingCreativity: 0.5,

@@ -272,6 +272,12 @@ export function createMindServer(host_public = false, port = 8080) {
         socket.on('listen-to-agents', () => {
             addListener(socket);
         });
+
+        // Ping handler for frontend latency monitoring
+        socket.on('ping', (data) => {
+            // Echo back the ping data as pong for latency monitoring
+            socket.emit('pong', data);
+        });
     });
 
     let host = host_public ? '0.0.0.0' : 'localhost';

@@ -44,6 +44,7 @@ import {
   reconnectToServer,
   clearConnectionError
 } from '../../store/slices/connectionSlice';
+import { selectAgent as selectAgentAction } from '../../store/slices/agentsSlice';
 import { getSocketService } from '../../services/socketService';
 import ConnectionStatus from '../common/ConnectionStatus';
 import DebugPanel from '../common/DebugPanel';
@@ -118,8 +119,8 @@ const CognitiveDashboard: React.FC = () => {
     console.log('[CognitiveDashboard] Manual reconnect triggered');
     dispatch(reconnectToServer());
   };
-
-
+ 
+  
   const handleClearError = () => {
     console.log('[CognitiveDashboard] Clearing connection error');
     dispatch(clearConnectionError());
@@ -132,7 +133,7 @@ const CognitiveDashboard: React.FC = () => {
       console.error('[CognitiveDashboard] Socket service not available');
       return;
     }
-
+  
     console.log('[CognitiveDashboard] Refreshing agent list...');
     setRefreshing(true);
     
@@ -164,7 +165,7 @@ const CognitiveDashboard: React.FC = () => {
   }, [activeTab, tabValue, tabs]);
 
   // Loading state
-  if (loading && agents.size === 0) {
+  if (loading && Object.keys(agents).length === 0) {
     return (
       <Box p={3}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -194,7 +195,7 @@ const CognitiveDashboard: React.FC = () => {
   }
 
   // Error state
-  if (error && agents.size === 0) {
+  if (error && Object.keys(agents).length === 0) {
     return (
       <Box p={3}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -258,7 +259,7 @@ const CognitiveDashboard: React.FC = () => {
   }
 
   // No agents state
-  if (agents.size === 0 && connectionState.status === 'connected') {
+  if (Object.keys(agents).length === 0 && connectionState.status === 'connected') {
     return (
       <Box p={3}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
@@ -332,14 +333,14 @@ const CognitiveDashboard: React.FC = () => {
       </Box>
 
       {/* Agent Selection */}
-      {agents.size > 0 && (
+      {Object.keys(agents).length > 0 && (
         <Paper sx={{ p: 2, mb: 3 }}>
           <Typography variant="h6" gutterBottom>
             Select Agent
           </Typography>
           <Grid container spacing={2}>
-            {Array.from(agents.values()).map((agent) => (
-              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={agent.id}>
+            {Object.values(agents).map((agent) => (
+              <Grid item xs={12} sm={6} md={4} lg={3} key={agent.id}>
                 <Card
                   data-testid="agent-card"
                   sx={{
@@ -352,7 +353,7 @@ const CognitiveDashboard: React.FC = () => {
                     border: selectedAgent?.id === agent.id ? 2 : 0,
                     borderColor: selectedAgent?.id === agent.id ? 'primary.main' : 'transparent',
                   }}
-                  onClick={() => dispatch(selectAgent(agent.id))}
+                  onClick={() => dispatch(selectAgentAction(agent.id))}
                 >
                   <CardContent sx={{ pb: 2 }}>
                     <Box display="flex" alignItems="center" mb={1}>
@@ -418,7 +419,7 @@ const CognitiveDashboard: React.FC = () => {
             <MemoryTab agentId={selectedAgent.id} agent={selectedAgent} />
           </TabPanel>
           <TabPanel value={tabValue} index={3}>
-            <GoalsTab agent={selectedAgent} />
+            <GoalsTab agentId={selectedAgent.id} agent={selectedAgent} />
           </TabPanel>
           <TabPanel value={tabValue} index={4}>
             <SocialTab agent={selectedAgent} />

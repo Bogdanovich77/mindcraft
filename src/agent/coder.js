@@ -59,8 +59,8 @@ export class Coder {
                 }
                 messages.push({
                     role: 'system', 
-                    content: 'Error: no code provided. Write code in codeblock in your response. ``` // example ```'}
-                );
+                    content: 'Error: no code provided. Write code in codeblock in your response. ``` // example ```'
+                });
                 console.warn("No code block generated. Trying again.");
                 no_code_failures++;
                 continue;
@@ -120,7 +120,7 @@ export class Coder {
         }
         const allDocs = await this.agent.prompter.skill_libary.getAllSkillDocs();
         // check function exists
-        const missingSkills = skills.filter(skill => !!allDocs[skill]);
+        const missingSkills = skills.filter(skill => !allDocs[skill]);
         if (missingSkills.length > 0) {
             result += 'These functions do not exist.\n';
             result += '### FUNCTIONS NOT FOUND ###\n';
@@ -192,7 +192,7 @@ export class Coder {
         const mainFn = compartment.evaluate(src);
         
         if (write_result) {
-            console.error('Error writing code execution file: ' + result);
+            console.error('Error writing code execution file: ' + write_result);
             return null;
         }
         return { func:{main: mainFn}, src_lint_copy: src_lint_copy };
