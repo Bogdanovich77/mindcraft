@@ -1,5 +1,5 @@
 import { type ExtendedEpisodicEvent } from './episodic_memory.js';
-import type { AgentState, MemoryQuery, MemoryRetrieval, SemanticConcept, ProceduralSkill, WorkingMemoryState, MemoryStatistics, SocialState } from '../langgraph/interfaces.js';
+import type { AgentState, MemoryQuery, MemoryRetrieval, ProceduralSkill, WorkingMemoryState, SocialState } from '../langgraph/interfaces.js';
 /**
  * Main memory system orchestrator that coordinates all memory components
  */
@@ -36,7 +36,7 @@ export declare class MemorySystem {
     /**
      * Store semantic knowledge
      */
-    storeSemanticConcept(concept: SemanticConcept): Promise<void>;
+    storeSemanticConcept(concept: any): Promise<void>;
     /**
      * Store procedural knowledge
      */
@@ -52,7 +52,7 @@ export declare class MemorySystem {
     /**
      * Get memory statistics
      */
-    getStatistics(): MemoryStatistics;
+    getStatistics(): any;
     /**
      * Learn from reactive emergency events
      */
@@ -122,13 +122,7 @@ export declare class MemorySystem {
     /**
      * Get social memory statistics
      */
-    getSocialMemoryStatistics(): {
-        totalSocialMemories: number;
-        memoriesByAgent: Record<string, number>;
-        memoryTypes: Record<string, number>;
-        patternCount: number;
-        relationshipHistories: number;
-    };
+    getSocialMemoryStatistics(): any;
     /**
      * Cleanup old social memories
      */

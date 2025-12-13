@@ -52,7 +52,7 @@ class PatternExtractor {
             patterns.push({
                 type: 'resource_pattern', // Type cast to handle the enum limitation
                 action: event.action,
-                outcome: event.outcome,
+                outcome: event.outcome || 'unknown',
                 context: {
                     availability: event.success ? 'available' : 'unavailable',
                     efficiency: event.success ? event.importance : event.importance * 0.5
@@ -456,9 +456,12 @@ export class SemanticMemory {
         const existingRels = this.relationships.get(fromConcept);
         const existingIndex = existingRels.findIndex(r => r.target === relationship.target && r.type === relationship.type);
         if (existingIndex >= 0) {
-            // Update existing relationship
-            existingRels[existingIndex].strength = Math.max(existingRels[existingIndex].strength, relationship.strength);
-            existingRels[existingIndex].confidence = Math.max(existingRels[existingIndex].confidence, relationship.confidence);
+            const existingRel = existingRels[existingIndex];
+            if (existingRel) {
+                // Update existing relationship
+                existingRel.strength = Math.max(existingRel.strength, relationship.strength);
+                existingRel.confidence = Math.max(existingRel.confidence, relationship.confidence);
+            }
         }
         else {
             // Add new relationship
@@ -474,7 +477,7 @@ export class SemanticMemory {
         const results = [];
         const queryLower = query.query.toLowerCase();
         const currentTime = Date.now();
-        for (const concept of this.concepts.values()) {
+        for (const concept of Array.from(this.concepts.values())) {
             // Apply time filter if specified
             if (query.timeRange) {
                 if (concept.lastAccessed < query.timeRange.start || concept.lastAccessed > query.timeRange.end) {
@@ -633,8 +636,11 @@ export class SemanticMemory {
         // Remove bottom 20% of concepts
         const toRemove = Math.floor(sorted.length * 0.2);
         for (let i = 0; i < toRemove; i++) {
-            this.concepts.delete(sorted[i][0]);
-            this.relationships.delete(sorted[i][0]);
+            const id = sorted[i]?.[0];
+            if (id !== undefined) {
+                this.concepts.delete(id);
+                this.relationships.delete(id);
+            }
         }
     }
     async cleanupWeakRelationships() {
@@ -642,7 +648,7 @@ export class SemanticMemory {
             .reduce((sum, rels) => sum + rels.length, 0);
         if (totalRelationships <= this.maxRelationships * 0.8)
             return;
-        for (const [conceptId, relationships] of this.relationships.entries()) {
+        for (const [conceptId, relationships] of Array.from(this.relationships.entries())) {
             const filtered = relationships.filter(rel => rel.strength > 0.3 && rel.confidence > 0.5);
             this.relationships.set(conceptId, filtered);
         }

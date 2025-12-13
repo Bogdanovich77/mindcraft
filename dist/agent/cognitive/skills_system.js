@@ -637,9 +637,8 @@ export class SkillsSystem {
             // Calculate next threshold
             skill.proficiency.nextLevelThreshold = this.calculateLevelThreshold(skill.proficiency.level + 1);
             // Check for breakthrough at milestone levels
-            if (skill.proficiency.level % 10 === 0) {
+            if (skill.proficiency.level >= 10) {
                 breakthroughs++;
-                skill.metadata.breakthroughCount++;
             }
             // Update mastery bonus
             if (skill.proficiency.level >= 50) {
@@ -902,7 +901,7 @@ export class SkillsSystem {
      */
     updateAdaptiveLearning() {
         const now = Date.now();
-        for (const skill of this.skills.values()) {
+        for (const skill of Array.from(this.skills.values())) {
             // Calculate recent performance
             const recentUses = skill.usage.recentUses.filter(time => now - time < 7 * 24 * 60 * 60 * 1000);
             if (recentUses.length >= 5) {
@@ -967,8 +966,9 @@ export class SkillsSystem {
             return null;
         }
         // Check relationship with observed agent
-        const relationship = this.socialState.relationships.activeRelationships.includes(observedAgentId);
-        const trustLevel = this.socialState.relationships.trustLevels[observedAgentId] || 0.5;
+        const relationship = this.socialState.relationships.has(observedAgentId);
+        const relationshipData = this.socialState.relationships.get(observedAgentId);
+        const trustLevel = relationshipData?.trustLevel || 0.5;
         // Higher trust and better relationship = better learning from observation
         const learningMultiplier = 0.3 + (trustLevel * 0.4) + (relationship ? 0.3 : 0);
         // Create observation event
@@ -1028,8 +1028,9 @@ export class SkillsSystem {
             return null;
         }
         // Check relationship with student
-        const relationship = this.socialState.relationships.activeRelationships.includes(studentAgentId);
-        const trustLevel = this.socialState.relationships.trustLevels[studentAgentId] || 0.5;
+        const relationship = this.socialState.relationships.has(studentAgentId);
+        const relationshipData = this.socialState.relationships.get(studentAgentId);
+        const trustLevel = relationshipData?.trustLevel || 0.5;
         // Teaching improves teacher's understanding (learning by teaching)
         const teachingBonus = 0.2 + (teachingQuality * 0.3);
         // Create teaching experience event
@@ -1083,9 +1084,10 @@ export class SkillsSystem {
         let totalRelationshipStrength = 0;
         let validCollaborators = 0;
         collaborators.forEach(collaboratorId => {
-            if (this.socialState.relationships.activeRelationships.includes(collaboratorId)) {
-                const trustLevel = this.socialState.relationships.trustLevels[collaboratorId] || 0.5;
-                const friendshipLevel = this.socialState.relationships.friendshipLevels[collaboratorId] || 0.5;
+            if (this.socialState.relationships.has(collaboratorId)) {
+                const relationshipData = this.socialState.relationships.get(collaboratorId);
+                const trustLevel = relationshipData?.trustLevel || 0.5;
+                const friendshipLevel = relationshipData?.friendshipScore || 0.5;
                 totalRelationshipStrength += (trustLevel + friendshipLevel) / 2;
                 validCollaborators++;
             }
@@ -1098,11 +1100,11 @@ export class SkillsSystem {
             id: `collaboration_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             skillType,
             amount: Math.floor(20 * collaborationBonus),
-            source: ExperienceSource.SOCIAL, // Use SOCIAL instead of COLLABORATION
+            source: ExperienceSource.SOCIAL,
             success: true,
             quality: 0.7 + (avgRelationshipStrength * 0.2),
-            difficulty: 0.4, // Collaboration often reduces difficulty
-            impact: 0.9, // Collaboration has high impact
+            difficulty: 0.4,
+            impact: 0.9,
             context: {
                 ...context,
                 situation: 'collaborative_execution',
@@ -1139,9 +1141,10 @@ export class SkillsSystem {
         reputation += Math.min(0.3, teachings * 0.05); // Teaching improves reputation
         // Social feedback from relationships
         if (this.socialState) {
-            const avgTrust = this.socialState.relationships.activeRelationships.reduce((sum, agentId) => {
-                return sum + (this.socialState.relationships.trustLevels[agentId] || 0.5);
-            }, 0) / Math.max(1, this.socialState.relationships.activeRelationships.length);
+            const relationshipArray = Array.from(this.socialState.relationships.values());
+            const avgTrust = relationshipArray.reduce((sum, relationship) => {
+                return sum + relationship.trustLevel;
+            }, 0) / Math.max(1, relationshipArray.length);
             reputation += (avgTrust - 0.5) * 0.4; // Trust affects reputation
         }
         // Count observations and endorsements
@@ -1181,11 +1184,12 @@ export class SkillsSystem {
                 socialImportance = 0.8;
             }
             // Adjust based on relationship needs
-            if (this.socialState.relationships.activeRelationships.length > 3) {
+            const relationshipCount = this.socialState.relationships.size;
+            if (relationshipCount > 3) {
                 socialImportance += 0.2; // More relationships = higher social skill importance
             }
             // Adjust based on group activities
-            if (this.socialState.socialContext.groupDynamics?.cohesion > 0.6) {
+            if (this.socialState.socialContext?.groupDynamics?.cohesion > 0.6) {
                 socialImportance += 0.1;
             }
             // Calculate gap based on skill level vs social importance
@@ -1213,7 +1217,8 @@ export class SkillsSystem {
             `Teach ${skill.name} to others to deepen understanding`,
             `Collaborate on projects requiring ${skill.name}`
         ];
-        return recommendations[Math.floor(Math.random() * recommendations.length)];
+        const randomIndex = Math.floor(Math.random() * recommendations.length);
+        return recommendations[randomIndex] || `Practice ${skill.name} regularly`;
     }
     /**
      * Get social learning insights

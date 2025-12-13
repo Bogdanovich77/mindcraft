@@ -77,7 +77,12 @@ export class ConsolidationEngine {
                     weather: 'clear',
                     nearbyEntities: [],
                     nearbyBlocks: [],
-                    inventory: [],
+                    inventory: {
+                        items: [],
+                        slots: 36,
+                        usedSlots: 0,
+                        length: 0
+                    },
                     equipment: {
                         helmet: undefined,
                         chestplate: undefined,
@@ -103,6 +108,7 @@ export class ConsolidationEngine {
             type: 'strategy',
             sequence: [
                 {
+                    id: 'assess_threat',
                     action: 'assess_threat',
                     parameters: { threat_type: event.type },
                     conditions: ['danger_detected'],
@@ -110,6 +116,7 @@ export class ConsolidationEngine {
                     duration: 100
                 },
                 {
+                    id: 'response_action',
                     action: event.action,
                     parameters: event.metadata?.parameters || {},
                     conditions: ['threat_identified'],
@@ -152,7 +159,7 @@ export class ConsolidationEngine {
             averagePatternsPerEvent: totalEvents > 0 ? totalPatterns / totalEvents : 0,
             consolidationRate: totalEvents > 0 ? totalConsolidated / totalEvents : 0,
             lastConsolidation: this.consolidationHistory.length > 0
-                ? this.consolidationHistory[this.consolidationHistory.length - 1].timestamp
+                ? this.consolidationHistory[this.consolidationHistory.length - 1]?.timestamp || 0
                 : 0
         };
     }
@@ -204,7 +211,7 @@ class ActionOutcomeRecognizer extends PatternRecognizer {
             }
         }
         // Create patterns for frequent action-outcome pairs
-        for (const [action, data] of actionOutcomes.entries()) {
+        for (const [action, data] of Array.from(actionOutcomes.entries())) {
             if (data.frequency >= 3) { // Pattern threshold
                 patterns.push({
                     type: 'action_outcome',
@@ -247,7 +254,7 @@ class LocationPatternRecognizer extends PatternRecognizer {
             locationEvents.get(locationKey).push(event);
         }
         // Find patterns in locations
-        for (const [location, eventsAtLocation] of locationEvents.entries()) {
+        for (const [location, eventsAtLocation] of Array.from(locationEvents.entries())) {
             if (eventsAtLocation.length >= 5) {
                 const commonTypes = this.getCommonEventTypes(eventsAtLocation);
                 if (commonTypes.length > 0) {
@@ -322,12 +329,12 @@ class PatternGeneralizationRule extends LearningRule {
         const results = [];
         // Group similar patterns and create generalizations
         const groupedPatterns = this.groupSimilarPatterns(patterns);
-        for (const [group, patterns] of groupedPatterns.entries()) {
-            if (patterns.length >= 3) {
+        for (const [group, patternList] of Array.from(groupedPatterns.entries())) {
+            if (patternList.length >= 3) {
                 results.push({
                     type: 'concept_formation',
                     target: group,
-                    improvement: patterns.length * 0.05,
+                    improvement: patternList.length * 0.05,
                     reason: 'pattern_generalization'
                 });
             }
@@ -355,7 +362,7 @@ class FrequencyBasedRule extends LearningRule {
             const key = `${pattern.type}_${pattern.action || pattern.trigger || 'unknown'}`;
             patternCounts.set(key, (patternCounts.get(key) || 0) + 1);
         }
-        for (const [key, count] of patternCounts.entries()) {
+        for (const [key, count] of Array.from(patternCounts.entries())) {
             if (count >= 5) {
                 results.push({
                     type: 'importance_boost',

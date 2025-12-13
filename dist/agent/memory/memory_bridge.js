@@ -90,6 +90,9 @@ export class MemoryBridge {
         const totalLocations = this.migrationLog.reduce((sum, log) => sum + log.locationsMigrated, 0);
         const totalConcepts = this.migrationLog.reduce((sum, log) => sum + log.conceptsCreated, 0);
         const totalErrors = this.migrationLog.reduce((sum, log) => sum + log.errors, 0);
+        const lastLogEntry = this.migrationLog.length > 0
+            ? this.migrationLog[this.migrationLog.length - 1]
+            : null;
         return {
             totalMigrations: this.migrationLog.length,
             successfulMigrations: successful.length,
@@ -97,9 +100,7 @@ export class MemoryBridge {
             totalLocationsMigrated: totalLocations,
             totalConceptsCreated: totalConcepts,
             totalErrors,
-            lastMigration: this.migrationLog.length > 0
-                ? this.migrationLog[this.migrationLog.length - 1].timestamp
-                : 0
+            lastMigration: lastLogEntry ? lastLogEntry.timestamp : 0
         };
     }
     /**
@@ -118,42 +119,50 @@ export class MemoryBridge {
             // Query semantic memory for location concepts
             const locationQuery = {
                 query: 'location',
-                types: ['semantic'],
+                type: 'semantic',
+                criteria: {},
+                filters: { type: 'semantic' },
                 limit: 100
             };
             const semanticResults = await memorySystem.query(locationQuery);
             // Extract location data from semantic concepts
-            for (const concept of semanticResults.semantic) {
-                if (concept.attributes.location) {
-                    const location = concept.attributes.location;
-                    legacyFormat.memory[concept.name] = {
-                        x: location.x || 0,
-                        y: location.y || 64,
-                        z: location.z || 0,
-                        type: concept.attributes.type || 'unknown',
-                        importance: concept.importance,
-                        description: concept.attributes.description || ''
-                    };
+            if (semanticResults.semantic && Array.isArray(semanticResults.semantic)) {
+                for (const concept of semanticResults.semantic) {
+                    if (concept.attributes && concept.attributes.location) {
+                        const location = concept.attributes.location;
+                        legacyFormat.memory[concept.name] = {
+                            x: location.x || 0,
+                            y: location.y || 64,
+                            z: location.z || 0,
+                            type: concept.attributes.type || 'unknown',
+                            importance: concept.importance,
+                            description: concept.attributes.description || ''
+                        };
+                    }
                 }
             }
             // Add episodic location memories
             const episodicQuery = {
                 query: 'location',
-                types: ['episodic'],
+                type: 'episodic',
+                criteria: {},
+                filters: { type: 'episodic' },
                 limit: 50
             };
             const episodicResults = await memorySystem.query(episodicQuery);
-            for (const event of episodicResults.episodic) {
-                if (event.location && !legacyFormat.memory[`event_${event.id}`]) {
-                    legacyFormat.memory[`event_${event.id}`] = {
-                        x: event.location.x,
-                        y: event.location.y,
-                        z: event.location.z,
-                        type: 'event_location',
-                        timestamp: event.timestamp,
-                        importance: event.importance,
-                        description: `${event.tags[0] || 'event'}: ${event.actions[0]?.action || 'unknown action'}`
-                    };
+            if (episodicResults.episodic && Array.isArray(episodicResults.episodic)) {
+                for (const event of episodicResults.episodic) {
+                    if (event.location && !legacyFormat.memory[`event_${event.id}`]) {
+                        legacyFormat.memory[`event_${event.id}`] = {
+                            x: event.location.x,
+                            y: event.location.y,
+                            z: event.location.z,
+                            type: 'event_location',
+                            timestamp: event.timestamp,
+                            importance: event.importance,
+                            description: `${event.tags && event.tags[0] ? event.tags[0] : 'event'}: ${event.actions && event.actions[0] ? event.actions[0].action : 'unknown action'}`
+                        };
+                    }
                 }
             }
             console.log(`Exported ${Object.keys(legacyFormat.memory).length} locations to legacy format`);
@@ -341,13 +350,15 @@ export class LegacyMemoryBankWrapper {
             // Query semantic memory
             const query = {
                 query: name,
-                types: ['semantic'],
+                type: 'semantic',
+                criteria: {},
+                filters: { type: 'semantic' },
                 limit: 1
             };
             const results = await this.memorySystem.query(query);
-            if (results.semantic.length > 0) {
+            if (results.semantic && Array.isArray(results.semantic) && results.semantic.length > 0) {
                 const concept = results.semantic[0];
-                if (concept.attributes.location) {
+                if (concept.attributes && concept.attributes.location) {
                     const location = concept.attributes.location;
                     this.cache.set(name, location);
                     return location;
@@ -406,13 +417,18 @@ export class LegacyMemoryBankWrapper {
         try {
             const query = {
                 query: 'location',
-                types: ['semantic'],
+                type: 'semantic',
+                criteria: {},
+                filters: { type: 'semantic' },
                 limit: 100
             };
             const results = await this.memorySystem.query(query);
-            return results.semantic
-                .filter(concept => concept.attributes.location)
-                .map(concept => concept.name);
+            if (results.semantic && Array.isArray(results.semantic)) {
+                return results.semantic
+                    .filter(concept => concept.attributes && concept.attributes.location)
+                    .map(concept => concept.name);
+            }
+            return [];
         }
         catch (error) {
             console.error('Failed to list locations:', error);

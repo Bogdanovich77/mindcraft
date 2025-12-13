@@ -169,6 +169,10 @@ export declare class PurposeCore {
      */
     generateSocialGoals(): string[];
     /**
+     * Generate social relationship goals
+     */
+    private generateSocialRelationshipGoals;
+    /**
      * Export to legacy profile format
      */
     toLegacyProfile(): any;

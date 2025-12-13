@@ -1,4 +1,7 @@
-import { Goal, GoalExecutionContext, PrioritizationFactors, GoalType, AgentState, DecisionContext } from '../langgraph/interfaces.js';
+/**
+ * Goal Prioritization Engine
+ */
+import * as Interfaces from '../langgraph/interfaces.js';
 /**
  * Goal Prioritization Engine for LangGraph v2
  *
@@ -36,7 +39,7 @@ export declare class GoalPrioritizationEngine {
     /**
      * Calculate priority score for a goal
      */
-    calculateGoalPriority(goal: Goal, agentState: AgentState, context: DecisionContext, executionContext?: GoalExecutionContext): GoalPriorityScore;
+    calculateGoalPriority(goal: Interfaces.Goal, agentState: Interfaces.AgentState, context: Interfaces.DecisionContext, executionContext?: Interfaces.GoalExecutionContext): Interfaces.GoalPriorityScore;
     /**
      * Calculate individual factor scores for a goal
      */
@@ -120,8 +123,8 @@ export declare class GoalPrioritizationEngine {
     /**
      * Prioritize multiple goals and return ranked results
      */
-    prioritizeGoals(goals: GoalType[], // Use the goal_types Goal type
-    context: GoalExecutionContext): GoalPrioritizationResult;
+    prioritizeGoals(goals: Interfaces.GoalType[], // Use the goal_types Goal type
+    context: Interfaces.GoalExecutionContext): Interfaces.GoalPrioritizationResult;
     /**
      * Get current prioritization factors and weights
      */
@@ -131,6 +134,8 @@ export declare class GoalPrioritizationEngine {
      * Helper method to calculate distance between two positions
      */
     private calculateDistance;
+    private calculateSocialPriorityFactor;
+    private calculateMotivationAlignment;
     /**
      * Helper method to calculate value alignment
      */
@@ -140,6 +145,10 @@ export declare class GoalPrioritizationEngine {
      * Returns a numeric score (0-1) for goal feasibility
      */
     private calculateFeasibilityScore;
+    private calculateResourceAvailabilityFactor;
+    private calculateToolAvailabilityFactor;
+    private calculateAssistanceFactor;
+    private calculateCostFactor;
     /**
      * Calculate enhanced resource score with detailed assessment
      * Returns a numeric score (0-1) for resource efficiency and availability
@@ -165,6 +174,8 @@ export declare class GoalPrioritizationEngine {
      * Calculate environmental fit assessment
      */
     private calculateEnvironmentalFit;
+    private calculateResourceFactor;
+    private calculateGoalTypeFactor;
     /**
      * Calculate time feasibility based on deadlines and duration
      */
@@ -177,5 +188,7 @@ export declare class GoalPrioritizationEngine {
      * Extract required skills from goal description
      */
     private extractRequiredSkills;
+    private calculateSkillFactor;
+    private calculateSkillPriorityFactor;
 }
 //# sourceMappingURL=goal_prioritization.d.ts.map

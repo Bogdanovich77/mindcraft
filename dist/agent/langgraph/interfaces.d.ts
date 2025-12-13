@@ -223,7 +223,7 @@ export interface Skill {
 }
 export interface Goal {
     id: string;
-    type: 'strategic' | 'tactical' | 'operational';
+    type: 'strategic' | 'tactical' | 'operational' | 'social' | 'collaborative' | 'crafting' | 'exploration' | 'mining' | 'building';
     priority: 'critical' | 'high' | 'medium' | 'low';
     status: 'pending' | 'active' | 'completed' | 'failed' | 'paused';
     description: string;
@@ -532,6 +532,7 @@ export interface SocialState {
     agentId?: string;
     trustLevels?: Map<string, number>;
     mentalModels?: Map<string, MentalModel>;
+    nearbyAgents: string[];
 }
 export interface Relationship {
     agentId: string;
@@ -600,7 +601,6 @@ export interface Plan {
     description: string;
     goalId: string;
     steps: PlanStep[];
-    dependencies: string[];
     estimatedDuration: number;
     requiredResources: ResourceRequirement[];
     requiredSkills: SkillRequirement[];
@@ -1158,6 +1158,7 @@ export interface GoalDependency {
 export interface RankedGoal extends Goal {
     priorityScore: number;
     factors: PrioritizationFactors;
+    rank: number;
 }
 export interface PrioritizationFactors {
     urgency: number;
