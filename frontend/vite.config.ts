@@ -168,6 +168,8 @@ export default defineConfig(({ mode }) => {
       ],
       // Force optimization to prevent duplicate React instances
       force: true,
+      // Ensure single instance of React and related packages
+      preBundleExtensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
     },
     // Experimental features for production
     experimental: {

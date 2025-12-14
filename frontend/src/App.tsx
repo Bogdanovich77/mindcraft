@@ -51,9 +51,10 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     const initializeStreamingServices = async () => {
       try {
-        console.log('🚀 Starting simplified streaming services initialization...');
+        console.log('🚀 Starting event-driven streaming services initialization...');
         
-        // Initialize the socket service first with default config
+        // Step 1: Initialize the socket service first
+        console.log('📡 Step 1: Initializing socket service...');
         const socketService = initializeSocket({
           url: import.meta.env.VITE_SOCKET_URL || 'http://localhost:8080',
           options: {
@@ -66,50 +67,42 @@ const AppContent: React.FC = () => {
           },
         });
         
-        // Connect to the server first
-        console.log('📡 Connecting to server...');
+        // Step 2: Connect to the server and wait for successful connection
+        console.log('📡 Step 2: Establishing server connection...');
         await dispatch(connectToServer()).unwrap();
+        console.log('✅ Server connection established successfully');
         
-        // Initialize streaming service once
-        console.log('📊 Creating simplified streams...');
+        // Step 3: Initialize streaming service
+        console.log('📊 Step 3: Creating simplified streams...');
         const { streamingService } = await import('./services/streamingService');
         
         // Ensure streams are created before proceeding
         await streamingService.createSimplifiedStreams();
+        console.log('✅ Streaming service initialized successfully');
         
-        // Wait a brief moment for streams to be fully registered
-        await new Promise(resolve => setTimeout(resolve, 50));
+        // Step 4: Initialize agents socket system
+        console.log('🤖 Step 4: Initializing simplified agent system...');
+        await dispatch(initializeAgentsSocket()).unwrap();
+        console.log('✅ Agent system initialized successfully');
         
-        // Then initialize simplified agents socket
-        console.log('🤖 Initializing simplified agent system...');
-        const initPromises = [
-          dispatch(initializeAgentsSocket()).unwrap(),
-        ];
-        
-        // Wait for all to complete with error handling
-        const results = await Promise.allSettled(initPromises);
-        
-        // Check for any failed initializations
-        const failed = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
-        if (failed.length > 0) {
-          console.warn('⚠️ Some simplified components failed to initialize:', failed.map(f => f.reason));
-        } else {
-          console.log('✅ Simplified components initialized successfully');
-        }
-        
-        console.log('🎉 Simplified streaming services initialized successfully');
+        console.log('🎉 All event-driven streaming services initialized successfully');
         
       } catch (error) {
-        console.error('❌ Failed to initialize simplified streaming services:', error);
+        console.error('❌ Failed to initialize streaming services:', error);
+        console.error('Error details:', {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString()
+        });
+        
         // Don't let initialization failure crash the app
         // The dashboard will show connection status and allow retry
       }
     };
 
-    // Add a small delay to ensure React is fully mounted
-    const timer = setTimeout(initializeStreamingServices, 100);
+    // Start initialization immediately without artificial delays
+    initializeStreamingServices();
     
-    return () => clearTimeout(timer);
   }, [dispatch]);
 
   return (

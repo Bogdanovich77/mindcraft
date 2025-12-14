@@ -400,6 +400,20 @@ export function createMindServer(host_public = false, port = 8080) {
             addListener(socket);
         });
 
+        socket.on('listen-to-agents', () => {
+            addListener(socket);
+        });
+
+        // FIX: Add handler for get_agent_list to support explicit agent list requests
+        socket.on('get_agent_list', () => {
+            console.log('[MindServer] Received get_agent_list request');
+            try {
+                agentsStatusUpdate(socket);
+            } catch (error) {
+                console.error('Failed to send agents status on get_agent_list request:', error);
+            }
+        });
+
         // Ping handler for frontend latency monitoring
         socket.on('ping', (data) => {
             // Echo back the ping data as pong for latency monitoring

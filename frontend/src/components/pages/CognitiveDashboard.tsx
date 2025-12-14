@@ -83,6 +83,7 @@ const a11yProps = (index: number) => {
 };
 
 const CognitiveDashboard: React.FC = () => {
+  // Initialize hooks at the top level (following Rules of Hooks)
   const dispatch = useAppDispatch();
   const agents = useAppSelector(selectAllAgents);
   const loading = useAppSelector(selectAgentsLoading);
@@ -122,7 +123,7 @@ const CognitiveDashboard: React.FC = () => {
     dispatch(clearConnectionError());
   };
 
-  // Enhanced refresh with loading state - Fixed to use correct events
+  // Enhanced refresh with loading state and retry mechanism
   const handleRefresh = async () => {
     const socketService = getSocketService();
     if (!socketService) {
@@ -130,14 +131,38 @@ const CognitiveDashboard: React.FC = () => {
       return;
     }
    
-    console.log('[CognitiveDashboard] Refreshing agent list...');
+    console.log('[CognitiveDashboard] Refreshing agent list with retry mechanism...');
     setRefreshing(true);
     
     try {
-      socketService.requestAgentList(); // This uses the correct 'get_agent_list' event
+      // Request agent list multiple times to ensure it's received
+      socketService.requestAgentList();
       socketService.send('listen-to-agents', {});
       
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Add retry mechanism for refresh
+      let retryCount = 0;
+      const maxRetries = 3;
+      const retryDelay = 800;
+      
+      const retryRefresh = () => {
+        if (retryCount < maxRetries && Object.keys(agents).length === 0) {
+          retryCount++;
+          console.log(`[CognitiveDashboard] Refresh retry ${retryCount}/${maxRetries}`);
+          
+          setTimeout(() => {
+            socketService.requestAgentList();
+            if (retryCount < maxRetries) {
+              retryRefresh();
+            }
+          }, retryDelay);
+        }
+      };
+      
+      // Start retry after initial request
+      setTimeout(retryRefresh, 500);
+      
+      // Wait for at least one retry cycle
+      await new Promise(resolve => setTimeout(resolve, 2000));
     } catch (error) {
       console.error('[CognitiveDashboard] Error refreshing agents:', error);
     } finally {
@@ -156,7 +181,7 @@ const CognitiveDashboard: React.FC = () => {
       console.log('[CognitiveDashboard] Component unmounting, cleaning up');
       // Add any necessary cleanup here if needed
     };
-  }, []); // No dependencies needed since we're just logging
+  }, []);
 
   // Sync tab value with activeTab from store
   useEffect(() => {

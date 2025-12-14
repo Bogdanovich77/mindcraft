@@ -16,7 +16,7 @@ const selectAgentsObject = createSelector(
 // Socket.IO initialization thunk
 export const initializeAgentsSocket = createAsyncThunk(
   'agents/initializeAgentsSocket',
-  async (_, { rejectWithValue, dispatch }) => {
+  async (_, { rejectWithValue, dispatch, getState }) => {
     try {
       // Import socketService dynamically to avoid circular dependencies
       const { getSocketService } = await import('../../services/socketService');
@@ -72,37 +72,155 @@ export const initializeAgentsSocket = createAsyncThunk(
         dispatch(setAgents(agentSummaries));
       });
 
-      // Add throttling for agentUpdate events to prevent continuous update loops
+      // Improved debouncing and throttling for agentUpdate events to prevent UI storms
       let lastUpdateTime = 0;
-      const UPDATE_THROTTLE_MS = 1000; // 1 second minimum between updates
+      let pendingUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+      let pendingUpdateData: any = null;
       
-      // Add listener for agentUpdate events (the real-time updates)
+      const UPDATE_THROTTLE_MS = 500; // Reduced to 500ms for more responsive updates
+      const DEBOUNCE_DELAY_MS = 200; // Debounce rapid updates
+      
+      const processPendingUpdate = () => {
+        if (pendingUpdateData) {
+          const now = Date.now();
+          console.log('[AgentsSlice] Processing debounced agent update:', pendingUpdateData);
+          
+          // Transform object format to array format
+          const agentsArray = Object.entries(pendingUpdateData).map(([name, agentData]: [string, any]) => ({
+            id: name,
+            name: name,
+            profile: 'default',
+            status: agentData.gameplay?.in_game ? 'online' : 'offline',
+            position: agentData.position || { x: 0, y: 64, z: 0 },
+            health: agentData.gameplay?.health || 20,
+            level: 1,
+            lastUpdate: now,
+          }));
+          
+          dispatch(setAgents(agentsArray));
+          pendingUpdateData = null;
+          lastUpdateTime = now;
+        }
+        pendingUpdateTimeout = null;
+      };
+      
+      // Add listener for agentUpdate events with improved debouncing
       socketService.on('agentUpdate', (data: any) => {
         const now = Date.now();
+        
+        // Throttle check - skip if we updated too recently
         if (now - lastUpdateTime < UPDATE_THROTTLE_MS) {
-          return; // Skip this update to prevent spam
+          console.log('[AgentsSlice] Throttling agent update, skipping:', data);
+          return;
         }
-        lastUpdateTime = now;
         
-        console.log('[AgentsSlice] Received agent update:', data);
+        // Store the latest data
+        pendingUpdateData = data;
         
-        // Transform object format to array format
-        const agentsArray = Object.entries(data).map(([name, agentData]: [string, any]) => ({
-          id: name,
-          name: name,
-          profile: 'default',
-          status: agentData.gameplay?.in_game ? 'online' : 'offline',
-          position: agentData.position || { x: 0, y: 64, z: 0 },
-          health: agentData.gameplay?.health || 20,
-          level: 1,
-          lastUpdate: now,
-        }));
+        // Clear any existing timeout
+        if (pendingUpdateTimeout) {
+          clearTimeout(pendingUpdateTimeout);
+        }
         
-        dispatch(setAgents(agentsArray));
+        // Set new timeout to process the update after debounce delay
+        pendingUpdateTimeout = setTimeout(processPendingUpdate, DEBOUNCE_DELAY_MS);
       });
 
+      // Request agent list after setting up listeners with improved retry mechanism
+      console.log('[AgentsSlice] Requesting agent list after initialization...');
+      
+      // Immediate request after listeners are set up
+      socketService.requestAgentList();
+      
+      // Improved retry mechanism with exponential backoff and better error handling
+      let retryCount = 0;
+      const maxRetries = 5; // Increased max retries but with longer delays
+      const baseRetryDelay = 2000; // Start with 2 seconds
+      let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+      
+      const retryAgentListRequest = async () => {
+        if (retryCount >= maxRetries) {
+          console.warn(`[AgentsSlice] Max retries (${maxRetries}) reached for agent list request`);
+          return;
+        }
+        
+        retryCount++;
+        const delay = baseRetryDelay * Math.pow(2, retryCount - 1); // Exponential backoff
+        const maxDelay = 16000; // Cap at 16 seconds
+        const actualDelay = Math.min(delay, maxDelay);
+        
+        console.log(`[AgentsSlice] Retry attempt ${retryCount}/${maxRetries} for agent list (delay: ${actualDelay}ms)...`);
+        
+        // Clear any existing timeout
+        if (retryTimeout) {
+          clearTimeout(retryTimeout);
+        }
+        
+        retryTimeout = setTimeout(async () => {
+          try {
+            // Check if we have agents before retrying
+            const currentState = getState() as { agents: AgentsState };
+            const currentAgents = Object.keys(currentState.agents.agents);
+            
+            if (currentAgents.length > 0) {
+              console.log(`[AgentsSlice] Agents received successfully! Found ${currentAgents.length} agents.`);
+              return;
+            }
+            
+            // Request agent list again
+            socketService.requestAgentList();
+            
+            // Wait a bit for the response before checking again
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Check if we received agents after this request
+            const updatedState = getState() as { agents: AgentsState };
+            const updatedAgents = Object.keys(updatedState.agents.agents);
+            
+            if (updatedAgents.length > 0) {
+              console.log(`[AgentsSlice] Agents received after retry ${retryCount}! Found ${updatedAgents.length} agents.`);
+            } else {
+              console.log(`[AgentsSlice] No agents received after retry ${retryCount}, scheduling next retry...`);
+              retryAgentListRequest();
+            }
+            
+          } catch (error) {
+            console.error(`[AgentsSlice] Error during retry ${retryCount}:`, error);
+            retryAgentListRequest(); // Retry on error as well
+          }
+        }, actualDelay);
+      };
+      
+      // Start retry mechanism after a longer initial delay to allow for proper connection establishment
+      setTimeout(() => {
+        const currentState = getState() as { agents: AgentsState };
+        const currentAgents = Object.keys(currentState.agents.agents);
+        
+        if (currentAgents.length === 0) {
+          console.log('[AgentsSlice] No agents after initial request, starting improved retry mechanism...');
+          retryAgentListRequest();
+        } else {
+          console.log(`[AgentsSlice] Initial agents received! Found ${currentAgents.length} agents.`);
+        }
+      }, 3000); // Increased from 2000ms to 3000ms
+      
+      // Cleanup function to clear retry timeout if component unmounts
+      return () => {
+        if (retryTimeout) {
+          clearTimeout(retryTimeout);
+        }
+      };
+
       console.log('✅ Agents socket initialization completed');
-      return true;
+      
+      // Return cleanup function for the event listeners
+      return () => {
+        // Clear any pending update timeout
+        if (pendingUpdateTimeout) {
+          clearTimeout(pendingUpdateTimeout);
+          pendingUpdateTimeout = null;
+        }
+      };
     } catch (error) {
       console.error('❌ Failed to initialize agents socket:', error);
       return rejectWithValue(error instanceof Error ? error.message : 'Failed to initialize agents socket');
@@ -567,6 +685,19 @@ export const selectAllAgents = createSelector(
   (agents) => {
     const values = Object.values(agents);
     return values.length === 0 ? EMPTY_AGENTS_ARRAY : values;
+  },
+  {
+    // Add equality function to prevent unnecessary recalculations
+    equalityCheck: (a, b) => {
+      if (a === b) return true;
+      if (!a || !b) return false;
+      if (a.length !== b.length) return false;
+      return a.every((agent, index) =>
+        agent && b[index] &&
+        agent.id === b[index].id &&
+        agent.lastUpdate === b[index].lastUpdate
+      );
+    }
   }
 );
 
@@ -583,16 +714,52 @@ export const selectSelectedAgent = createSelector(
   (agents, selectedId) => selectedId ? agents[selectedId] || null : null
 );
 
-// Create a memoized selector that properly handles array creation
+// Cache for sorted agent IDs to prevent new array creation
+const sortedAgentsCache = new Map<string, string[]>();
+
+// Create a memoized selector that properly handles array creation with improved caching
 export const selectAgentIds = createSelector(
   [selectAgentsObject],
   (agents) => {
     const keys = Object.keys(agents);
+    
+    // Always return the same frozen empty array for empty state
     if (keys.length === 0) {
       return EMPTY_ARRAY;
     }
-    // Sort keys for consistent ordering
-    return keys.sort();
+    
+    // Create a stable cache key that accounts for agent order and content
+    // Include both the count and the sorted keys to prevent collisions
+    const sortedKeys = [...keys].sort();
+    const cacheKey = `${keys.length}:${sortedKeys.join(',')}`;
+    
+    // Return cached array if available
+    if (sortedAgentsCache.has(cacheKey)) {
+      return sortedAgentsCache.get(cacheKey)!;
+    }
+    
+    // Create and cache the new array
+    const frozenArray = Object.freeze(sortedKeys);
+    sortedAgentsCache.set(cacheKey, frozenArray);
+    
+    // Improved cache management - clean oldest entries when cache gets large
+    if (sortedAgentsCache.size > 50) { // Reduced from 100 to prevent memory issues
+      // Delete the oldest entries (first 25% of the cache)
+      const entriesToDelete = Math.floor(sortedAgentsCache.size * 0.25);
+      const keysToDelete = Array.from(sortedAgentsCache.keys()).slice(0, entriesToDelete);
+      keysToDelete.forEach(key => sortedAgentsCache.delete(key));
+    }
+    
+    return frozenArray;
+  },
+  {
+    // Add equality function to prevent unnecessary recalculations
+    equalityCheck: (a, b) => {
+      if (a === b) return true;
+      if (!a || !b) return false;
+      if (a.length !== b.length) return false;
+      return a.every((val, index) => val === b[index]);
+    }
   }
 );
 
@@ -604,6 +771,20 @@ export const selectOnlineAgents = createSelector(
   (agents) => {
     const onlineAgents = Object.values(agents).filter(agent => agent.status === 'online');
     return onlineAgents.length === 0 ? EMPTY_AGENTS_ARRAY : onlineAgents;
+  },
+  {
+    // Add equality function to prevent unnecessary recalculations
+    equalityCheck: (a, b) => {
+      if (a === b) return true;
+      if (!a || !b) return false;
+      if (a.length !== b.length) return false;
+      return a.every((agent, index) =>
+        agent && b[index] &&
+        agent.id === b[index].id &&
+        agent.status === b[index].status &&
+        agent.lastUpdate === b[index].lastUpdate
+      );
+    }
   }
 );
 
