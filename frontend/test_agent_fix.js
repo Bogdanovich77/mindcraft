@@ -7,7 +7,7 @@ import { io } from 'socket.io-client';
 
 console.log('🔍 Testing agent data transformation fix...');
 
-const socket = io('http://localhost:8080', {
+const socket = io('http://localhost:8000', {
   transports: ['websocket', 'polling'],
   timeout: 10000,
   reconnection: false

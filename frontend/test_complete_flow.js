@@ -2,7 +2,7 @@ const { io } = require('socket.io-client');
 
 console.log('🔍 Testing complete frontend data flow...');
 
-const socket = io('http://localhost:8080');
+const socket = io('http://localhost:8000');
 
 socket.on('connect', () => {
   console.log('✅ Connected to MindServer');
