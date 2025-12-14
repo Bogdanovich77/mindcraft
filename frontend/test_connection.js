@@ -9,7 +9,7 @@ console.log('🔍 Testing WebSocket connection to MindServer...');
 console.log('Make sure the backend is running with: npm run dev or node main.js');
 console.log('');
 
-const socket = io('http://localhost:8080', {
+const socket = io('http://localhost:8000', {
   transports: ['websocket', 'polling'],
   timeout: 10000,
   reconnection: false
@@ -25,8 +25,8 @@ testTimeout = setTimeout(() => {
     console.log('');
     console.log('🔧 Troubleshooting:');
     console.log('1. Ensure the MindServer backend is running');
-    console.log('2. Check that port 8080 is not blocked');
-    console.log('3. Verify no other application is using port 8080');
+    console.log('2. Check that port 8000 is not blocked');
+    console.log('3. Verify no other application is using port 8000');
     console.log('4. Try restarting the backend server');
     process.exit(1);
   }

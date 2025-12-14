@@ -20,7 +20,7 @@ import type {
 import { getSocketService } from './socketService';
 
 // Base API configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 const API_TIMEOUT = 30000; // 30 seconds timeout
 
 // Retry configuration

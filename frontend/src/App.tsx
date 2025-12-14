@@ -56,7 +56,7 @@ const AppContent: React.FC = () => {
         // Step 1: Initialize the socket service first
         console.log('📡 Step 1: Initializing socket service...');
         const socketService = initializeSocket({
-          url: import.meta.env.VITE_SOCKET_URL || 'http://localhost:8080',
+          url: import.meta.env.VITE_SOCKET_URL || 'http://localhost:8000',
           options: {
             transports: ['websocket', 'polling'],
             timeout: 20000,

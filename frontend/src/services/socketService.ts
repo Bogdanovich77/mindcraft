@@ -145,7 +145,7 @@ class SocketService {
           let errorMessage = 'Unknown connection error';
           if (error.message) {
             if (error.message.includes('ECONNREFUSED')) {
-              errorMessage = 'Backend server is not running or not accessible on port 8080';
+              errorMessage = 'Backend server is not running or not accessible on port 8000';
             } else if (error.message.includes('timeout')) {
               errorMessage = 'Connection timeout - server may be overloaded or network issues';
             } else if (error.message.includes('WebSocket is closed')) {

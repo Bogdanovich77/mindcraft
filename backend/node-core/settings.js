@@ -4,9 +4,9 @@ const settings = {
     "port": 55916, // set to -1 to automatically scan for open ports
     "auth": "offline", // or "microsoft"
 
-    // the mindserver manages all agents and hosts the UI
-    "mindserver_port": 8080,
-    "auto_open_ui": true, // opens UI in browser on startup
+    // the mindserver manages all agents (internal Socket.IO server only)
+    "mindserver_port": 8081,
+    "auto_open_ui": false, // UI is now handled by FastAPI Gateway on port 8000
     
     "base_profile": "survival", // survival, assistant, creative, or god_mode
     
@@ -68,14 +68,15 @@ const settings = {
   
     "log_all_prompts": false, // log ALL prompts to file
 
-    // DEPRECATION SETTINGS
-    "ui_deprecation": {
-        "old_ui_deprecated": true,
-        "old_ui_port": 8080,
-        "new_ui_port": 5173,
+    // FASTAPI GATEWAY MIGRATION SETTINGS
+    "gateway_migration": {
+        "completed": true,
+        "agent_core_port": 8081,  // Internal Node.js Socket.IO server
+        "gateway_port": 8000,      // FastAPI Gateway (external API)
+        "frontend_port": 5173,     // React Frontend
         "sunset_date": "2026-12-31",
-        "show_deprecation_warning": true,
-        "auto_redirect": true
+        "old_ui_deprecated": true,
+        "old_ui_port": 8080        // Legacy port (no longer used)
     }
 
 }

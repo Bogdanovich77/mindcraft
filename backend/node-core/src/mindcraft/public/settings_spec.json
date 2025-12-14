@@ -1,4 +1,5 @@
 {
+    "_DEPRECATION_NOTICE": "This file is deprecated as part of the FastAPI Gateway migration. Settings spec is now handled by the FastAPI Gateway on port 8000. This file is kept for reference only.",
     "profile": {
         "type": "object",
         "required": true,

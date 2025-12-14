@@ -1,10 +1,10 @@
-import * as Mindcraft from './dist/src/mindcraft/mindcraft.js';
-import settings, { setSettings } from './dist/src/agent/settings.js';
+import * as Mindcraft from './src/mindcraft/mindcraft.js';
+import settings, { setSettings } from './src/agent/settings.js';
 import settingsConfig from './settings.js';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { readFileSync } from 'fs';
-import { createAgentLoader } from './dist/src/agent/langgraph_agent_loader.js';
+import { createAgentLoader } from './src/agent/langgraph_agent_loader.js';
 
 // Initialize the global settings object with the configuration from settings.js
 setSettings(settingsConfig);
@@ -84,8 +84,8 @@ if (settings.auto_open_ui && settings.ui_deprecation?.old_ui_deprecated !== fals
     console.log('');
 }
 
-// Initialize Mindcraft server
-Mindcraft.init(true, settings.mindserver_port, settings.auto_open_ui);
+// Initialize Mindcraft server with internal port (no UI auto-open)
+Mindcraft.init(true, settings.mindserver_port, false);
 
 // Initialize agent loader based on system configuration
 const agentLoader = createAgentLoader();
@@ -137,9 +137,9 @@ async function initializeAgents() {
                         init_message: settings.init_message || null
                     }, viewer_port);
                     
-                    // Connect the agent to the MindServer
+                    // Connect the agent to the MindServer (internal port)
                     console.log(`[DEBUG] Connecting agent ${agent.profile.name} to MindServer...`);
-                    agent.connectToMindServer(settings.mindserver_port || 8080);
+                    agent.connectToMindServer(settings.mindserver_port || 8081);
                     
                     agentIndex++;
                     console.log(`[DEBUG] Registered LangGraph agent: ${agent.profile.name}`);

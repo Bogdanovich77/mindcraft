@@ -1,17 +1,12 @@
 import { Server } from 'socket.io';
-import express from 'express';
-import http from 'http';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { createServer } from 'http';
 import * as mindcraft from './mindcraft.js';
-import { readFileSync } from 'fs';
 import ProfileManager from './profileManager.js';
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Mindserver is:
 // - central hub for communication between all agent processes
-// - api to control from other languages and remote users 
-// - host for webapp
+// - internal Socket.IO server for Agent Core Service
+// - handles agent lifecycle management and real-time state updates
 
 let io;
 let server;
@@ -102,7 +97,13 @@ function emitMessageSent(agentName, message, target = null) {
     }
 }
 
-const settings_spec = JSON.parse(readFileSync(path.join(__dirname, 'public/settings_spec.json'), 'utf8'));
+// Settings spec is now handled by the FastAPI Gateway
+// const settings_spec = JSON.parse(readFileSync(path.join(__dirname, 'public/settings_spec.json'), 'utf8'));
+const settings_spec = {
+    // Default settings spec for internal validation
+    required: ['profile'],
+    default: {}
+};
 
 class AgentConnection {
     constructor(settings, viewer_port) {
@@ -169,51 +170,19 @@ function setupSimplifiedAgentEventHandlers(agentSocket, agentName) {
     });
 }
 
-// Initialize the server
-export function createMindServer(host_public = false, port = 8080) {
-    const app = express();
-    server = http.createServer(app);
-    io = new Server(server);
-
-    // Serve static files with deprecation warnings
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    
-    // Add deprecation middleware
-    app.use((req, res, next) => {
-        // Add deprecation headers for all non-API routes
-        if (!req.path.startsWith('/api')) {
-            res.setHeader('Deprecation', 'true');
-            res.setHeader('Sunset', '2026-12-31'); // One year deprecation timeline
-            res.setHeader('Link', '<http://localhost:5173>; rel="new-ui"; type="text/html"');
+// Initialize the internal Socket.IO server
+export function createMindServer(host_public = false, port = 8081) {
+    // Create HTTP server for Socket.IO only (no Express)
+    server = createServer();
+    io = new Server(server, {
+        cors: {
+            origin: ["http://localhost:8000", "http://localhost:5173"], // Allow FastAPI Gateway and Frontend
+            methods: ["GET", "POST"]
         }
-        next();
     });
 
-    // Add redirect for root path to new UI
-    app.get('/', (req, res) => {
-        console.log('[DEPRECATION] Old UI accessed from', req.ip, '- redirecting to new UI');
-        res.status(301).send({
-            message: 'This interface is deprecated. Please use the new UI at http://localhost:5173',
-            redirect: 'http://localhost:5173',
-            deprecationNotice: 'The old UI (port 8080) will be discontinued. Please update your bookmarks.',
-            migrationGuide: 'See documentation for migration instructions.'
-        });
-    });
-
-    // Add deprecation warning for static files
-    app.use(express.static(path.join(__dirname, 'public'), {
-        setHeaders: (res, path) => {
-            res.setHeader('Deprecation', 'true');
-            res.setHeader('Sunset', '2026-12-31');
-            res.setHeader('X-Deprecation-Warning', 'This UIered content will be removed. Use the new UI at http://localhost:5173');
-        }
-    }));
-    
-    // Add JSON middleware for REST API
-    app.use(express.json());
-    
-    // REST API Routes for Profile Management
-    setupProfileRoutes(app);
+    console.log('[Agent Core Service] Starting internal Socket.IO server...');
+    console.log('[Agent Core Service] This server only accepts internal connections from FastAPI Gateway');
 
     // Socket.io connection handling
     io.on('connection', (socket) => {
@@ -457,198 +426,28 @@ export function createMindServer(host_public = false, port = 8080) {
             // Echo back the ping data as pong for latency monitoring
             socket.emit('pong', data);
         });
-    });
 
-    // Socket.IO Events for Profile Management
-    setupProfileSocketHandlers(socket);
+        // Socket.IO Events for Profile Management (kept for internal FastAPI communication)
+        setupProfileSocketHandlers(socket);
+    });
 
     let host = host_public ? '0.0.0.0' : 'localhost';
     server.listen(port, host, () => {
-        console.log(`MindServer running on port ${port}`);
-        console.log(`⚠️  DEPRECATION WARNING: The old UI (port ${port}) is deprecated and will be discontinued.`);
-        console.log(`   Please use the new UI at http://localhost:5173`);
-        console.log(`   Migration guide: http://localhost:${port}/api/deprecation-info`);
-        console.log(`   Sunset: 2026-12-31`);
+        console.log(`[Agent Core Service] Internal Socket.IO server running on port ${port}`);
+        console.log(`[Agent Core Service] Ready for internal communication from FastAPI Gateway`);
+        console.log(`[Agent Core Service] External API requests should go to port 8000 (FastAPI Gateway)`);
     });
 
     return server;
 }
 
 /**
- * Setup REST API routes for profile management
+ * REST API routes are now handled by the FastAPI Gateway
+ * This function is kept for reference but no longer used
  */
 function setupProfileRoutes(app) {
-    // GET /api/profiles - List all profiles
-    app.get('/api/profiles', async (req, res) => {
-        try {
-            const profiles = await profileManager.getProfiles();
-            res.json({
-                success: true,
-                data: profiles,
-                meta: {
-                    timestamp: new Date().toISOString(),
-                    count: profiles.length
-                }
-            });
-        } catch (error) {
-            console.error('GET /api/profiles error:', error);
-            res.status(500).json({
-                success: false,
-                error: error.message,
-                meta: {
-                    timestamp: new Date().toISOString()
-                }
-            });
-        }
-    });
-
-    // GET /api/profiles/:name - Get specific profile
-    app.get('/api/profiles/:name', async (req, res) => {
-        try {
-            const { name } = req.params;
-            const profile = await profileManager.getProfile(name);
-            res.json({
-                success: true,
-                data: profile,
-                meta: {
-                    timestamp: new Date().toISOString()
-                }
-            });
-        } catch (error) {
-            console.error(`GET /api/profiles/${req.params.name} error:`, error);
-            res.status(404).json({
-                success: false,
-                error: error.message,
-                meta: {
-                    timestamp: new Date().toISOString()
-                }
-            });
-        }
-    });
-
-    // PUT /api/profiles/:name - Update profile
-    app.put('/api/profiles/:name', async (req, res) => {
-        try {
-            const { name } = req.params;
-            const profileData = req.body;
-            
-            const updatedProfile = await profileManager.saveProfile(name, profileData);
-            res.json({
-                success: true,
-                data: updatedProfile,
-                meta: {
-                    timestamp: new Date().toISOString(),
-                    message: `Profile '${name}' updated successfully`
-                }
-            });
-        } catch (error) {
-            console.error(`PUT /api/profiles/${req.params.name} error:`, error);
-            res.status(400).json({
-                success: false,
-                error: error.message,
-                meta: {
-                    timestamp: new Date().toISOString()
-                }
-            });
-        }
-    });
-
-    // POST /api/profiles - Create new profile
-    app.post('/api/profiles', async (req, res) => {
-        try {
-            const profileData = req.body;
-            
-            const newProfile = await profileManager.createProfile(profileData);
-            res.status(201).json({
-                success: true,
-                data: newProfile,
-                meta: {
-                    timestamp: new Date().toISOString(),
-                    message: `Profile '${newProfile.name}' created successfully`
-                }
-            });
-        } catch (error) {
-            console.error('POST /api/profiles error:', error);
-            res.status(400).json({
-                success: false,
-                error: error.message,
-                meta: {
-                    timestamp: new Date().toISOString()
-                }
-            });
-        }
-    });
-
-    // DELETE /api/profiles/:name - Delete profile
-    app.delete('/api/profiles/:name', async (req, res) => {
-        try {
-            const { name } = req.params;
-            
-            await profileManager.deleteProfile(name);
-            res.json({
-                success: true,
-                data: null,
-                meta: {
-                    timestamp: new().toISOString(),
-                    message: `Profile '${疲惫'${name}' deleted successfully`
-                }
-            });
-        } catch (error) {
-            console.error(`DELETE /api/profiles/${req.params.name} error:`, error);
-            res.status(404).json({
-               : false,
-                error: error.message,
-                meta: {
-                    timestamp: new().toISOString()
-                }
-            });
-        }
-    });
-
-    // DEPRECATION INFO /api/deprecation-info - Migration information
-    app.get('/api/deprecation-info', (req, res) => {
-        res.json({
-            success: true,
-            data: {
-                title: 'UI Deprecation Notice',
-                message: 'The old UI (port 8080) is deprecated and will be discontinued.',
-                sunsetDate: '2026-12-31',
-                newUI: {
-                    url: 'http://localhost:5173',
-                    description: 'New React-based cognitive dashboard with enhanced features'
-                },
-                migration: {
-                    steps: [
-                        'Update your bookmarks from port 8080 to 5173',
-                        'The new UI provides all functionality of the old interface',
-                        'API endpoints remain unchanged for backend integration',
-                        'Development workflow: npm run dev in frontend/ directory'
-                    ],
-                    benefits: [
-                        'Modern React-based interface',
-                        'Real-time updates and improved performance',
-                        'Enhanced agent visualization',
-                        'Better error handling and debugging tools',
-                        'Mobile-responsive design'
-                    ]
-                },
-                timeline: {
-                    '2025-12-14': 'Deprecation announcement',
-                    '2026-06-01': 'Begin deprecation warnings',
-                    '2026-12-31': 'Final sunset of old UI'
-                },
-                support: {
-                    'documentation': 'See README.md for new UI setup',
-                    'issues': 'Report issues on GitHub',
-                    'community': 'Discord support available'
-                }
-            },
-            meta: {
-                timestamp: new Date().toISOString(),
-                apiVersion: '1.0.0'
-            }
-        });
-    });
+    // REST API routes moved to FastAPI Gateway
+    console.log('[Agent Core Service] REST API routes are now handled by FastAPI Gateway on port 8000');
 }
 
 /**
