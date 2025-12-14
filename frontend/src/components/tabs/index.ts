@@ -14,6 +14,10 @@ export { default as GoalsTab } from './GoalsTab';
 export { default as SocialTab } from './SocialTab';
 export { default as SkillsTab } from './SkillsTab';
 export { default as PerformanceTab } from './PerformanceTab';
+export { default as SelfAwarenessTab } from './SelfAwarenessTab';
+export { default as DriveTab } from './DriveTab';
+export { default as ConversationLogTab } from './ConversationLogTab';
+export { default as SimplifiedFlowTab } from './SimplifiedFlowTab';
 
 // Re-export types for convenience
 export type {

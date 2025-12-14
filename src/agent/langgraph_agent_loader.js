@@ -12,38 +12,52 @@ import settings from '../settings.js';
 
 export class LangGraphAgentLoader {
     constructor() {
-        this.profileAdapter = new ProfileAdapter({
-            autoMigrate: true,
-            backupOriginal: false,
-            validateOnLoad: true,
-            preserveLegacy: true
-        });
+        console.log('[DEBUG] LangGraphAgentLoader constructor - initializing profile adapter...');
+        try {
+            this.profileAdapter = new ProfileAdapter({
+                autoMigrate: true,
+                backupOriginal: false,
+                validateOnLoad: true,
+                preserveLegacy: true
+            });
+            console.log('[DEBUG] ProfileAdapter initialized successfully');
+        } catch (error) {
+            console.error('[DEBUG] Failed to initialize ProfileAdapter:', error);
+            throw error;
+        }
     }
 
     /**
      * Load agent based on profile type
      */
     async loadAgent(profilePath, options = {}) {
+        console.log(`[DEBUG] Loading agent from profile: ${profilePath}`);
         try {
             // Load and enhance profile
+            console.log('[DEBUG] Step 1: Loading profile...');
             const profile = await this.profileAdapter.loadProfile(profilePath);
+            console.log(`[DEBUG] Profile loaded: ${profile.name}, agentType: ${profile.agentType}, compatibilityMode: ${profile.compatibilityMode}`);
             
             // Determine agent type based on profile
+            console.log('[DEBUG] Step 2: Determining agent type...');
             const agentType = this.determineAgentType(profile);
+            console.log(`[DEBUG] Determined agent type: ${agentType}`);
             
             console.log(`Loading agent '${profile.name}' as ${agentType} type`);
             
             switch (agentType) {
                 case 'langgraph_v2':
+                    console.log('[DEBUG] Step 3: Loading LangGraph agent...');
                     return await this.loadLangGraphAgent(profile, options);
                     
                 case 'legacy':
                 default:
+                    console.log('[DEBUG] Step 3: Loading legacy agent...');
                     return await this.loadLegacyAgent(profile, options);
             }
             
         } catch (error) {
-            console.error(`Failed to load agent from ${profilePath}:`, error);
+            console.error(`[DEBUG] Failed to load agent from ${profilePath}:`, error);
             throw error;
         }
     }
@@ -52,19 +66,30 @@ export class LangGraphAgentLoader {
      * Determine the appropriate agent type for a profile
      */
     determineAgentType(profile) {
+        console.log(`[DEBUG] determineAgentType called with profile:`, {
+            name: profile.name,
+            agentType: profile.agentType,
+            profileVersion: profile.profileVersion,
+            compatibilityMode: profile.compatibilityMode,
+            hasPurposeCore: !!profile.purposeCore
+        });
+
         // Check if profile has been migrated to LangGraph v2
         if (profile.agentType === 'langgraph_v2' || 
             profile.profileVersion === '2.0.0' ||
             profile.purposeCore) {
+            console.log('[DEBUG] determineAgentType returning: langgraph_v2 (condition 1)');
             return 'langgraph_v2';
         }
         
         // Check compatibility mode setting
         if (profile.compatibilityMode === 'new_only') {
+            console.log('[DEBUG] determineAgentType returning: langgraph_v2 (condition 2)');
             return 'langgraph_v2';
         }
         
         // Default to legacy for backward compatibility
+        console.log('[DEBUG] determineAgentType returning: legacy (default)');
         return 'legacy';
     }
 
@@ -72,27 +97,47 @@ export class LangGraphAgentLoader {
      * Load a new LangGraph agent
      */
     async loadLangGraphAgent(profile, options) {
-        const agent = new LangGraphAgent();
-        
-        // Initialize with LangGraph-specific configuration
-        await agent.start({
-            profile: profile,
-            ...options
-        });
-        
-        return agent;
+        console.log('[DEBUG] loadLangGraphAgent called');
+        try {
+            console.log('[DEBUG] Creating new LangGraphAgent instance...');
+            const agent = new LangGraphAgent();
+            console.log('[DEBUG] LangGraphAgent instance created');
+            
+            // Initialize with LangGraph-specific configuration
+            console.log('[DEBUG] Initializing LangGraphAgent with profile...');
+            await agent.start({
+                profile: profile,
+                ...options
+            });
+            console.log('[DEBUG] LangGraphAgent initialized successfully');
+            
+            return agent;
+        } catch (error) {
+            console.error('[DEBUG] Failed to load LangGraph agent:', error);
+            throw error;
+        }
     }
 
     /**
      * Load a legacy agent
      */
     async loadLegacyAgent(profile, options) {
-        const agent = new Agent();
-        
-        // Initialize with legacy configuration
-        await agent.start(options.load_mem, options.init_message, options.count_id);
-        
-        return agent;
+        console.log('[DEBUG] loadLegacyAgent called');
+        try {
+            console.log('[DEBUG] Creating new Agent instance...');
+            const agent = new Agent();
+            console.log('[DEBUG] Agent instance created');
+            
+            // Initialize with legacy configuration
+            console.log('[DEBUG] Initializing Agent with legacy options...');
+            await agent.start(options.load_mem, options.init_message, options.count_id);
+            console.log('[DEBUG] Agent initialized successfully');
+            
+            return agent;
+        } catch (error) {
+            console.error('[DEBUG] Failed to load legacy agent:', error);
+            throw error;
+        }
     }
 
     /**

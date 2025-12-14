@@ -49,14 +49,12 @@ import { getSocketService } from '../../services/socketService';
 import ConnectionStatus from '../common/ConnectionStatus';
 import DebugPanel from '../common/DebugPanel';
 
-// Import tab components (placeholders for now)
+// Import tab components (simplified for simplified architecture)
 import OverviewTab from '../tabs/OverviewTab';
 import PersonalityTab from '../tabs/PersonalityTab';
-import MemoryTab from '../tabs/MemoryTab';
-import GoalsTab from '../tabs/GoalsTab';
-import SocialTab from '../tabs/SocialTab';
-import SkillsTab from '../tabs/SkillsTab';
-import PerformanceTab from '../tabs/PerformanceTab';
+import ConversationLogTab from '../tabs/ConversationLogTab';
+import DriveTab from '../tabs/DriveTab';
+import SelfAwarenessTab from '../tabs/SelfAwarenessTab';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -69,8 +67,8 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
     <div
       role="tabpanel"
       hidden={value !== index}
-      id={`cognitive-tabpanel-${index}`}
-      aria-labelledby={`cognitive-tab-${index}`}
+      id={`simplified-tabpanel-${index}`}
+      aria-labelledby={`simplified-tab-${index}`}
     >
       {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
     </div>
@@ -79,8 +77,8 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
 
 const a11yProps = (index: number) => {
   return {
-    id: `cognitive-tab-${index}`,
-    'aria-controls': `cognitive-tabpanel-${index}`,
+    id: `simplified-tab-${index}`,
+    'aria-controls': `simplified-tabpanel-${index}`,
   };
 };
 
@@ -97,15 +95,13 @@ const CognitiveDashboard: React.FC = () => {
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Tab configuration
+  // Simplified tab configuration for core functionality
   const tabs = [
     { label: 'Overview', icon: <DashboardIcon />, key: 'overview' },
     { label: 'Personality', icon: <PersonIcon />, key: 'personality' },
-    { label: 'Memory', icon: <MemoryIcon />, key: 'memory' },
-    { label: 'Goals', icon: <FlagIcon />, key: 'goals' },
-    { label: 'Social', icon: <PeopleIcon />, key: 'social' },
-    { label: 'Skills', icon: <BuildIcon />, key: 'skills' },
-    { label: 'Performance', icon: <AssessmentIcon />, key: 'performance' },
+    { label: 'Conversation', icon: <MemoryIcon />, key: 'conversation' },
+    { label: 'Drive', icon: <FlagIcon />, key: 'drive' },
+    { label: 'Self-Awareness', icon: <PeopleIcon />, key: 'selfawareness' },
   ];
 
   // Handle tab changes
@@ -120,7 +116,7 @@ const CognitiveDashboard: React.FC = () => {
     dispatch(reconnectToServer());
   };
  
-  
+   
   const handleClearError = () => {
     console.log('[CognitiveDashboard] Clearing connection error');
     dispatch(clearConnectionError());
@@ -170,7 +166,7 @@ const CognitiveDashboard: React.FC = () => {
       <Box p={3}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h4" component="h1">
-            Cognitive Dashboard
+            Simplified Cognitive Dashboard
           </Typography>
           <Box display="flex" gap={1}>
             <Tooltip title="Open Debug Panel">
@@ -184,7 +180,7 @@ const CognitiveDashboard: React.FC = () => {
         <Paper sx={{ p: 3, textAlign: 'center' }}>
           <LinearProgress sx={{ mb: 2 }} />
           <Typography variant="h6" gutterBottom>
-            Initializing Cognitive Dashboard...
+            Initializing Simplified Dashboard...
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Establishing connection to MindServer
@@ -200,7 +196,7 @@ const CognitiveDashboard: React.FC = () => {
       <Box p={3}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h4" component="h1">
-            Cognitive Dashboard
+            Simplified Cognitive Dashboard
           </Typography>
           <Box display="flex" gap={1}>
             <Tooltip title="Open Debug Panel">
@@ -264,7 +260,7 @@ const CognitiveDashboard: React.FC = () => {
       <Box p={3}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
           <Typography variant="h4" component="h1">
-            Cognitive Dashboard
+            Simplified Cognitive Dashboard
           </Typography>
           <Box display="flex" gap={1}>
             <Tooltip title="Open Debug Panel">
@@ -300,7 +296,7 @@ const CognitiveDashboard: React.FC = () => {
       <Box mb={3}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <Typography variant="h4" component="h1">
-            Cognitive Dashboard
+            Simplified Cognitive Dashboard
           </Typography>
           <Box display="flex" gap={1}>
             <Tooltip title="Open Debug Panel">
@@ -394,7 +390,7 @@ const CognitiveDashboard: React.FC = () => {
               onChange={handleTabChange}
               variant="scrollable"
               scrollButtons="auto"
-              aria-label="Cognitive dashboard tabs"
+              aria-label="Simplified cognitive dashboard tabs"
             >
               {tabs.map((tab, index) => (
                 <Tab
@@ -416,28 +412,22 @@ const CognitiveDashboard: React.FC = () => {
             <PersonalityTab agent={selectedAgent} />
           </TabPanel>
           <TabPanel value={tabValue} index={2}>
-            <MemoryTab agentId={selectedAgent.id} agent={selectedAgent} />
+            <ConversationLogTab agent={selectedAgent} />
           </TabPanel>
           <TabPanel value={tabValue} index={3}>
-            <GoalsTab agentId={selectedAgent.id} agent={selectedAgent} />
+            <DriveTab agent={selectedAgent} />
           </TabPanel>
           <TabPanel value={tabValue} index={4}>
-            <SocialTab agent={selectedAgent} />
-          </TabPanel>
-          <TabPanel value={tabValue} index={5}>
-            <SkillsTab agent={selectedAgent} />
-          </TabPanel>
-          <TabPanel value={tabValue} index={6}>
-            <PerformanceTab agent={selectedAgent} />
+            <SelfAwarenessTab agent={selectedAgent} />
           </TabPanel>
         </Paper>
       ) : (
         <Paper sx={{ p: 3, textAlign: 'center' }}>
           <Typography variant="h6" gutterBottom>
-            Select an Agent to View Cognitive Data
+            Select an Agent to View Simplified Cognitive Data
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Choose an agent from the cards above to explore their cognitive state, personality, memory, goals, and more.
+            Choose an agent from the cards above to explore their personality, conversation, drive, and self-awareness.
           </Typography>
         </Paper>
       )}

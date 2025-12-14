@@ -47,6 +47,12 @@ import {
   Wifi as WifiIcon,
   WifiOff as WifiOffIcon,
 } from '@mui/icons-material';
+import {
+  Visibility as VisibilityIcon,
+  Psychology as PsychologyIcon,
+  Chat as ChatIcon,
+  AccountTree as AccountTreeIcon,
+} from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store';
 import {
@@ -67,7 +73,10 @@ import MemoryTab from '../components/tabs/MemoryTab';
 import GoalsTab from '../components/tabs/GoalsTab';
 import SocialTab from '../components/tabs/SocialTab';
 import SkillsTab from '../components/tabs/SkillsTab';
-import PerformanceTab from '../components/tabs/PerformanceTab';
+import SelfAwarenessTab from '../components/tabs/SelfAwarenessTab';
+import DriveTab from '../components/tabs/DriveTab';
+import ConversationLogTab from '../components/tabs/ConversationLogTab';
+import SimplifiedFlowTab from '../components/tabs/SimplifiedFlowTab';
 import type { AgentState } from '../types/agent';
 
 interface CognitiveDashboardProps {
@@ -194,13 +203,10 @@ const CognitiveDashboard: React.FC<CognitiveDashboardProps> = ({ agentId }) => {
 
   // Tab configuration
   const tabs = useMemo(() => [
-    { label: 'Overview', icon: <DashboardIcon />, component: OverviewTab },
-    { label: 'Personality', icon: <PersonIcon />, component: PersonalityTab },
-    { label: 'Memory', icon: <MemoryIcon />, component: MemoryTab },
-    { label: 'Goals', icon: <GoalsIcon />, component: GoalsTab },
-    { label: 'Social', icon: <SocialIcon />, component: SocialTab },
-    { label: 'Skills', icon: <SkillsIcon />, component: SkillsTab },
-    { label: 'Performance', icon: <PerformanceIcon />, component: PerformanceTab },
+    { label: 'Self-Awareness', icon: <VisibilityIcon />, component: SelfAwarenessTab },
+    { label: 'Drive', icon: <PsychologyIcon />, component: DriveTab },
+    { label: 'Conversation', icon: <ChatIcon />, component: ConversationLogTab },
+    { label: 'Flow', icon: <AccountTreeIcon />, component: SimplifiedFlowTab },
   ], []);
 
   // Connection status

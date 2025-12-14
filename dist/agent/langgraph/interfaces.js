@@ -1,110 +1,22 @@
 /**
- * Core TypeScript interfaces for the Mindcraft LangGraph hybrid agent system
+ * Simplified TypeScript interfaces for the Mindcraft LangGraph agent system
  *
- * This file contains all TypeScript interfaces and type definitions
- * for the agent state structure, supporting both reactive and cognitive
- * components with comprehensive social integration.
+ * This file contains the streamlined TypeScript interfaces and type definitions
+ * for the simplified agent state structure, focusing on core functionality:
+ * - Inter-bot communication with help requests/offers
+ * - Personality-driven responses using single string interpretation
+ * - Self-awareness with HP, inventory, and equipment tracking
+ * - Autonomous behavior driven by goals and mandate system
  */
 import { Annotation } from "@langchain/langgraph";
-export var ProcessingPhase;
-(function (ProcessingPhase) {
-    ProcessingPhase["PERCEPTION"] = "perception";
-    ProcessingPhase["ANALYSIS"] = "analysis";
-    ProcessingPhase["PLANNING"] = "planning";
-    ProcessingPhase["DECISION"] = "decision";
-    ProcessingPhase["EXECUTION"] = "execution";
-    ProcessingPhase["REFLECTION"] = "reflection";
-    ProcessingPhase["CONVERSATION"] = "conversation";
-    ProcessingPhase["COORDINATION"] = "coordination";
-})(ProcessingPhase || (ProcessingPhase = {}));
-export var InterruptPriority;
-(function (InterruptPriority) {
-    InterruptPriority["EMERGENCY"] = "emergency";
-    InterruptPriority["SURVIVAL"] = "survival";
-    InterruptPriority["OPPORTUNITY"] = "opportunity";
-    InterruptPriority["COGNITIVE"] = "cognitive";
-})(InterruptPriority || (InterruptPriority = {}));
-export var FeasibilityLevel;
-(function (FeasibilityLevel) {
-    FeasibilityLevel["IMPOSSIBLE"] = "impossible";
-    FeasibilityLevel["VERY_DIFFICULT"] = "very_difficult";
-    FeasibilityLevel["DIFFICULT"] = "difficult";
-    FeasibilityLevel["MODERATE"] = "moderate";
-    FeasibilityLevel["EASY"] = "easy";
-    FeasibilityLevel["TRIVIAL"] = "trivial";
-    // Add missing values for compatibility
-    FeasibilityLevel["VERY_HIGH"] = "very_high";
-    FeasibilityLevel["HIGH"] = "high";
-    FeasibilityLevel["MEDIUM"] = "medium";
-    FeasibilityLevel["LOW"] = "low";
-    FeasibilityLevel["VERY_LOW"] = "very_low";
-})(FeasibilityLevel || (FeasibilityLevel = {}));
-export var PlanStatus;
-(function (PlanStatus) {
-    PlanStatus["PENDING"] = "pending";
-    PlanStatus["ACTIVE"] = "active";
-    PlanStatus["COMPLETED"] = "completed";
-    PlanStatus["FAILED"] = "failed";
-    PlanStatus["CANCELLED"] = "cancelled";
-})(PlanStatus || (PlanStatus = {}));
-export var DelegationStatus;
-(function (DelegationStatus) {
-    DelegationStatus["PENDING"] = "pending";
-    DelegationStatus["ACCEPTED"] = "accepted";
-    DelegationStatus["REJECTED"] = "rejected";
-    DelegationStatus["COMPLETED"] = "completed";
-    DelegationStatus["FAILED"] = "failed";
-})(DelegationStatus || (DelegationStatus = {}));
-// Skill types for experience tracking
-export var SkillType;
-(function (SkillType) {
-    SkillType["COMBAT"] = "combat";
-    SkillType["MINING"] = "mining";
-    SkillType["BUILDING"] = "building";
-    SkillType["CRAFTING"] = "crafting";
-    SkillType["FARMING"] = "farming";
-    SkillType["EXPLORATION"] = "exploration";
-    SkillType["SOCIAL"] = "social";
-    SkillType["TRADING"] = "trading";
-    SkillType["MAGIC"] = "magic";
-    SkillType["SURVIVAL"] = "survival";
-})(SkillType || (SkillType = {}));
-export var ExperienceSource;
-(function (ExperienceSource) {
-    ExperienceSource["PRACTICE"] = "practice";
-    ExperienceSource["SUCCESS"] = "success";
-    ExperienceSource["FAILURE"] = "failure";
-    ExperienceSource["TEACHING"] = "teaching";
-    ExperienceSource["OBSERVATION"] = "observation";
-    ExperienceSource["EXPERIMENTATION"] = "experimentation";
-    ExperienceSource["SOCIAL"] = "social";
-    ExperienceSource["BREAKTHROUGH"] = "breakthrough";
-})(ExperienceSource || (ExperienceSource = {}));
-export var LearningMethod;
-(function (LearningMethod) {
-    LearningMethod["PRACTICE"] = "practice";
-    LearningMethod["INSTRUCTION"] = "instruction";
-    LearningMethod["OBSERVATION"] = "observation";
-    LearningMethod["EXPERIMENTATION"] = "experimentation";
-    LearningMethod["SOCIAL_LEARNING"] = "social_learning";
-    LearningMethod["TRIAL_AND_ERROR"] = "trial_and_error";
-})(LearningMethod || (LearningMethod = {}));
-export var GoalType;
-(function (GoalType) {
-    GoalType["STRATEGIC"] = "strategic";
-    GoalType["TACTICAL"] = "tactical";
-    GoalType["OPERATIONAL"] = "operational";
-    GoalType["SOCIAL"] = "social";
-    GoalType["COLLABORATIVE"] = "collaborative";
-})(GoalType || (GoalType = {}));
-// LangGraph State Annotation
+// LangGraph State Annotation for simplified AgentState
 export const AgentStateAnnotation = Annotation.Root({
-    context: (Annotation),
-    reactive: (Annotation),
-    cognitive: (Annotation),
-    executive: (Annotation),
-    metadata: (Annotation),
-    antiIdleSystem: (Annotation),
-    multiAgentCoordinator: (Annotation)
+    worldContext: (Annotation),
+    personality: (Annotation),
+    goals: (Annotation),
+    mandate: (Annotation),
+    conversation: (Annotation),
+    lastAction: (Annotation),
+    response: (Annotation),
 });
 //# sourceMappingURL=interfaces.js.map

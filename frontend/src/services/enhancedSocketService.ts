@@ -1,38 +1,14 @@
 /**
  * Enhanced Socket.IO Service for Live Data Streaming
  *
- * This service provides comprehensive real-time data streaming for all cognitive components
- * including agent states, personality traits, memory systems, goals, social relationships,
- * skills progression, and performance metrics.
+ * This service provides comprehensive real-time data streaming for simplified agent components
+ * including agent states, messages, and actions.
  */
 
 import { io, Socket } from 'socket.io-client';
 import type {
-  AgentState,
   AgentStateUpdateEvent,
-  AgentConnectionEvent,
-  PersonalityTraitUpdateEvent,
-  PersonalityEmotionEvent,
-  PersonalityMoodEvent,
-  PersonalityEvolutionEvent,
-  MemoryUpdateEvent,
-  MemoryConsolidationEvent,
-  GoalUpdateEvent,
-  GoalHierarchyEvent,
-  GoalProgressEvent,
-  SocialDataUpdateEvent,
-  SocialNetworkUpdateEvent,
-  SocialInteractionEvent,
-  SkillDataUpdateEvent,
-  SkillExperienceEvent,
-  SkillMilestoneEvent,
-  SkillSynergyEvent,
-  PerformanceMetricsUpdateEvent,
-  PerformanceAlertEvent,
-  PerformanceAnomalyEvent,
-  SystemStatusUpdateEvent,
-  SystemErrorEvent,
-  ConnectionStatusEvent
+  AgentConnectionEvent
 } from '../types/socketEvents';
 
 // Configuration interface
@@ -53,52 +29,23 @@ export interface EnhancedSocketConfig {
   enableBackpressure: boolean;
 }
 
-// Event handler interface
+// Simplified event handler interface
 export interface SocketEventHandlers {
   // Agent events
   onAgentStateUpdate?: (data: AgentStateUpdateEvent) => void;
   onAgentConnected?: (data: AgentConnectionEvent) => void;
   onAgentDisconnected?: (data: AgentConnectionEvent) => void;
   
-  // Personality events
-  onPersonalityTraitUpdate?: (data: PersonalityTraitUpdateEvent) => void;
-  onPersonalityEmotionUpdate?: (data: PersonalityEmotionEvent) => void;
-  onPersonalityMoodUpdate?: (data: PersonalityMoodEvent) => void;
-  onPersonalityEvolution?: (data: PersonalityEvolutionEvent) => void;
+  // Message events
+  onAgentMessageSent?: (data: any) => void;
   
-  // Memory events
-  onMemorySemanticUpdate?: (data: MemoryUpdateEvent) => void;
-  onMemoryEpisodicUpdate?: (data: MemoryUpdateEvent) => void;
-  onMemoryProceduralUpdate?: (data: MemoryUpdateEvent) => void;
-  onMemoryConsolidation?: (data: MemoryConsolidationEvent) => void;
-  
-  // Goal events
-  onGoalStrategicUpdate?: (data: GoalUpdateEvent) => void;
-  onGoalTacticalUpdate?: (data: GoalUpdateEvent) => void;
-  onGoalOperationalUpdate?: (data: GoalUpdateEvent) => void;
-  onGoalProgress?: (data: GoalProgressEvent) => void;
-  onGoalHierarchy?: (data: GoalHierarchyEvent) => void;
-  
-  // Social events
-  onSocialRelationshipUpdate?: (data: SocialDataUpdateEvent) => void;
-  onSocialInteraction?: (data: SocialInteractionEvent) => void;
-  onSocialNetworkUpdate?: (data: SocialNetworkUpdateEvent) => void;
-  
-  // Skill events
-  onSkillProgressUpdate?: (data: SkillDataUpdateEvent) => void;
-  onSkillExperience?: (data: SkillExperienceEvent) => void;
-  onSkillSynergy?: (data: SkillSynergyEvent) => void;
-  onSkillMilestone?: (data: SkillMilestoneEvent) => void;
-  
-  // Performance events
-  onPerformanceMetricsUpdate?: (data: PerformanceMetricsUpdateEvent) => void;
-  onPerformanceAlert?: (data: PerformanceAlertEvent) => void;
-  onPerformanceAnomaly?: (data: PerformanceAnomalyEvent) => void;
+  // Action events
+  onAgentActionExecuted?: (data: any) => void;
   
   // System events
-  onSystemStatusUpdate?: (data: SystemStatusUpdateEvent) => void;
-  onSystemError?: (data: SystemErrorEvent) => void;
-  onConnectionStatus?: (data: ConnectionStatusEvent) => void;
+  onSystemStatusUpdate?: (data: any) => void;
+  onSystemError?: (data: any) => void;
+  onConnectionStatus?: (data: any) => void;
 }
 
 // Performance optimization interface
@@ -177,110 +124,14 @@ export class EnhancedSocketService {
       return data && typeof data.agentId === 'string' && typeof data.timestamp === 'number';
     });
     
-    // Personality event validators
-    this.eventValidators.set('personality:trait:update', (data: PersonalityTraitUpdateEvent) => {
-      return data && typeof data.agentId === 'string' && data.traits && typeof data.timestamp === 'number';
+    // Message event validators
+    this.eventValidators.set('agent:message:sent', (data: any) => {
+      return data && typeof data.agentId === 'string' && data.message && typeof data.timestamp === 'number';
     });
     
-    this.eventValidators.set('personality:emotion:update', (data: any) => {
-      return data && typeof data.agentId === 'string' && typeof data.emotion === 'string' && 
-             typeof data.intensity === 'number' && typeof data.timestamp === 'number';
-    });
-    
-    this.eventValidators.set('personality:mood:update', (data: any) => {
-      return data && typeof data.agentId === 'string' && typeof data.mood === 'string' && 
-             typeof data.timestamp === 'number';
-    });
-    
-    // Memory event validators
-    this.eventValidators.set('memory:semantic:update', (data: MemoryUpdateEvent) => {
-      return data && typeof data.agentId === 'string' && data.memoryType === 'semantic' && 
-             typeof data.timestamp === 'number';
-    });
-    
-    this.eventValidators.set('memory:episodic:update', (data: MemoryUpdateEvent) => {
-      return data && typeof data.agentId === 'string' && data.memoryType === 'episodic' && 
-             typeof data.timestamp === 'number';
-    });
-    
-    this.eventValidators.set('memory:procedural:update', (data: MemoryUpdateEvent) => {
-      return data && typeof data.agentId === 'string' && data.memoryType === 'procedural' && 
-             typeof data.timestamp === 'number';
-    });
-    
-    this.eventValidators.set('memory:consolidation:event', (data: MemoryConsolidationEvent) => {
-      return data && typeof data.agentId === 'string' && data.consolidationId && typeof data.timestamp === 'number' ? true : false;
-    });
-    
-    // Goal event validators
-    this.eventValidators.set('goal:strategic:update', (data: GoalUpdateEvent) => {
-      return data && typeof data.goalId === 'string' && data.goal && data.goal.type === 'strategic';
-    });
-    
-    this.eventValidators.set('goal:tactical:update', (data: GoalUpdateEvent) => {
-      return data && typeof data.goalId === 'string' && data.goal && data.goal.type === 'tactical';
-    });
-    
-    this.eventValidators.set('goal:operational:update', (data: GoalUpdateEvent) => {
-      return data && typeof data.goalId === 'string' && data.goal && data.goal.type === 'operational';
-    });
-    
-    this.eventValidators.set('goal:progress:update', (data: GoalProgressEvent) => {
-      return data && typeof data.goalId === 'string' && typeof data.progress === 'number' && 
-             typeof data.timestamp === 'number';
-    });
-    
-    // Social event validators
-    this.eventValidators.set('social:relationship:update', (data: SocialDataUpdateEvent) => {
-      return data && typeof data.agentId === 'string' && data.type === 'relationship_update' && 
-             typeof data.timestamp === 'number';
-    });
-    
-    this.eventValidators.set('social:interaction:event', (data: SocialInteractionEvent) => {
-      return data && typeof data.timestamp === 'number';
-    });
-    
-    this.eventValidators.set('social:network:update', (data: SocialNetworkUpdateEvent) => {
-      return data && data.changes && typeof data.timestamp === 'number';
-    });
-    
-    // Skill event validators
-    this.eventValidators.set('skill:progress:update', (data: SkillDataUpdateEvent) => {
-      return data && typeof data.skillId === 'string' && data.type && typeof data.timestamp === 'number';
-    });
-    
-    this.eventValidators.set('skill:experience:event', (data: SkillExperienceEvent) => {
-      return data && typeof data.skillId === 'string' && data.experience && data.impact && typeof data.timestamp === 'number';
-    });
-    
-    this.eventValidators.set('skill:synergy:update', (data: SkillSynergyEvent) => {
-      return data && data.synergy && data.transferEvent && typeof data.timestamp === 'number';
-    });
-    
-    this.eventValidators.set('skill:milestone:event', (data: SkillMilestoneEvent) => {
-      return data && typeof data.skillId === 'string' && data.milestone && data.abilities && typeof data.timestamp === 'number';
-    });
-    
-    // Performance event validators
-    this.eventValidators.set('performance:metrics:update', (data: PerformanceMetricsUpdateEvent) => {
-      return data && typeof data.agentId === 'string' && data.metrics && typeof data.timestamp === 'number';
-    });
-    
-    this.eventValidators.set('performance:alert:event', (data: PerformanceAlertEvent) => {
-      return data && typeof data.timestamp === 'number';
-    });
-    
-    this.eventValidators.set('performance:anomaly:detect', (data: PerformanceAnomalyEvent) => {
-      return data && typeof data.timestamp === 'number';
-    });
-    
-    // System event validators
-    this.eventValidators.set('system:status:update', (data: SystemStatusUpdateEvent) => {
-      return data && typeof data.timestamp === 'number';
-    });
-    
-    this.eventValidators.set('system:error:event', (data: SystemErrorEvent) => {
-      return data && typeof data.timestamp === 'number';
+    // Action event validators
+    this.eventValidators.set('agent:action:executed', (data: any) => {
+      return data && typeof data.agentId === 'string' && data.action && typeof data.timestamp === 'number';
     });
   }
   
@@ -354,7 +205,7 @@ export class EnhancedSocketService {
   }
   
   /**
-   * Setup event listeners for all cognitive components
+   * Setup event listeners for simplified agent components
    */
   private setupEventListeners(): void {
     if (!this.socket) return;
@@ -372,110 +223,22 @@ export class EnhancedSocketService {
       this.handleEvent('agent:disconnected', data, this.handlers.onAgentDisconnected);
     });
     
-    // Personality events
-    this.socket.on('personality:trait:update', (data: PersonalityTraitUpdateEvent) => {
-      this.handleEvent('personality:trait:update', data, this.handlers.onPersonalityTraitUpdate);
+    // Message events
+    this.socket.on('agent:message:sent', (data: any) => {
+      this.handleEvent('agent:message:sent', data, this.handlers.onAgentMessageSent);
     });
     
-    this.socket.on('personality:emotion:update', (data: PersonalityEmotionEvent) => {
-      this.handleEvent('personality:emotion:update', data, this.handlers.onPersonalityEmotionUpdate);
-    });
-    
-    this.socket.on('personality:mood:update', (data: PersonalityMoodEvent) => {
-      this.handleEvent('personality:mood:update', data, this.handlers.onPersonalityMoodUpdate);
-    });
-    
-    this.socket.on('personality:evolution', (data: PersonalityEvolutionEvent) => {
-      this.handleEvent('personality:evolution', data, this.handlers.onPersonalityEvolution);
-    });
-    
-    // Memory events
-    this.socket.on('memory:semantic:update', (data: MemoryUpdateEvent) => {
-      this.handleEvent('memory:semantic:update', data, this.handlers.onMemorySemanticUpdate);
-    });
-    
-    this.socket.on('memory:episodic:update', (data: MemoryUpdateEvent) => {
-      this.handleEvent('memory:episodic:update', data, this.handlers.onMemoryEpisodicUpdate);
-    });
-    
-    this.socket.on('memory:procedural:update', (data: MemoryUpdateEvent) => {
-      this.handleEvent('memory:procedural:update', data, this.handlers.onMemoryProceduralUpdate);
-    });
-    
-    this.socket.on('memory:consolidation:event', (data: MemoryConsolidationEvent) => {
-      this.handleEvent('memory:consolidation:event', data, this.handlers.onMemoryConsolidation);
-    });
-    
-    // Goal events
-    this.socket.on('goal:strategic:update', (data: GoalUpdateEvent) => {
-      this.handleEvent('goal:strategic:update', data, this.handlers.onGoalStrategicUpdate);
-    });
-    
-    this.socket.on('goal:tactical:update', (data: GoalUpdateEvent) => {
-      this.handleEvent('goal:tactical:update', data, this.handlers.onGoalTacticalUpdate);
-    });
-    
-    this.socket.on('goal:operational:update', (data: GoalUpdateEvent) => {
-      this.handleEvent('goal:operational:update', data, this.handlers.onGoalOperationalUpdate);
-    });
-    
-    this.socket.on('goal:progress:update', (data: GoalProgressEvent) => {
-      this.handleEvent('goal:progress:update', data, this.handlers.onGoalProgress);
-    });
-    
-    this.socket.on('goal:hierarchy', (data: GoalHierarchyEvent) => {
-      this.handleEvent('goal:hierarchy', data, this.handlers.onGoalHierarchy);
-    });
-    
-    // Social events
-    this.socket.on('social:relationship:update', (data: SocialDataUpdateEvent) => {
-      this.handleEvent('social:relationship:update', data, this.handlers.onSocialRelationshipUpdate);
-    });
-    
-    this.socket.on('social:interaction:event', (data: SocialInteractionEvent) => {
-      this.handleEvent('social:interaction:event', data, this.handlers.onSocialInteraction);
-    });
-    
-    this.socket.on('social:network:update', (data: SocialNetworkUpdateEvent) => {
-      this.handleEvent('social:network:update', data, this.handlers.onSocialNetworkUpdate);
-    });
-    
-    // Skill events
-    this.socket.on('skill:progress:update', (data: SkillDataUpdateEvent) => {
-      this.handleEvent('skill:progress:update', data, this.handlers.onSkillProgressUpdate);
-    });
-    
-    this.socket.on('skill:experience:event', (data: SkillExperienceEvent) => {
-      this.handleEvent('skill:experience:event', data, this.handlers.onSkillExperience);
-    });
-    
-    this.socket.on('skill:synergy:update', (data: SkillSynergyEvent) => {
-      this.handleEvent('skill:synergy:update', data, this.handlers.onSkillSynergy);
-    });
-    
-    this.socket.on('skill:milestone:event', (data: SkillMilestoneEvent) => {
-      this.handleEvent('skill:milestone:event', data, this.handlers.onSkillMilestone);
-    });
-    
-    // Performance events
-    this.socket.on('performance:metrics:update', (data: PerformanceMetricsUpdateEvent) => {
-      this.handleEvent('performance:metrics:update', data, this.handlers.onPerformanceMetricsUpdate);
-    });
-    
-    this.socket.on('performance:alert:event', (data: PerformanceAlertEvent) => {
-      this.handleEvent('performance:alert:event', data, this.handlers.onPerformanceAlert);
-    });
-    
-    this.socket.on('performance:anomaly:detect', (data: PerformanceAnomalyEvent) => {
-      this.handleEvent('performance:anomaly:detect', data, this.handlers.onPerformanceAnomaly);
+    // Action events
+    this.socket.on('agent:action:executed', (data: any) => {
+      this.handleEvent('agent:action:executed', data, this.handlers.onAgentActionExecuted);
     });
     
     // System events
-    this.socket.on('system:status:update', (data: SystemStatusUpdateEvent) => {
+    this.socket.on('system:status:update', (data: any) => {
       this.handleEvent('system:status:update', data, this.handlers.onSystemStatusUpdate);
     });
     
-    this.socket.on('system:error:event', (data: SystemErrorEvent) => {
+    this.socket.on('system:error:event', (data: any) => {
       this.handleEvent('system:error:event', data, this.handlers.onSystemError);
     });
     
@@ -663,24 +426,6 @@ export class EnhancedSocketService {
   unsubscribeFromAgent(agentId: string): void {
     if (this.socket) {
       this.socket.emit('agent:unsubscribe', { agentId });
-    }
-  }
-  
-  /**
-   * Subscribe to cognitive component events
-   */
-  subscribeToComponent(component: 'personality' | 'memory' | 'goals' | 'social' | 'skills' | 'performance'): void {
-    if (this.socket) {
-      this.socket.emit('component:subscribe', { component });
-    }
-  }
-  
-  /**
-   * Unsubscribe from cognitive component events
-   */
-  unsubscribeFromComponent(component: 'personality' | 'memory' | 'goals' | 'social' | 'skills' | 'performance'): void {
-    if (this.socket) {
-      this.socket.emit('component:unsubscribe', { component });
     }
   }
   

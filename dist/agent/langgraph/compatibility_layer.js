@@ -246,8 +246,9 @@ export class CompatibilityLayer {
         // Map action to legacy system calls
         switch (action.type) {
             case 'set_goal':
-                const goalData = action.parameters;
-                await this.controllerAdapter.setGoal(goalData.name, goalData.quantity);
+                // @ts-ignore - Using metadata for parameters since it's not in the interface
+                const goalData = action.metadata || action.parameters || {};
+                await this.controllerAdapter.setGoal(goalData.name || 'default', goalData.quantity || 1);
                 return true;
             case 'execute_goal':
                 await this.controllerAdapter.executeNext();

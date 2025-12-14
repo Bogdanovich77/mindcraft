@@ -12,14 +12,13 @@ import { MessageType, MessagePriority, MessageDeliveryStatus, ChannelState, Broa
 export class CommunicationProtocols {
     state;
     agentId;
-    socialState;
     eventHandlers;
     performanceMetrics;
     messageProcessingQueue;
     isProcessing = false;
-    constructor(agentId, socialState) {
+    messageProcessingInterval = null;
+    constructor(agentId) {
         this.agentId = agentId;
-        this.socialState = socialState;
         this.eventHandlers = new Map();
         this.messageProcessingQueue = [];
         this.state = {
@@ -47,7 +46,8 @@ export class CommunicationProtocols {
                         enabled: true,
                         penaltyMultiplier: 1.5,
                         recoveryRate: 0.1,
-                        violationHistory: []
+                        violationHistory: [],
+                        messageLimits: new Map()
                     },
                     spamProtection: {
                         enabled: true,
@@ -93,9 +93,14 @@ export class CommunicationProtocols {
      * Start message processing loop
      */
     startMessageProcessing() {
-        setInterval(() => {
-            if (!this.isProcessing && this.messageProcessingQueue.length > 0) {
-                this.processMessageQueue();
+        this.messageProcessingInterval = setInterval(() => {
+            try {
+                if (!this.isProcessing && this.messageProcessingQueue.length > 0) {
+                    this.processMessageQueue();
+                }
+            }
+            catch (error) {
+                console.error('[COMMUNICATION_PROTOCOLS] Error in message processing loop:', error);
             }
         }, 10); // Process every 10ms for <100ms latency
     }
@@ -151,8 +156,8 @@ export class CommunicationProtocols {
                     type: message.type,
                     priority: message.priority,
                     recipient: message.recipient || 'broadcast',
-                    recipients: message.recipients,
-                    channel: message.channel,
+                    recipients: message.recipients || [],
+                    channel: message.channel || 'default',
                     payload: message.payload,
                     timestamp: message.timestamp,
                     deliveryStatus: MessageDeliveryStatus.DELIVERED,
@@ -194,13 +199,17 @@ export class CommunicationProtocols {
             }
         }
         catch (error) {
-            return { success: false, error: error.message };
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            return { success: false, error: errorMessage };
         }
     }
     /**
      * Send message to specific channel
      */
     async sendToChannel(message) {
+        if (!message.channel) {
+            return { success: false, error: 'Channel not specified' };
+        }
         const channel = this.state.activeChannels.get(message.channel);
         if (!channel) {
             return { success: false, error: `Channel ${message.channel} not found` };
@@ -222,11 +231,15 @@ export class CommunicationProtocols {
      */
     async sendDirectMessage(message) {
         try {
+            if (!message.recipient) {
+                return { success: false, error: 'Recipient not specified' };
+            }
             await this.deliverToAgent(message.recipient, message);
             return { success: true };
         }
         catch (error) {
-            return { success: false, error: error.message };
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            return { success: false, error: errorMessage };
         }
     }
     /**
@@ -246,7 +259,8 @@ export class CommunicationProtocols {
             return { success: true };
         }
         catch (error) {
-            return { success: false, error: error.message };
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            return { success: false, error: errorMessage };
         }
     }
     /**
@@ -273,11 +287,6 @@ export class CommunicationProtocols {
      * Check if agent is available for communication
      */
     isAgentAvailable(agentId) {
-        // Check social relationships for availability
-        const trustLevel = this.socialState.relationships.trustLevels[agentId] || 0;
-        if (trustLevel < 0.3) {
-            return false; // Low trust agents may be blocked
-        }
         // Random availability simulation (90% available)
         return Math.random() > 0.1;
     }
@@ -393,14 +402,21 @@ export class CommunicationProtocols {
             type,
             priority,
             sender: this.agentId,
-            recipient: options.recipient,
-            recipients: options.recipients,
-            channel: options.channel,
             payload,
             timestamp: Date.now(),
             retryCount: 0,
             maxRetries: options.maxRetries || 3
         };
+        // Add optional properties only if they exist
+        if (options.recipient) {
+            message.recipient = options.recipient;
+        }
+        if (options.recipients) {
+            message.recipients = options.recipients;
+        }
+        if (options.channel) {
+            message.channel = options.channel;
+        }
         // Add to priority queue
         this.messageProcessingQueue.push(message);
         this.state.messageQueue.push(message);
@@ -421,9 +437,12 @@ export class CommunicationProtocols {
             frequency,
             duration: frequency === BroadcastFrequency.ONCE ? 0 : 3600000, // 1 hour for recurring
             startTime: Date.now(),
-            endTime: frequency === BroadcastFrequency.ONCE ? Date.now() + 60000 : undefined, // 1 minute expiry for once
             status: BroadcastStatus.ACTIVE
         };
+        // Add endTime only for ONCE frequency
+        if (frequency === BroadcastFrequency.ONCE) {
+            broadcast.endTime = Date.now() + 60000; // 1 minute expiry
+        }
         this.state.broadcasting.activeBroadcasts.set(broadcastId, broadcast);
         // Convert broadcast to message
         const recipients = this.determineBroadcastRecipients(audience);
@@ -575,17 +594,37 @@ export class CommunicationProtocols {
         console.log(`[COMMUNICATION_PROTOCOLS] Performance improved:`, event.data);
     }
     /**
-     * Cleanup resources
+     * Cleanup resources and destroy the communication protocols
      */
-    cleanup() {
-        // Clear active channels
+    destroy() {
+        // Clear the message processing interval
+        if (this.messageProcessingInterval) {
+            clearInterval(this.messageProcessingInterval);
+            this.messageProcessingInterval = null;
+        }
+        // Clear all state
         this.state.activeChannels.clear();
-        // Clear message queues
+        this.state.broadcasting.activeBroadcasts.clear();
+        this.state.broadcasting.frequencyControl.messageLimits.clear();
+        this.state.broadcasting.subscriptionManager.subscriptions.clear();
+        this.state.metrics.channelUtilization.clear();
+        // Clear queues
         this.messageProcessingQueue = [];
         this.state.messageQueue = [];
+        this.state.sentMessages = [];
+        this.state.receivedMessages = [];
+        this.state.broadcasting.broadcastHistory = [];
         // Clear event handlers
         this.eventHandlers.clear();
-        console.log('[COMMUNICATION_PROTOCOLS] Cleanup completed');
+        // Reset processing state
+        this.isProcessing = false;
+        console.log('[COMMUNICATION_PROTOCOLS] Communication protocols destroyed and resources cleaned up');
+    }
+    /**
+     * Cleanup resources (deprecated - use destroy instead)
+     */
+    cleanup() {
+        this.destroy();
     }
 }
 //# sourceMappingURL=communication_protocols.js.map

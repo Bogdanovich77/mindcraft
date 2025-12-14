@@ -1,6 +1,21 @@
 import { Goal, GoalLevel, GoalCreationRequest, GoalUpdateRequest, GoalExecutionResult, GoalPrioritizationResult } from './goal_types.js';
-import { AgentState, SocialState } from '../langgraph/interfaces.js';
-import { PlanningEngine } from '../langgraph/interfaces.js';
+import { AgentState, SocialState, PlanningEngine } from '../langgraph/interfaces.js';
+export interface PlanRequest {
+    id: string;
+    goalId: string;
+    type: 'strategic' | 'tactical' | 'operational';
+    title: string;
+    description: string;
+    priority: string;
+    deadline?: number;
+    context: AgentState;
+    requirements: any;
+}
+export declare enum PlanType {
+    STRATEGIC = "strategic",
+    TACTICAL = "tactical",
+    OPERATIONAL = "operational"
+}
 /**
  * Goal system configuration
  */

@@ -5,6 +5,9 @@
  * used in the cognitive dashboard for real-time data streaming.
  */
 
+// Import simplified types
+import type { AgentState, WorldContext, ConversationState } from './agent';
+
 // Base event interface
 export interface BaseEvent {
   timestamp: number;
@@ -12,8 +15,8 @@ export interface BaseEvent {
   agentId?: string;
 }
 
-// Agent state events
-export interface AgentState {
+// Simplified Agent State for Socket.IO events (matches the 7-field structure)
+export interface SimplifiedAgentState {
   id: string;
   name: string;
   status: 'active' | 'idle' | 'disconnected' | 'error';
@@ -30,12 +33,21 @@ export interface AgentState {
     weather: string;
   };
   lastActivity: number;
+  
+  // Core 7 fields for simplified architecture
+  worldContext?: Partial<WorldContext>;
+  personality?: string;
+  goals?: string;
+  mandate?: string;
+  conversation?: Partial<ConversationState>;
+  lastAction?: string;
+  response?: string;
 }
 
 export interface AgentStateUpdateEvent extends BaseEvent {
   agentId: string;
-  state: AgentState;
-  changes: Partial<AgentState>;
+  state: SimplifiedAgentState;
+  changes: Partial<SimplifiedAgentState>;
   type: 'state_update';
 }
 
@@ -50,7 +62,8 @@ export interface AgentDisconnectionEvent extends BaseEvent {
   reason?: string;
 }
 
-// Personality events
+// Legacy complex event types - marked as deprecated
+/** @deprecated Use simplified personality string instead */
 export interface PersonalityTraits {
   openness: number;
   conscientiousness: number;
@@ -64,6 +77,7 @@ export interface PersonalityTraits {
   curiosity: number;
 }
 
+/** @deprecated Use simplified personality string instead */
 export interface PersonalityEmotion {
   emotion: string;
   intensity: number;
@@ -72,6 +86,7 @@ export interface PersonalityEmotion {
   context?: string;
 }
 
+/** @deprecated Use simplified personality string instead */
 export interface PersonalityMood {
   mood: string;
   intensity: number;
@@ -79,6 +94,7 @@ export interface PersonalityMood {
   factors: string[];
 }
 
+/** @deprecated Use simplified personality string instead */
 export interface PersonalityTraitUpdateEvent extends BaseEvent {
   agentId: string;
   traits: PersonalityTraits;
@@ -87,6 +103,7 @@ export interface PersonalityTraitUpdateEvent extends BaseEvent {
   confidence: number;
 }
 
+/** @deprecated Use simplified personality string instead */
 export interface PersonalityEmotionEvent extends BaseEvent {
   agentId: string;
   emotion: PersonalityEmotion;
@@ -94,6 +111,7 @@ export interface PersonalityEmotionEvent extends BaseEvent {
   transition: boolean;
 }
 
+/** @deprecated Use simplified personality string instead */
 export interface PersonalityMoodEvent extends BaseEvent {
   agentId: string;
   mood: PersonalityMood;
@@ -101,6 +119,7 @@ export interface PersonalityMoodEvent extends BaseEvent {
   factors: string[];
 }
 
+/** @deprecated Use simplified personality string instead */
 export interface PersonalityEvolutionEvent extends BaseEvent {
   agentId: string;
   evolutionType: 'trait_drift' | 'experience_based' | 'social_influence' | 'adaptation';
@@ -109,7 +128,8 @@ export interface PersonalityEvolutionEvent extends BaseEvent {
   timespan: number;
 }
 
-// Memory events
+// Legacy memory events - marked as deprecated
+/** @deprecated No longer used in simplified architecture */
 export interface MemoryConcept {
   id: string;
   type: 'concept' | 'fact' | 'relationship';
@@ -121,6 +141,7 @@ export interface MemoryConcept {
   relatedConcepts: string[];
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface MemoryEpisode {
   id: string;
   timestamp: number;
@@ -134,6 +155,7 @@ export interface MemoryEpisode {
   summary: string;
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface MemoryProcedural {
   id: string;
   name: string;
@@ -145,6 +167,7 @@ export interface MemoryProcedural {
   context: string[];
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface MemoryUpdateEvent extends BaseEvent {
   agentId: string;
   memoryType: 'semantic' | 'episodic' | 'procedural';
@@ -154,6 +177,7 @@ export interface MemoryUpdateEvent extends BaseEvent {
   impact: number;
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface MemoryConsolidationEvent extends BaseEvent {
   agentId: string;
   consolidationId: string;
@@ -164,7 +188,8 @@ export interface MemoryConsolidationEvent extends BaseEvent {
   context: string;
 }
 
-// Goal events
+// Legacy goal events - marked as deprecated
+/** @deprecated Use simplified goals string instead */
 export interface Goal {
   id: string;
   type: 'strategic' | 'tactical' | 'operational';
@@ -190,6 +215,7 @@ export interface Goal {
   };
 }
 
+/** @deprecated Use simplified goals string instead */
 export interface GoalUpdateEvent extends BaseEvent {
   goalId: string;
   goal: Goal;
@@ -197,6 +223,7 @@ export interface GoalUpdateEvent extends BaseEvent {
   reason: string;
 }
 
+/** @deprecated Use simplified goals string instead */
 export interface GoalHierarchyEvent extends BaseEvent {
   agentId: string;
   hierarchyType: 'strategic_to_tactical' | 'tactical_to_operational' | 'full_hierarchy';
@@ -212,6 +239,7 @@ export interface GoalHierarchyEvent extends BaseEvent {
   }>;
 }
 
+/** @deprecated Use simplified goals string instead */
 export interface GoalProgressEvent extends BaseEvent {
   goalId: string;
   progress: number;
@@ -222,7 +250,8 @@ export interface GoalProgressEvent extends BaseEvent {
   estimatedCompletion?: number;
 }
 
-// Social events
+// Legacy social events - marked as deprecated
+/** @deprecated No longer used in simplified architecture */
 export interface SocialRelationship {
   id: string;
   sourceAgentId: string;
@@ -239,6 +268,7 @@ export interface SocialRelationship {
   conflicts: string[];
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface SocialInteraction {
   id: string;
   participants: string[];
@@ -255,6 +285,7 @@ export interface SocialInteraction {
   emotions: string[];
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface SocialNetwork {
   agentId: string;
   nodes: Array<{
@@ -278,6 +309,7 @@ export interface SocialNetwork {
   };
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface SocialDataUpdateEvent extends BaseEvent {
   agentId: string;
   type: 'relationship_update' | 'network_change' | 'reputation_change';
@@ -285,6 +317,7 @@ export interface SocialDataUpdateEvent extends BaseEvent {
   impact: number;
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface SocialInteractionEvent extends BaseEvent {
   interaction: SocialInteraction;
   impact: {
@@ -294,6 +327,7 @@ export interface SocialInteractionEvent extends BaseEvent {
   context: string;
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface SocialNetworkUpdateEvent extends BaseEvent {
   agentId: string;
   changes: Array<{
@@ -303,7 +337,8 @@ export interface SocialNetworkUpdateEvent extends BaseEvent {
   metrics: any;
 }
 
-// Skill events
+// Legacy skill events - marked as deprecated
+/** @deprecated No longer used in simplified architecture */
 export interface Skill {
   id: string;
   name: string;
@@ -346,6 +381,7 @@ export interface Skill {
   };
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface SkillDataUpdateEvent extends BaseEvent {
   skillId: string;
   type: 'experience_gained' | 'level_up' | 'milestone_achieved' | 'synergy_discovered' | 'proficiency_change';
@@ -359,6 +395,7 @@ export interface SkillDataUpdateEvent extends BaseEvent {
   impact: number;
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface ExperienceEvent {
   id: string;
   skillType: string;
@@ -375,6 +412,7 @@ export interface ExperienceEvent {
   timestamp: number;
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface SkillExperienceEvent extends BaseEvent {
   skillId: string;
   experience: ExperienceEvent;
@@ -385,6 +423,7 @@ export interface SkillExperienceEvent extends BaseEvent {
   };
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface SkillMilestone {
   id: string;
   name: string;
@@ -400,12 +439,14 @@ export interface SkillMilestone {
   achievedAt?: number;
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface SkillMilestoneEvent extends BaseEvent {
   skillId: string;
   milestone: SkillMilestone;
   abilities: string[];
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface SkillSynergy {
   id: string;
   sourceSkillId: string;
@@ -420,6 +461,7 @@ export interface SkillSynergy {
   };
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface SkillSynergyEvent extends BaseEvent {
   synergy: SkillSynergy;
   transferEvent: {
@@ -431,7 +473,7 @@ export interface SkillSynergyEvent extends BaseEvent {
   };
 }
 
-// Performance events
+// Performance events (kept for system monitoring)
 export interface PerformanceMetrics {
   agentId: string;
   responseTime: number;
@@ -489,7 +531,7 @@ export interface PerformanceAnomalyEvent extends BaseEvent {
   analysis: string;
 }
 
-// System events
+// System events (kept for system monitoring)
 export interface SystemStatus {
   overall: 'healthy' | 'degraded' | 'critical';
   components: Record<string, 'healthy' | 'degraded' | 'critical'>;
@@ -531,7 +573,7 @@ export interface SystemErrorEvent extends BaseEvent {
   impact: string;
 }
 
-// Connection events
+// Connection events (kept for connection management)
 export interface ConnectionStatusEvent extends BaseEvent {
   status: 'connected' | 'disconnected' | 'reconnecting' | 'failed' | 'error';
   message: string;
@@ -539,13 +581,15 @@ export interface ConnectionStatusEvent extends BaseEvent {
   lastPing: number;
 }
 
-// Event handler interfaces
+// Simplified event handler interfaces
 export interface AgentEventHandlers {
   onAgentStateUpdate?: (event: AgentStateUpdateEvent) => void;
   onAgentConnected?: (event: AgentConnectionEvent) => void;
   onAgentDisconnected?: (event: AgentConnectionEvent) => void;
 }
 
+// Legacy event handlers - marked as deprecated
+/** @deprecated Use simplified event handlers instead */
 export interface PersonalityEventHandlers {
   onPersonalityTraitUpdate?: (event: PersonalityTraitUpdateEvent) => void;
   onPersonalityEmotionUpdate?: (event: PersonalityEmotionEvent) => void;
@@ -553,6 +597,7 @@ export interface PersonalityEventHandlers {
   onPersonalityEvolution?: (event: PersonalityEvolutionEvent) => void;
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface MemoryEventHandlers {
   onMemorySemanticUpdate?: (event: MemoryUpdateEvent) => void;
   onMemoryEpisodicUpdate?: (event: MemoryUpdateEvent) => void;
@@ -560,6 +605,7 @@ export interface MemoryEventHandlers {
   onMemoryConsolidation?: (event: MemoryConsolidationEvent) => void;
 }
 
+/** @deprecated Use simplified goals string instead */
 export interface GoalEventHandlers {
   onGoalStrategicUpdate?: (event: GoalUpdateEvent) => void;
   onGoalTacticalUpdate?: (event: GoalUpdateEvent) => void;
@@ -568,12 +614,14 @@ export interface GoalEventHandlers {
   onGoalHierarchy?: (event: GoalHierarchyEvent) => void;
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface SocialEventHandlers {
   onSocialRelationshipUpdate?: (event: SocialDataUpdateEvent) => void;
   onSocialInteraction?: (event: SocialInteractionEvent) => void;
   onSocialNetworkUpdate?: (event: SocialNetworkUpdateEvent) => void;
 }
 
+/** @deprecated No longer used in simplified architecture */
 export interface SkillEventHandlers {
   onSkillProgressUpdate?: (event: SkillDataUpdateEvent) => void;
   onSkillExperience?: (event: SkillExperienceEvent) => void;

@@ -15,13 +15,20 @@ const PREALLOCATED_MODES = new Map();
  */
 export class LegacyModeWrapper {
     name;
-    priority;
+    priority; // Changed to number for compatibility
     legacyMode; // Would be the actual mode from modes.js
     executeFunction;
     isEmergencyMode;
+    // Add missing properties for ReactiveMode interface
+    conditions = {};
+    behaviors = {};
+    // Add missing properties for ReactiveMode interface
+    active = false;
+    lastExecution = 0;
+    executionCount = 0;
     constructor(name, priority, legacyMode, executeFunction) {
         this.name = name;
-        this.priority = priority;
+        this.priority = this.convertPriorityToNumber(priority); // Convert enum to number
         this.legacyMode = legacyMode;
         this.executeFunction = executeFunction;
         this.isEmergencyMode = priority <= InterruptPriority.SURVIVAL;
@@ -34,6 +41,18 @@ export class LegacyModeWrapper {
                 lastExecution: 0,
                 executionCount: 0
             });
+        }
+    }
+    /**
+     * Convert InterruptPriority enum to number for compatibility
+     */
+    convertPriorityToNumber(priority) {
+        switch (priority) {
+            case InterruptPriority.EMERGENCY: return 0;
+            case InterruptPriority.SURVIVAL: return 1;
+            case InterruptPriority.OPPORTUNITY: return 2;
+            case InterruptPriority.COGNITIVE: return 3;
+            default: return 3;
         }
     }
     /**
@@ -67,9 +86,9 @@ export class LegacyModeWrapper {
         }
         catch (error) {
             const endTime = process.hrtime.bigint();
-            const executionTime = Number(endTime - startTime) / 1000000; // Convert to ms;
+            const executionTime = Number(endTime - startTime) / 1000000; // Convert to ms
             // FAST-PATH: Optimized error handling for PathStopped
-            if (error.message && error.message.includes('PathStopped')) {
+            if (error?.message && error.message.includes('PathStopped')) {
                 // Silent handling for performance - only log if slow
                 if (executionTime > 30) {
                     console.log(`[REACTIVE] Mode ${this.name} interrupted (PathStopped) after ${executionTime.toFixed(1)}ms`);
@@ -80,7 +99,7 @@ export class LegacyModeWrapper {
                 return; // Success - this was an expected interruption
             }
             // Handle other errors
-            console.error(`[REACTIVE] Error executing mode ${this.name}:`, error.message);
+            console.error(`[REACTIVE] Error executing mode ${this.name}:`, error?.message);
             this.performFastPathfinderCleanup(agent);
             this.updateExecutionMetrics(agent, executionTime, 'error');
         }
@@ -105,10 +124,10 @@ export class LegacyModeWrapper {
             ]);
         }
         catch (error) {
-            if (error.message === 'Emergency timeout') {
+            if (error?.message === 'Emergency timeout') {
                 console.warn(`[REACTIVE] Emergency mode ${this.name} timed out`);
                 // Force pathfinder stop and continue
-                if (agent.bot.pathfinder) {
+                if (agent.bot?.pathfinder) {
                     agent.bot.pathfinder.stop();
                 }
                 return; // Don't fail the entire execution
@@ -122,7 +141,7 @@ export class LegacyModeWrapper {
     performFastPathfinderCleanup(agent) {
         try {
             // Get bot ID from agent metadata
-            const botId = agent.state.metadata?.agentId || 'unknown';
+            const botId = agent.state?.metadata?.agentId || 'unknown';
             const pathfinderManager = PathfinderStateManager.getInstance();
             const pathfinder = pathfinderManager.getPathfinder(botId);
             if (pathfinder) {
@@ -131,18 +150,17 @@ export class LegacyModeWrapper {
             }
             else {
                 // Fallback cleanup
-                if (agent.bot.pathfinder) {
+                if (agent.bot?.pathfinder) {
                     agent.bot.pathfinder.stop();
                     agent.bot.pathfinder.setGoal(null);
                 }
-                this.resetBotControls(agent.bot);
             }
         }
         catch (error) {
             // Silent error handling for performance
             // Only log if this is critical
             if (this.isEmergencyMode) {
-                console.warn(`[REACTIVE] Emergency cleanup failed:`, error.message);
+                console.warn(`[REACTIVE] Emergency cleanup failed:`, error?.message);
             }
         }
     }
@@ -150,11 +168,11 @@ export class LegacyModeWrapper {
      * Update execution metrics for performance monitoring
      */
     updateExecutionMetrics(agent, executionTime, result) {
-        if (agent.state.executive.performanceMetrics.reactiveResponseTime) {
+        if (agent.state?.executive?.performanceMetrics?.reactiveResponseTime) {
             agent.state.executive.performanceMetrics.reactiveResponseTime.push(executionTime);
         }
         // Update reactive layer metrics if available
-        if (agent.state.reactive.metrics) {
+        if (agent.state?.reactive?.metrics) {
             const metrics = agent.state.reactive.metrics;
             metrics.totalModeExecutions++;
             if (this.isEmergencyMode) {
@@ -168,31 +186,31 @@ export class LegacyModeWrapper {
     }
     canHandle(state) {
         // Check if this mode can handle the current emergency conditions
-        const emergencies = state.reactive.emergencyConditions;
+        const emergencies = state?.reactive?.emergencyConditions || [];
         switch (this.name) {
             case 'self_preservation':
-                return emergencies.some(e => e.type === 'drowning' || e.type === 'burning' || e.type === 'falling');
+                return emergencies.some((e) => e.type === 'drowning' || e.type === 'burning' || e.type === 'falling');
             case 'self_defense':
-                return emergencies.some(e => e.type === 'hostile_nearby');
+                return emergencies.some((e) => e.type === 'hostile_nearby');
             case 'cowardice':
-                return emergencies.some(e => e.type === 'hostile_nearby' || e.type === 'low_health');
+                return emergencies.some((e) => e.type === 'hostile_nearby' || e.type === 'low_health');
             case 'unstuck':
-                return emergencies.some(e => e.type === 'stuck');
+                return emergencies.some((e) => e.type === 'stuck');
             case 'hunting':
-                return !emergencies.some(e => {
+                return !emergencies.some((e) => {
                     const emergencyPriority = LegacyModeWrapper.getEmergencyPriority(e.type);
                     return emergencyPriority <= InterruptPriority.SURVIVAL;
-                }) && state.context.nearbyEntities.some(e => !e.hostile && e.distance < 16);
+                }) && state?.context?.nearbyEntities?.some((e) => !e.hostile && e.distance < 16);
             case 'item_collecting':
-                return !emergencies.some(e => {
+                return !emergencies.some((e) => {
                     const emergencyPriority = LegacyModeWrapper.getEmergencyPriority(e.type);
                     return emergencyPriority <= InterruptPriority.SURVIVAL;
-                }) && state.context.nearbyBlocks.some(b => b.distance < 8);
+                }) && state?.context?.nearbyBlocks?.some((b) => b.distance < 8);
             case 'torch_placing':
-                return !emergencies.some(e => {
+                return !emergencies.some((e) => {
                     const emergencyPriority = LegacyModeWrapper.getEmergencyPriority(e.type);
                     return emergencyPriority <= InterruptPriority.SURVIVAL;
-                }) && state.context.timeOfDay > 13000; // Night time
+                }) && (state?.context?.timeOfDay || 0) > 13000; // Night time
             default:
                 return false;
         }
@@ -221,7 +239,7 @@ export class LegacyModeWrapper {
     performPathfinderCleanup(agent, reason) {
         try {
             // Get bot ID from agent metadata or use a default
-            const botId = agent.state.metadata?.agentId || 'unknown';
+            const botId = agent.state?.metadata?.agentId || 'unknown';
             const pathfinderManager = PathfinderStateManager.getInstance();
             const pathfinder = pathfinderManager.getPathfinder(botId);
             if (pathfinder) {
@@ -245,47 +263,23 @@ export class LegacyModeWrapper {
             else {
                 // Fallback to basic cleanup if state manager not available
                 console.log(`[REACTIVE] Using basic pathfinder cleanup for bot ${botId}. Reason: ${reason}`);
-                if (agent.bot.pathfinder) {
+                if (agent.bot?.pathfinder) {
                     agent.bot.pathfinder.stop();
                     agent.bot.pathfinder.setGoal(null);
                 }
-                // Reset bot controls
-                this.resetBotControls(agent.bot);
             }
         }
         catch (cleanupError) {
             console.error(`[REACTIVE] Error during enhanced pathfinder cleanup:`, cleanupError);
             // Ultimate fallback - try to stop pathfinder directly
             try {
-                if (agent.bot.pathfinder) {
+                if (agent.bot?.pathfinder) {
                     agent.bot.pathfinder.stop();
                 }
-                this.resetBotControls(agent.bot);
             }
             catch (fallbackError) {
                 console.error(`[REACTIVE] Even fallback pathfinder cleanup failed:`, fallbackError);
             }
-        }
-    }
-    /**
-     * Reset all bot controls to safe state
-     */
-    resetBotControls(bot) {
-        try {
-            bot.setControlState('forward', false);
-            bot.setControlState('back', false);
-            bot.setControlState('left', false);
-            bot.setControlState('right', false);
-            bot.setControlState('jump', false);
-            bot.setControlState('sprint', false);
-            bot.setControlState('sneak', false);
-            // Stop any active digging
-            if (bot.targetDigBlock) {
-                bot.stopDigging();
-            }
-        }
-        catch (error) {
-            console.warn(`[REACTIVE] Error resetting bot controls:`, error);
         }
     }
 }
@@ -296,7 +290,7 @@ export class LegacyModeWrapper {
 export class ReactiveBehaviorLayerImpl {
     modes = [];
     interruptController;
-    modeController; // Would be the existing ModeController
+    // Remove modeController since it's already public from the original
     lastModeCheck = 0;
     modeCheckInterval = 50; // Reduced to 50ms for faster response
     pathfinderManager;
@@ -318,6 +312,9 @@ export class ReactiveBehaviorLayerImpl {
         lastModeSwitch: 0,
         modeSwitchCount: 0
     };
+    // Add missing properties for ReactiveBehaviorLayer interface
+    name = 'ReactiveBehaviorLayer';
+    activeMode = 'none';
     constructor(interruptController, bot, botId = 'default') {
         this.interruptController = interruptController;
         this.botId = botId;
@@ -381,7 +378,11 @@ export class ReactiveBehaviorLayerImpl {
             // Would call actual torch placing logic
         }));
         // Sort modes by priority (lower number = higher priority)
-        this.modes.sort((a, b) => a.priority - b.priority);
+        this.modes.sort((a, b) => {
+            const aPriority = typeof a.priority === 'string' ? this.convertPriorityToNumber(a.priority) : a.priority;
+            const bPriority = typeof b.priority === 'string' ? this.convertPriorityToNumber(b.priority) : b.priority;
+            return aPriority - bPriority;
+        });
     }
     /**
      * FAST-PATH: Optimized main update loop for reactive behavior layer
@@ -391,9 +392,9 @@ export class ReactiveBehaviorLayerImpl {
         const startTime = process.hrtime.bigint();
         const now = Date.now();
         // FAST-PATH: Emergency detection first (highest priority)
-        const priority = this.interruptController.checkEmergencyConditions(agent.state);
+        const priority = this.checkEmergencyConditions(agent.state);
         // If emergency detected, execute immediate response and bypass everything else
-        if (priority <= InterruptPriority.SURVIVAL) {
+        if (this.convertPriorityToNumber(priority) <= 1) { // EMERGENCY or SURVIVAL
             await this.executeFastEmergencyResponse(agent, priority);
             this.updateMetrics(startTime, priority);
             return; // Early exit for emergencies
@@ -410,10 +411,25 @@ export class ReactiveBehaviorLayerImpl {
             this.lastModeCheck = now;
         }
         // Monitor cognitive processing and interrupt if needed (only if not in reflection)
-        if (agent.state.cognitive.processing.currentPhase !== ProcessingPhase.REFLECTION) {
+        if (agent.state?.cognitive?.processing?.currentPhase !== ProcessingPhase.REFLECTION) {
             await this.monitorAndInterruptIfNeeded(agent);
         }
         this.updateMetrics(startTime, priority);
+    }
+    /**
+     * Convert InterruptPriority to number for comparison
+     */
+    convertPriorityToNumber(priority) {
+        if (typeof priority === 'number') {
+            return priority;
+        }
+        switch (priority) {
+            case InterruptPriority.EMERGENCY: return 0;
+            case InterruptPriority.SURVIVAL: return 1;
+            case InterruptPriority.OPPORTUNITY: return 2;
+            case InterruptPriority.COGNITIVE: return 3;
+            default: return 3;
+        }
     }
     /**
      * FAST-PATH: Optimized emergency response with minimal overhead
@@ -422,7 +438,7 @@ export class ReactiveBehaviorLayerImpl {
         const responseStart = process.hrtime.bigint();
         try {
             // FAST-PATH: Use cached emergency mode for instant access
-            const emergencyType = agent.state.reactive.emergencyConditions[0]?.type;
+            const emergencyType = agent.state?.reactive?.emergencyConditions?.[0]?.type;
             let activeMode = null;
             if (emergencyType) {
                 // Try to get cached emergency mode
@@ -430,13 +446,13 @@ export class ReactiveBehaviorLayerImpl {
                     case 'drowning':
                     case 'burning':
                     case 'falling':
-                        activeMode = this.emergencyModeCache.get('self_preservation');
+                        activeMode = this.emergencyModeCache.get('self_preservation') || null;
                         break;
                     case 'hostile_nearby':
-                        activeMode = this.emergencyModeCache.get('self_defense');
+                        activeMode = this.emergencyModeCache.get('self_defense') || null;
                         break;
                     case 'low_health':
-                        activeMode = this.emergencyModeCache.get('cowardice');
+                        activeMode = this.emergencyModeCache.get('cowardice') || null;
                         break;
                 }
             }
@@ -454,19 +470,21 @@ export class ReactiveBehaviorLayerImpl {
                 this.recordModeSwitch(activeMode);
             }
             // Update agent state
-            agent.state.reactive.lastReactiveAction = {
-                mode: activeMode.name,
-                priority,
-                timestamp: Date.now(),
-                context: agent.state.context,
-                action: activeMode.name,
-                result: 'success'
-            };
+            if (agent.state?.reactive) {
+                agent.state.reactive.lastReactiveAction = {
+                    mode: activeMode.name,
+                    priority,
+                    timestamp: Date.now(),
+                    context: agent.state.context,
+                    action: activeMode.name,
+                    result: 'success'
+                };
+            }
             const responseTime = Number(process.hrtime.bigint() - responseStart) / 1000000;
             this.metrics.emergencyResponseTime = responseTime;
             this.metrics.emergencyExecutions++;
             // Validate performance requirements
-            if (priority <= InterruptPriority.EMERGENCY && responseTime > 50) {
+            if (priority === InterruptPriority.EMERGENCY && responseTime > 50) {
                 console.warn(`[REACTIVE] Emergency response took ${responseTime.toFixed(1)}ms (target: <50ms)`);
             }
             else if (priority === InterruptPriority.SURVIVAL && responseTime > 100) {
@@ -474,23 +492,25 @@ export class ReactiveBehaviorLayerImpl {
             }
         }
         catch (error) {
-            console.error('[REACTIVE] Emergency response failed:', error.message);
+            console.error('[REACTIVE] Emergency response failed:', error?.message);
             // Record failed response
-            agent.state.reactive.lastReactiveAction = {
-                mode: 'emergency_failed',
-                priority,
-                timestamp: Date.now(),
-                context: agent.state.context,
-                action: 'none',
-                result: 'failed'
-            };
+            if (agent.state?.reactive) {
+                agent.state.reactive.lastReactiveAction = {
+                    mode: 'emergency_failed',
+                    priority,
+                    timestamp: Date.now(),
+                    context: agent.state.context,
+                    action: 'none',
+                    result: 'failed'
+                };
+            }
         }
     }
     /**
      * FAST-PATH: Execute mode with timeout and performance monitoring
      */
     async executeModeWithTimeout(agent, mode, priority) {
-        const timeout = priority <= InterruptPriority.EMERGENCY ? 80 : 150; // Different timeouts for different priorities
+        const timeout = priority === InterruptPriority.EMERGENCY ? 80 : 150; // Different timeouts for different priorities
         const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => reject(new Error('Mode execution timeout')), timeout);
         });
@@ -501,7 +521,7 @@ export class ReactiveBehaviorLayerImpl {
             ]);
         }
         catch (error) {
-            if (error.message === 'Mode execution timeout') {
+            if (error?.message === 'Mode execution timeout') {
                 console.warn(`[REACTIVE] Mode ${mode.name} timed out after ${timeout}ms`);
                 // Force cleanup and continue
                 this.forcePathfinderCleanup('mode_timeout');
@@ -516,7 +536,8 @@ export class ReactiveBehaviorLayerImpl {
     canSwitchMode(mode) {
         const now = Date.now();
         // Emergency modes can always switch
-        if (mode.priority <= InterruptPriority.SURVIVAL) {
+        const modePriority = this.convertPriorityToNumber(mode.priority);
+        if (modePriority <= 1) { // EMERGENCY or SURVIVAL
             return true;
         }
         // Non-emergency modes respect cooldown
@@ -530,6 +551,7 @@ export class ReactiveBehaviorLayerImpl {
         this.lastModeSwitch = Date.now();
         this.metrics.modeSwitchCount++;
         this.metrics.lastModeSwitch = this.lastModeSwitch;
+        this.activeMode = mode.name;
     }
     /**
      * Update performance metrics
@@ -546,7 +568,22 @@ export class ReactiveBehaviorLayerImpl {
      * Check emergency conditions (delegates to interrupt controller)
      */
     checkEmergencyConditions(state) {
-        return this.interruptController.checkEmergencyConditions(state);
+        // Use fallback implementation if method doesn't exist
+        if (typeof this.interruptController.checkEmergencyConditions === 'function') {
+            return this.interruptController.checkEmergencyConditions(state);
+        }
+        // Fallback: basic emergency detection
+        const emergencies = state?.reactive?.emergencyConditions || [];
+        if (emergencies.length === 0) {
+            return InterruptPriority.COGNITIVE;
+        }
+        // Return highest priority emergency
+        const highestPriority = emergencies.reduce((prev, current) => {
+            const prevPriority = LegacyModeWrapper.getEmergencyPriority(prev.type);
+            const currentPriority = LegacyModeWrapper.getEmergencyPriority(current.type);
+            return this.convertPriorityToNumber(prevPriority) < this.convertPriorityToNumber(currentPriority) ? prev : current;
+        });
+        return LegacyModeWrapper.getEmergencyPriority(highestPriority.type);
     }
     /**
      * Execute immediate reactive response for emergencies
@@ -571,18 +608,20 @@ export class ReactiveBehaviorLayerImpl {
             // Execute the reactive mode
             await activeMode.execute(agent);
             // Update agent state with reactive action context
-            agent.state.reactive.lastReactiveAction = {
-                mode: activeMode.name,
-                priority,
-                timestamp: Date.now(),
-                context: agent.state.context,
-                action: activeMode.name,
-                result: 'success'
-            };
+            if (agent.state?.reactive) {
+                agent.state.reactive.lastReactiveAction = {
+                    mode: activeMode.name,
+                    priority,
+                    timestamp: Date.now(),
+                    context: agent.state.context,
+                    action: activeMode.name,
+                    result: 'success'
+                };
+            }
             const executionTime = Date.now() - startTime;
             console.log(`[REACTIVE] Emergency response completed in ${executionTime}ms`);
             // Validate response time requirements
-            if (priority <= InterruptPriority.EMERGENCY && executionTime > 50) {
+            if (priority === InterruptPriority.EMERGENCY && executionTime > 50) {
                 console.warn(`[REACTIVE] Emergency response took ${executionTime}ms (target: <50ms)`);
             }
             else if (priority === InterruptPriority.SURVIVAL && executionTime > 100) {
@@ -592,14 +631,16 @@ export class ReactiveBehaviorLayerImpl {
         catch (error) {
             console.error('[REACTIVE] Error during emergency response:', error);
             // Record failed response
-            agent.state.reactive.lastReactiveAction = {
-                mode: 'emergency_failed',
-                priority,
-                timestamp: Date.now(),
-                context: agent.state.context,
-                action: 'none',
-                result: 'failed'
-            };
+            if (agent.state?.reactive) {
+                agent.state.reactive.lastReactiveAction = {
+                    mode: 'emergency_failed',
+                    priority,
+                    timestamp: Date.now(),
+                    context: agent.state.context,
+                    action: 'none',
+                    result: 'failed'
+                };
+            }
         }
     }
     /**
@@ -607,10 +648,17 @@ export class ReactiveBehaviorLayerImpl {
      */
     selectReactiveMode(agent, priority) {
         // Find modes that can handle the current situation and match priority
-        const suitableModes = this.modes.filter(mode => mode.priority === priority && mode.canHandle(agent.state));
+        const priorityNumber = this.convertPriorityToNumber(priority);
+        const suitableModes = this.modes.filter(mode => {
+            const modePriority = this.convertPriorityToNumber(mode.priority);
+            return modePriority === priorityNumber && mode.canHandle(agent.state);
+        });
         if (suitableModes.length === 0) {
             // If no exact priority match, try lower priority modes
-            const fallbackModes = this.modes.filter(mode => mode.priority > priority && mode.canHandle(agent.state));
+            const fallbackModes = this.modes.filter(mode => {
+                const modePriority = this.convertPriorityToNumber(mode.priority);
+                return modePriority > priorityNumber && mode.canHandle(agent.state);
+            });
             if (fallbackModes.length > 0) {
                 return fallbackModes[0];
             }
@@ -627,14 +675,19 @@ export class ReactiveBehaviorLayerImpl {
      */
     async checkOpportunisticBehaviors(agent) {
         // Only check opportunistic modes if no emergency conditions
-        const priority = this.interruptController.checkEmergencyConditions(agent.state);
-        if (priority > InterruptPriority.OPPORTUNITY) {
-            const opportunisticModes = this.modes.filter(mode => mode.priority === InterruptPriority.OPPORTUNITY && mode.canHandle(agent.state));
+        const priority = this.checkEmergencyConditions(agent.state);
+        if (this.convertPriorityToNumber(priority) > 2) { // Greater than OPPORTUNITY
+            const opportunisticModes = this.modes.filter(mode => {
+                const modePriority = this.convertPriorityToNumber(mode.priority);
+                return modePriority === 2 && mode.canHandle(agent.state); // OPPORTUNITY priority
+            });
             if (opportunisticModes.length > 0) {
                 const selectedMode = opportunisticModes[0];
                 // Don't interrupt cognitive processing for opportunities,
                 // but queue them for potential execution
-                console.log(`[REACTIVE] Opportunity detected: ${selectedMode.name}`);
+                if (selectedMode) {
+                    console.log(`[REACTIVE] Opportunity detected: ${selectedMode.name}`);
+                }
                 // Could add to cognitive consideration queue
                 // For now, just logging
             }
@@ -644,15 +697,19 @@ export class ReactiveBehaviorLayerImpl {
      * Monitor cognitive processing and interrupt if new emergencies arise
      */
     async monitorAndInterruptIfNeeded(agent) {
-        const currentPriority = this.interruptController.checkEmergencyConditions(agent.state);
-        if (currentPriority <= InterruptPriority.SURVIVAL) {
+        const currentPriority = this.checkEmergencyConditions(agent.state);
+        if (this.convertPriorityToNumber(currentPriority) <= 1) { // EMERGENCY or SURVIVAL
             console.log(`[REACTIVE] Interrupting cognitive processing for emergency (priority: ${currentPriority})`);
             // Signal cognitive processing to stop
-            this.interruptController.preemptCognitiveProcessing(currentPriority);
+            if (typeof this.interruptController.preemptCognitiveProcessing === 'function') {
+                this.interruptController.preemptCognitiveProcessing(currentPriority);
+            }
             // Execute emergency response
             await this.executeReactiveResponse(agent, currentPriority);
             // Resume cognitive processing after emergency is handled
-            this.interruptController.resumeCognitiveProcessing();
+            if (typeof this.interruptController.resumeCognitiveProcessing === 'function') {
+                this.interruptController.resumeCognitiveProcessing();
+            }
         }
     }
     /**
@@ -698,7 +755,7 @@ export class ReactiveBehaviorLayerImpl {
             // Validate current state
             const validation = pathfinder.validateState();
             if (!validation.isValid) {
-                console.warn(`[REACTIVE] Pathfinder state issues detected:`, validation.issues);
+                console.warn(`[REACTIVE] Pathfinder state validation failed after cleanup:`, validation.issues);
                 // Attempt recovery for minor issues
                 if (validation.corruptedOperations.length <= 2) {
                     console.log(`[REACTIVE] Attempting automatic recovery for ${validation.corruptedOperations.length} corrupted operations`);
@@ -722,17 +779,26 @@ export class ReactiveBehaviorLayerImpl {
                 // Force cleanup of old operations
                 const activeOps = pathfinder.getActiveOperations();
                 const now = Date.now();
-                const oldOps = activeOps.filter(op => now - op.startTime > 60000); // Operations older than 1 minute
+                const oldOps = activeOps.filter((op) => now - op.startTime > 60000); // Operations older than 1 minute
                 if (oldOps.length > 0) {
                     console.log(`[REACTIVE] Cleaning up ${oldOps.length} old pathfinder operations`);
-                    oldOps.forEach(op => {
+                    oldOps.forEach((op) => {
                         pathfinder.stopAllOperations('old_operation_cleanup');
                     });
                 }
             }
         }
         catch (error) {
-            console.error(`[REACTIVE] Error during periodic pathfinder maintenance:`, error);
+            console.error(`[REACTIVE] Error during enhanced pathfinder cleanup:`, error);
+            // Ultimate fallback - try to stop pathfinder directly
+            try {
+                if (agent.bot?.pathfinder) {
+                    agent.bot.pathfinder.stop();
+                }
+            }
+            catch (fallbackError) {
+                console.error(`[REACTIVE] Even fallback pathfinder cleanup failed:`, fallbackError);
+            }
         }
     }
     /**
@@ -767,6 +833,7 @@ export class ReactiveBehaviorLayerImpl {
     reset() {
         this.lastModeCheck = 0;
         this.lastPathfinderCleanup = 0;
+        this.activeMode = 'none';
         // Cleanup pathfinder state
         this.forcePathfinderCleanup('reactive_layer_reset');
         console.log('[REACTIVE] Reactive layer reset');
@@ -780,10 +847,31 @@ export class ReactiveBehaviorLayerImpl {
         this.pathfinderManager.unregisterPathfinder(this.botId);
         console.log('[REACTIVE] Reactive layer destroyed');
     }
+    /**
+     * Reset all bot controls to safe state
+     */
+    resetBotControls(bot) {
+        try {
+            bot.setControlState('forward', false);
+            bot.setControlState('back', false);
+            bot.setControlState('left', false);
+            bot.setControlState('right', false);
+            bot.setControlState('jump', false);
+            bot.setControlState('sprint', false);
+            bot.setControlState('sneak', false);
+            // Stop any active digging
+            if (bot.targetDigBlock) {
+                bot.stopDigging();
+            }
+        }
+        catch (error) {
+            console.warn(`[REACTIVE] Error resetting bot controls:`, error);
+        }
+    }
 }
-// ============================================================================
+// ==============================================================================
 // UTILITY FUNCTIONS
-// ============================================================================
+// =============================================================================
 /**
  * Create reactive behavior layer with existing modes system integration
  */

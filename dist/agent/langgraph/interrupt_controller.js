@@ -7,13 +7,13 @@ import { InterruptPriority } from './interfaces.js';
 import { PathfinderStateManager } from './pathfinder_state.js';
 // Pre-allocated emergency condition objects for performance
 const PREALLOCATED_EMERGENCIES = [
-    { type: 'drowning', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 } },
-    { type: 'burning', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 } },
-    { type: 'low_health', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 } },
-    { type: 'hostile_nearby', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 } },
-    { type: 'stuck', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 } },
-    { type: 'falling', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 } },
-    { type: 'pathfinder_stuck', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 } }
+    { type: 'drowning', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 }, timestamp: 0, context: 'drowning' },
+    { type: 'burning', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 }, timestamp: 0, context: 'burning' },
+    { type: 'low_health', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 }, timestamp: 0, context: 'low_health' },
+    { type: 'hostile_nearby', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 }, timestamp: 0, context: 'hostile_nearby' },
+    { type: 'stuck', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 }, timestamp: 0, context: 'stuck' },
+    { type: 'falling', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 }, timestamp: 0, context: 'falling' },
+    { type: 'pathfinder_stuck', severity: 0, detectedAt: 0, position: { x: 0, y: 0, z: 0 }, timestamp: 0, context: 'pathfinder_stuck' }
 ];
 export class InterruptController {
     emergencyThresholds = {
@@ -86,6 +86,7 @@ export class InterruptController {
             emergency.severity = this.calculateSeverity('drowning', context);
             emergency.detectedAt = now;
             emergency.position = { ...context.position };
+            emergency.timestamp = now;
             emergencies.push(emergency);
             emergencyCount++;
             return InterruptPriority.EMERGENCY; // Early exit for critical conditions
@@ -95,6 +96,7 @@ export class InterruptController {
             emergency.severity = this.calculateSeverity('burning', context);
             emergency.detectedAt = now;
             emergency.position = { ...context.position };
+            emergency.timestamp = now;
             emergencies.push(emergency);
             emergencyCount++;
             return InterruptPriority.EMERGENCY; // Early exit for critical conditions
@@ -104,6 +106,7 @@ export class InterruptController {
             emergency.severity = this.calculateSeverity('falling', context);
             emergency.detectedAt = now;
             emergency.position = { ...context.position };
+            emergency.timestamp = now;
             emergencies.push(emergency);
             emergencyCount++;
             return InterruptPriority.EMERGENCY; // Early exit for critical conditions
@@ -114,6 +117,7 @@ export class InterruptController {
             emergency.severity = this.calculateSeverity('low_health', context);
             emergency.detectedAt = now;
             emergency.position = { ...context.position };
+            emergency.timestamp = now;
             emergencies.push(emergency);
             emergencyCount++;
         }
@@ -122,12 +126,15 @@ export class InterruptController {
             emergency.severity = this.calculateSeverity('hostile_nearby', context);
             emergency.detectedAt = now;
             emergency.position = { ...context.position };
+            emergency.timestamp = now;
             emergencies.push(emergency);
             emergencyCount++;
         }
         // Early exit if survival threats found
         if (emergencyCount > 0) {
-            state.reactive.emergencyConditions = emergencies;
+            if (state.reactive?.emergencyConditions) {
+                state.reactive.emergencyConditions = emergencies;
+            }
             return InterruptPriority.SURVIVAL;
         }
         // OPPORTUNITY: Check less critical conditions
@@ -136,6 +143,7 @@ export class InterruptController {
             emergency.severity = this.calculateSeverity('stuck', context);
             emergency.detectedAt = now;
             emergency.position = { ...context.position };
+            emergency.timestamp = now;
             emergencies.push(emergency);
             emergencyCount++;
         }
@@ -146,9 +154,11 @@ export class InterruptController {
                 emergencyCount++;
             }
         }
-        state.reactive.emergencyConditions = emergencies;
+        if (state.reactive?.emergencyConditions) {
+            state.reactive.emergencyConditions = emergencies;
+        }
         return emergencyCount > 0 ?
-            (emergencyCount > 0 && emergencies[0].type === 'stuck' ? InterruptPriority.OPPORTUNITY : InterruptPriority.SURVIVAL) :
+            (emergencyCount > 0 && emergencies[0]?.type === 'stuck' ? InterruptPriority.OPPORTUNITY : InterruptPriority.SURVIVAL) :
             InterruptPriority.COGNITIVE;
     }
     /**
@@ -197,13 +207,16 @@ export class InterruptController {
     detectEmergencies(state) {
         const emergencies = [];
         const { context } = state;
+        const now = Date.now();
         // Check for drowning
         if (this.isDrowning(context)) {
             emergencies.push({
                 type: 'drowning',
                 severity: this.calculateSeverity('drowning', context),
-                detectedAt: Date.now(),
-                position: { ...context.position }
+                detectedAt: now,
+                position: { ...context.position },
+                timestamp: now,
+                context: 'drowning'
             });
         }
         // Check for burning
@@ -211,8 +224,10 @@ export class InterruptController {
             emergencies.push({
                 type: 'burning',
                 severity: this.calculateSeverity('burning', context),
-                detectedAt: Date.now(),
-                position: { ...context.position }
+                detectedAt: now,
+                position: { ...context.position },
+                timestamp: now,
+                context: 'burning'
             });
         }
         // Check for low health
@@ -220,8 +235,10 @@ export class InterruptController {
             emergencies.push({
                 type: 'low_health',
                 severity: this.calculateSeverity('low_health', context),
-                detectedAt: Date.now(),
-                position: { ...context.position }
+                detectedAt: now,
+                position: { ...context.position },
+                timestamp: now,
+                context: 'low_health'
             });
         }
         // Check for nearby hostile mobs
@@ -229,8 +246,10 @@ export class InterruptController {
             emergencies.push({
                 type: 'hostile_nearby',
                 severity: this.calculateSeverity('hostile_nearby', context),
-                detectedAt: Date.now(),
-                position: { ...context.position }
+                detectedAt: now,
+                position: { ...context.position },
+                timestamp: now,
+                context: 'hostile_nearby'
             });
         }
         // Check for stuck condition
@@ -238,8 +257,10 @@ export class InterruptController {
             emergencies.push({
                 type: 'stuck',
                 severity: this.calculateSeverity('stuck', context),
-                detectedAt: Date.now(),
-                position: { ...context.position }
+                detectedAt: now,
+                position: { ...context.position },
+                timestamp: now,
+                context: 'stuck'
             });
         }
         // Check for falling
@@ -247,8 +268,10 @@ export class InterruptController {
             emergencies.push({
                 type: 'falling',
                 severity: this.calculateSeverity('falling', context),
-                detectedAt: Date.now(),
-                position: { ...context.position }
+                detectedAt: now,
+                position: { ...context.position },
+                timestamp: now,
+                context: 'falling'
             });
         }
         return emergencies;
@@ -276,7 +299,9 @@ export class InterruptController {
                     type: 'pathfinder_stuck',
                     severity: this.calculateSeverity('pathfinder_stuck', state.context),
                     detectedAt: now,
-                    position: { ...state.context.position }
+                    position: { ...state.context.position },
+                    timestamp: now,
+                    context: 'pathfinder_stuck'
                 });
             }
         }
@@ -345,12 +370,17 @@ export class InterruptController {
             type,
             timestamp: Date.now(),
             handled: false,
-            bypassedCognitive
+            bypassedCognitive,
+            source: 'interrupt_controller',
+            context: {},
+            action: 'emergency_response'
         };
-        state.reactive.interruptHistory.push(event);
-        // Keep only last 100 interrupt events to prevent memory bloat
-        if (state.reactive.interruptHistory.length > 100) {
-            state.reactive.interruptHistory = state.reactive.interruptHistory.slice(-100);
+        if (state.reactive?.interruptHistory) {
+            state.reactive.interruptHistory.push(event);
+            // Keep only last 100 interrupt events to prevent memory bloat
+            if (state.reactive.interruptHistory.length > 100) {
+                state.reactive.interruptHistory = state.reactive.interruptHistory.slice(-100);
+            }
         }
     }
     /**
@@ -442,9 +472,9 @@ export class InterruptController {
                 // Severity based on distance to nearest hostile
                 const nearestHostile = context.nearbyEntities
                     .filter(e => e.hostile)
-                    .sort((a, b) => a.distance - b.distance)[0];
+                    .sort((a, b) => (a.distance || 0) - (b.distance || 0))[0];
                 if (nearestHostile) {
-                    return Math.max(0, 1 - (nearestHostile.distance / 8));
+                    return Math.max(0, 1 - ((nearestHostile.distance || 0) / 8));
                 }
                 return baseThreshold;
             case 'stuck':
@@ -475,7 +505,7 @@ export class InterruptController {
      * ENHANCED: Get comprehensive performance metrics for interrupt handling
      */
     getInterruptMetrics(state) {
-        const history = state.reactive.interruptHistory;
+        const history = state.reactive?.interruptHistory || [];
         const totalInterrupts = history.length;
         const emergencyInterrupts = history.filter(e => e.priority <= InterruptPriority.EMERGENCY).length;
         const bypassedCount = history.filter(e => e.bypassedCognitive).length;
@@ -566,13 +596,19 @@ export class InterruptController {
         if (performance.survivalRate < 0.8) {
             // Make agent more cautious
             Object.keys(this.emergencyThresholds).forEach(key => {
-                this.emergencyThresholds[key] = Math.min(1.0, this.emergencyThresholds[key] + 0.1);
+                const threshold = this.emergencyThresholds[key];
+                if (threshold !== undefined) {
+                    this.emergencyThresholds[key] = Math.min(1.0, threshold + 0.1);
+                }
             });
         }
         else if (performance.survivalRate > 0.95 && performance.responseTime < 100) {
             // Can be less cautious if performing well
             Object.keys(this.emergencyThresholds).forEach(key => {
-                this.emergencyThresholds[key] = Math.max(0.3, this.emergencyThresholds[key] - 0.05);
+                const threshold = this.emergencyThresholds[key];
+                if (threshold !== undefined) {
+                    this.emergencyThresholds[key] = Math.max(0.3, threshold - 0.05);
+                }
             });
         }
     }

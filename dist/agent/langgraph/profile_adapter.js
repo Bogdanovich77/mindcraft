@@ -167,7 +167,7 @@ export class ProfileAdapter {
             hasMemoryBank: !!profile.memory_bank,
             goalCount: profile.npc?.goals?.length || 0,
             memoryLocationCount: Object.keys(profile.memory_bank || {}).length,
-            lastMigrated: profile.lastMigrated,
+            lastMigrated: profile.lastMigrated || 0,
             age: Date.now() - (profile.createdAt || Date.now())
         };
         return stats;

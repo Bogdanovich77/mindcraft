@@ -5,6 +5,150 @@
 import { MigrationManager } from './migration_manager.js';
 import { ProfileAdapter } from './profile_adapter.js';
 /**
+ * Safe deep clone utility replacing unsafe JSON methods
+ */
+class SafeDeepCloner {
+    /**
+     * Safely deep clone an object with proper type preservation
+     */
+    static deepClone(obj) {
+        if (obj === null || typeof obj !== 'object') {
+            return obj;
+        }
+        // Handle Date objects
+        if (obj instanceof Date) {
+            return new Date(obj.getTime());
+        }
+        // Handle Array objects
+        if (Array.isArray(obj)) {
+            return obj.map(item => SafeDeepCloner.deepClone(item));
+        }
+        // Handle Map objects
+        if (obj instanceof Map) {
+            const clonedMap = new Map();
+            for (const [key, value] of Array.from(obj.entries())) {
+                clonedMap.set(key, SafeDeepCloner.deepClone(value));
+            }
+            return clonedMap;
+        }
+        // Handle Set objects
+        if (obj instanceof Set) {
+            const clonedSet = new Set();
+            for (const value of Array.from(obj.values())) {
+                clonedSet.add(SafeDeepCloner.deepClone(value));
+            }
+            return clonedSet;
+        }
+        // Handle plain objects with prototype safety
+        const cloned = {};
+        for (const key in obj) {
+            if (obj.hasOwnProperty(key) && this.isSafeKey(key)) {
+                cloned[key] = SafeDeepCloner.deepClone(obj[key]);
+            }
+        }
+        return cloned;
+    }
+    /**
+     * Check if a key is safe for cloning (prevents prototype pollution)
+     */
+    static isSafeKey(key) {
+        const unsafeKeys = ['__proto__', 'constructor', 'prototype', '__defineGetter__', '__defineSetter__', '__lookupGetter__', '__lookupSetter__'];
+        return !unsafeKeys.includes(key) && typeof key === 'string';
+    }
+    /**
+     * Validate that an object is safe for cloning
+     */
+    static validateForCloning(obj) {
+        const issues = [];
+        if (obj === null || typeof obj !== 'object') {
+            return { isValid: true, issues };
+        }
+        // Check for prototype pollution attempts
+        if (obj.__proto__ !== Object.prototype && obj.__proto__ !== null) {
+            issues.push('Object has modified prototype');
+        }
+        // Check for circular references
+        try {
+            JSON.stringify(obj);
+        }
+        catch (error) {
+            if (error instanceof Error && error.message.includes('circular')) {
+                issues.push('Object contains circular references');
+            }
+        }
+        // Check for unsafe keys
+        const checkKeys = (currentObj, path = '') => {
+            for (const key in currentObj) {
+                const currentPath = path ? `${path}.${key}` : key;
+                if (!this.isSafeKey(key)) {
+                    issues.push(`Unsafe key detected: ${currentPath}`);
+                }
+                if (typeof currentObj[key] === 'object' && currentObj[key] !== null) {
+                    if (path.length > 10) { // Prevent infinite recursion
+                        continue;
+                    }
+                    checkKeys(currentObj[key], currentPath);
+                }
+            }
+        };
+        checkKeys(obj);
+        return { isValid: issues.length === 0, issues };
+    }
+}
+/**
+ * Input validation utility
+ */
+class InputValidator {
+    /**
+     * Validate rollback point creation input
+     */
+    static validateRollbackInput(data, description, component) {
+        const errors = [];
+        // Validate data
+        if (data === null || data === undefined) {
+            errors.push('Data cannot be null or undefined');
+        }
+        else {
+            const cloneValidation = SafeDeepCloner.validateForCloning(data);
+            if (!cloneValidation.isValid) {
+                errors.push(...cloneValidation.issues);
+            }
+        }
+        // Validate description
+        if (!description || typeof description !== 'string') {
+            errors.push('Description must be a non-empty string');
+        }
+        else if (description.length > 500) {
+            errors.push('Description must be less than 500 characters');
+        }
+        else if (!this.isValidString(description)) {
+            errors.push('Description contains invalid characters');
+        }
+        // Validate component
+        if (!component || typeof component !== 'string') {
+            errors.push('Component must be a non-empty string');
+        }
+        else if (!this.isValidComponentName(component)) {
+            errors.push('Component name contains invalid characters');
+        }
+        return { isValid: errors.length === 0, errors };
+    }
+    /**
+     * Validate string for safety
+     */
+    static isValidString(str) {
+        // Allow alphanumeric, spaces, and basic punctuation
+        return /^[a-zA-Z0-9\s.,!?;:'"()-]+$/.test(str);
+    }
+    /**
+     * Validate component name for safety
+     */
+    static isValidComponentName(name) {
+        // Allow alphanumeric, underscores, and hyphens
+        return /^[a-zA-Z0-9_-]+$/.test(name);
+    }
+}
+/**
  * Validation and Rollback Manager
  */
 export class ValidationRollbackManager {
@@ -88,36 +232,53 @@ export class ValidationRollbackManager {
         }
     }
     /**
-     * Create a rollback point
+     * Create a rollback point with enhanced safety
      */
     async createRollbackPoint(data, description, component) {
-        const rollbackId = this.generateRollbackId();
-        const rollbackPoint = {
-            id: rollbackId,
-            timestamp: Date.now(),
-            description,
-            data: JSON.parse(JSON.stringify(data)), // Deep clone
-            metadata: {
-                version: '1.0.0',
-                component,
-                reason: description
-            }
-        };
-        this.rollbackPoints.set(rollbackId, rollbackPoint);
-        // Cleanup old rollback points
-        if (this.rollbackPoints.size > this.maxRollbackPoints) {
-            const oldestId = this.getOldestRollbackPoint();
-            if (oldestId) {
-                this.rollbackPoints.delete(oldestId);
-            }
+        // Validate inputs
+        const inputValidation = InputValidator.validateRollbackInput(data, description, component);
+        if (!inputValidation.isValid) {
+            throw new Error(`Invalid rollback input: ${inputValidation.errors.join(', ')}`);
         }
-        console.log(`Created rollback point ${rollbackId} for component ${component}`);
-        return rollbackId;
+        const rollbackId = this.generateRollbackId();
+        try {
+            // Safe deep clone using SafeDeepCloner instead of JSON methods
+            const clonedData = SafeDeepCloner.deepClone(data);
+            const rollbackPoint = {
+                id: rollbackId,
+                timestamp: Date.now(),
+                description: this.sanitizeDescription(description),
+                data: clonedData,
+                metadata: {
+                    version: '1.0.0',
+                    component: this.sanitizeComponentName(component),
+                    reason: this.sanitizeDescription(description)
+                }
+            };
+            this.rollbackPoints.set(rollbackId, rollbackPoint);
+            // Cleanup old rollback points
+            if (this.rollbackPoints.size > this.maxRollbackPoints) {
+                const oldestId = this.getOldestRollbackPoint();
+                if (oldestId) {
+                    this.rollbackPoints.delete(oldestId);
+                }
+            }
+            console.log(`Created rollback point ${rollbackId} for component ${component}`);
+            return rollbackId;
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to create rollback point: ${errorMessage}`);
+        }
     }
     /**
-     * Rollback to a specific point
+     * Rollback to a specific point with enhanced safety
      */
     async rollback(rollbackId) {
+        // Validate rollback ID
+        if (!rollbackId || typeof rollbackId !== 'string') {
+            throw new Error('Invalid rollback ID');
+        }
         const rollbackPoint = this.rollbackPoints.get(rollbackId);
         if (!rollbackPoint) {
             throw new Error(`Rollback point ${rollbackId} not found`);
@@ -129,8 +290,8 @@ export class ValidationRollbackManager {
             if (!validationResult.isValid) {
                 throw new Error(`Rollback data validation failed: ${validationResult.issues.map(i => i.message).join(', ')}`);
             }
-            // Return the rollback data
-            return JSON.parse(JSON.stringify(rollbackPoint.data));
+            // Safe deep clone the rollback data
+            return SafeDeepCloner.deepClone(rollbackPoint.data);
         }
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -233,41 +394,30 @@ export class ValidationRollbackManager {
         return [...this.healthHistory];
     }
     /**
-     * Validate profile structure
+     * Sanitize description to prevent injection attacks
      */
-    validateProfile(profile) {
-        const issues = [];
-        if (!profile.username) {
-            issues.push({
-                type: 'data_integrity',
-                severity: 'error',
-                message: 'Profile missing username',
-                component: 'profile'
-            });
+    sanitizeDescription(description) {
+        if (!description || typeof description !== 'string') {
+            return '';
         }
-        if (!profile.profileVersion) {
-            issues.push({
-                type: 'data_integrity',
-                severity: 'warning',
-                message: 'Profile missing version information',
-                component: 'profile'
-            });
+        // Remove potentially dangerous characters
+        return description
+            .replace(/[<>]/g, '') // Remove HTML brackets
+            .replace(/javascript:/gi, '') // Remove javascript protocol
+            .replace(/data:/gi, '') // Remove data protocol
+            .replace(/vbscript:/gi, '') // Remove vbscript protocol
+            .replace(/on\w+=/gi, '') // Remove event handlers
+            .trim();
+    }
+    /**
+     * Sanitize component name to prevent injection attacks
+     */
+    sanitizeComponentName(component) {
+        if (!component || typeof component !== 'string') {
+            return 'unknown';
         }
-        if (profile.compatibilityMode === 'new_only' && !profile.agentState) {
-            issues.push({
-                type: 'compatibility',
-                severity: 'error',
-                message: 'New-only mode requires agent state',
-                component: 'profile'
-            });
-        }
-        return {
-            isValid: issues.filter(i => i.severity === 'error').length === 0,
-            severity: this.calculateSeverity(issues),
-            issues,
-            recommendations: [],
-            score: Math.max(0, 100 - issues.filter(i => i.severity === 'error').length * 10)
-        };
+        // Only allow alphanumeric, underscores, and hyphens
+        return component.replace(/[^a-zA-Z0-9_-]/g, '');
     }
     /**
      * Validate agent state structure
@@ -369,7 +519,7 @@ export class ValidationRollbackManager {
         };
     }
     /**
-     * Validate rollback data
+     * Validate rollback data with enhanced security
      */
     validateRollbackData(data) {
         const issues = [];
@@ -380,6 +530,29 @@ export class ValidationRollbackManager {
                 message: 'Invalid rollback data structure',
                 component: 'rollback'
             });
+        }
+        else {
+            // Check for unsafe cloning issues
+            const cloneValidation = SafeDeepCloner.validateForCloning(data);
+            if (!cloneValidation.isValid) {
+                cloneValidation.issues.forEach(issue => {
+                    issues.push({
+                        type: 'data_integrity',
+                        severity: 'error',
+                        message: `Safety issue: ${issue}`,
+                        component: 'rollback'
+                    });
+                });
+            }
+            // Check for prototype pollution
+            if (data.__proto__ !== Object.prototype && data.__proto__ !== null) {
+                issues.push({
+                    type: 'data_integrity',
+                    severity: 'critical',
+                    message: 'Rollback data contains prototype pollution',
+                    component: 'rollback'
+                });
+            }
         }
         return {
             isValid: issues.filter(i => i.severity === 'error' || i.severity === 'critical').length === 0,

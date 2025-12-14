@@ -107,11 +107,11 @@ export declare class ValidationRollbackManager {
      */
     validateSystem(profile: EnhancedProfile, compatibilityLayer?: CompatibilityLayer): Promise<ValidationResult>;
     /**
-     * Create a rollback point
+     * Create a rollback point with enhanced safety
      */
     createRollbackPoint(data: any, description: string, component: string): Promise<string>;
     /**
-     * Rollback to a specific point
+     * Rollback to a specific point with enhanced safety
      */
     rollback(rollbackId: string): Promise<any>;
     /**
@@ -139,9 +139,13 @@ export declare class ValidationRollbackManager {
      */
     getHealthHistory(): SystemHealth[];
     /**
-     * Validate profile structure
+     * Sanitize description to prevent injection attacks
      */
-    private validateProfile;
+    private sanitizeDescription;
+    /**
+     * Sanitize component name to prevent injection attacks
+     */
+    private sanitizeComponentName;
     /**
      * Validate agent state structure
      */
@@ -155,7 +159,7 @@ export declare class ValidationRollbackManager {
      */
     private validateMigrationStatus;
     /**
-     * Validate rollback data
+     * Validate rollback data with enhanced security
      */
     private validateRollbackData;
     /**

@@ -6,6 +6,9 @@
  * Following the established patterns from cognitive components
  */
 import { RelationshipNetwork, AgentRelationship, RelationshipUpdateRequest, RelationshipQuery, RelationshipSearchResult, RelationshipManagerConfig, RelationshipStatus } from './relationship_types.js';
+export declare class RingNumberModel {
+    static get default(): any;
+}
 /**
  * Main relationship management system
  */

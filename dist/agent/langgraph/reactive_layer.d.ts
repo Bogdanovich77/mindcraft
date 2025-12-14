@@ -11,11 +11,20 @@ import { Bot } from 'mineflayer';
  */
 export declare class LegacyModeWrapper implements ReactiveMode {
     readonly name: string;
-    readonly priority: InterruptPriority;
+    readonly priority: number;
     private legacyMode;
     private executeFunction;
     private isEmergencyMode;
+    readonly conditions: any;
+    readonly behaviors: any;
+    readonly active: boolean;
+    readonly lastExecution: number;
+    readonly executionCount: number;
     constructor(name: string, priority: InterruptPriority, legacyMode: any, executeFunction: (bot: Bot) => Promise<void>);
+    /**
+     * Convert InterruptPriority enum to number for compatibility
+     */
+    private convertPriorityToNumber;
     /**
      * FAST-PATH: Execute mode with performance monitoring and optimized error handling
      */
@@ -41,19 +50,14 @@ export declare class LegacyModeWrapper implements ReactiveMode {
      * Perform enhanced pathfinder cleanup using state manager
      */
     private performPathfinderCleanup;
-    /**
-     * Reset all bot controls to safe state
-     */
-    private resetBotControls;
 }
 /**
  * OPTIMIZED: Main reactive behavior layer implementation
  * Optimized for <100ms survival response requirements
  */
 export declare class ReactiveBehaviorLayerImpl implements ReactiveBehaviorLayer {
-    private modes;
-    private interruptController;
-    private modeController;
+    modes: ReactiveMode[];
+    interruptController: InterruptController;
     private lastModeCheck;
     private modeCheckInterval;
     private pathfinderManager;
@@ -65,6 +69,8 @@ export declare class ReactiveBehaviorLayerImpl implements ReactiveBehaviorLayer 
     private modeSwitchCooldown;
     private emergencyModeCache;
     private metrics;
+    readonly name: string;
+    activeMode: string;
     constructor(interruptController: InterruptController, bot: Bot, botId?: string);
     /**
      * FAST-PATH: Pre-allocate emergency modes for instant access
@@ -79,6 +85,10 @@ export declare class ReactiveBehaviorLayerImpl implements ReactiveBehaviorLayer 
      * Prioritizes emergency detection and response
      */
     update(agent: Agent, deltaTime: number): Promise<void>;
+    /**
+     * Convert InterruptPriority to number for comparison
+     */
+    private convertPriorityToNumber;
     /**
      * FAST-PATH: Optimized emergency response with minimal overhead
      */
@@ -156,6 +166,10 @@ export declare class ReactiveBehaviorLayerImpl implements ReactiveBehaviorLayer 
      * Cleanup resources when destroying the reactive layer
      */
     destroy(): void;
+    /**
+     * Reset all bot controls to safe state
+     */
+    private resetBotControls;
 }
 /**
  * Create reactive behavior layer with existing modes system integration

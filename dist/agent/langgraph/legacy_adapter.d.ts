@@ -2,11 +2,7 @@
  * Legacy Adapter - Main compatibility layer for existing NPC system
  * Wraps the existing NPCData, ItemGoal, and BuildGoal systems to work with LangGraph
  */
-import { NPCData } from '../npc/data.js';
-import { NPCContoller } from '../npc/controller.js';
-import { MemoryBank } from '../memory_bank.js';
 import { AgentState } from './interfaces.js';
-import { Agent } from '../agent.js';
 /**
  * Legacy NPC Data Adapter
  * Converts between flat NPCData structure and hierarchical AgentState
@@ -15,10 +11,6 @@ export declare class LegacyNPCDataAdapter {
     private npcData;
     private originalProfile;
     constructor(profileData: any);
-    /**
-     * Convert legacy NPCData to AgentState cognitive components
-     */
-    toAgentState(): Partial<AgentState>;
     /**
      * Extract purpose state from legacy profile
      */
@@ -36,13 +28,17 @@ export declare class LegacyNPCDataAdapter {
      */
     private extractMemoryState;
     /**
+     * Convert legacy NPCData to AgentState cognitive components
+     */
+    toAgentState(): Partial<AgentState>;
+    /**
      * Update legacy NPCData from AgentState
      */
     updateFromAgentState(agentState: AgentState): void;
     /**
      * Get the legacy NPCData instance
      */
-    getNPCData(): NPCData;
+    getNPCData(): any;
     /**
      * Get the original profile data
      */
@@ -66,7 +62,7 @@ export declare class LegacyControllerAdapter {
     private controller;
     private dataAdapter;
     private agent;
-    constructor(agent: Agent, dataAdapter: LegacyNPCDataAdapter);
+    constructor(agent: any, dataAdapter: LegacyNPCDataAdapter);
     /**
      * Initialize the legacy controller
      */
@@ -94,7 +90,7 @@ export declare class LegacyControllerAdapter {
     /**
      * Get the underlying controller for direct access if needed
      */
-    getController(): NPCContoller;
+    getController(): any;
 }
 /**
  * Legacy Memory Adapter
@@ -122,6 +118,6 @@ export declare class LegacyMemoryAdapter {
     /**
      * Get the underlying memory bank
      */
-    getMemoryBank(): MemoryBank;
+    getMemoryBank(): any;
 }
 //# sourceMappingURL=legacy_adapter.d.ts.map

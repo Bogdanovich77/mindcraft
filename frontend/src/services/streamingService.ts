@@ -3,25 +3,11 @@
  *
  * This service provides advanced streaming capabilities for real-time data processing,
  * including data transformation, aggregation, filtering, and intelligent caching
- * for optimal performance across all cognitive components.
+ * for optimal performance across simplified agent components.
  */
 
 import type {
-  AgentState,
-  AgentStateUpdateEvent,
-  PersonalityTraitUpdateEvent,
-  PersonalityEmotionEvent,
-  PersonalityMoodEvent,
-  MemoryUpdateEvent,
-  MemoryConsolidationEvent,
-  GoalUpdateEvent,
-  GoalProgressEvent,
-  SocialDataUpdateEvent,
-  SocialInteractionEvent,
-  SkillDataUpdateEvent,
-  SkillExperienceEvent,
-  PerformanceMetricsUpdateEvent,
-  SystemStatusUpdateEvent
+  AgentStateUpdateEvent
 } from '../types/socketEvents';
 
 // Streaming configuration interface
@@ -521,28 +507,20 @@ export class StreamingService {
   }
 
   /**
-   * Create predefined streams for cognitive components
+   * Create predefined streams for simplified agent components
    */
-  createCognitiveStreams(): void {
+  createSimplifiedStreams(): void {
     const existingStreams = Array.from(this.streams.keys());
     const requiredStreams = [
       'agent-state',
-      'personality', 
-      'emotions',
-      'memory:semantic',
-      'memory:episodic',
-      'memory:procedural',
-      'memory:consolidation',
-      'goals',
-      'social',
-      'skills',
-      'performance'
+      'agent-messages',
+      'agent-actions'
     ];
     
     const missingStreams = requiredStreams.filter(id => !existingStreams.includes(id));
     
     if (missingStreams.length === 0) {
-      console.log('[StreamingService] All cognitive streams already exist');
+      console.log('[StreamingService] All simplified streams already exist');
       return;
     }
     
@@ -557,97 +535,25 @@ export class StreamingService {
       });
     }
 
-    // Personality stream
-    if (missingStreams.includes('personality')) {
-      this.createStream<PersonalityTraitUpdateEvent>('personality', 'personality', {
+    // Agent messages stream
+    if (missingStreams.includes('agent-messages')) {
+      this.createStream<any>('agent-messages', 'agent-messages', {
         window: this.config.aggregationWindow,
         enabled: this.config.enableAggregation,
         function: (events) => events[events.length - 1] // Keep latest
       });
     }
 
-    // Emotion stream
-    if (missingStreams.includes('emotions')) {
-      this.createStream<PersonalityEmotionEvent>('emotions', 'emotions', {
+    // Agent actions stream
+    if (missingStreams.includes('agent-actions')) {
+      this.createStream<any>('agent-actions', 'agent-actions', {
         window: this.config.aggregationWindow,
         enabled: this.config.enableAggregation,
         function: (events) => events[events.length - 1] // Keep latest
       });
     }
 
-    // Memory semantic stream
-    if (missingStreams.includes('memory:semantic')) {
-      this.createStream<MemoryUpdateEvent>('memory:semantic', 'memory:semantic', {
-        window: this.config.aggregationWindow,
-        enabled: this.config.enableAggregation,
-        function: (events) => events[events.length - 1] // Keep latest
-      });
-    }
-
-    // Memory episodic stream
-    if (missingStreams.includes('memory:episodic')) {
-      this.createStream<MemoryUpdateEvent>('memory:episodic', 'memory:episodic', {
-        window: this.config.aggregationWindow,
-        enabled: this.config.enableAggregation,
-        function: (events) => events[events.length - 1] // Keep latest
-      });
-    }
-
-    // Memory procedural stream
-    if (missingStreams.includes('memory:procedural')) {
-      this.createStream<MemoryUpdateEvent>('memory:procedural', 'memory:procedural', {
-        window: this.config.aggregationWindow,
-        enabled: this.config.enableAggregation,
-        function: (events) => events[events.length - 1] // Keep latest
-      });
-    }
-
-    // Memory consolidation stream
-    if (missingStreams.includes('memory:consolidation')) {
-      this.createStream<MemoryConsolidationEvent>('memory:consolidation', 'memory:consolidation', {
-        window: this.config.aggregationWindow,
-        enabled: this.config.enableAggregation,
-        function: (events) => events[events.length - 1] // Keep latest
-      });
-    }
-
-    // Goals stream
-    if (missingStreams.includes('goals')) {
-      this.createStream<GoalUpdateEvent>('goals', 'goals', {
-        window: this.config.aggregationWindow,
-        enabled: this.config.enableAggregation,
-        function: (events) => events[events.length - 1] // Keep latest
-      });
-    }
-
-    // Social stream
-    if (missingStreams.includes('social')) {
-      this.createStream<SocialDataUpdateEvent>('social', 'social', {
-        window: this.config.aggregationWindow,
-        enabled: this.config.enableAggregation,
-        function: (events) => events[events.length - 1] // Keep latest
-      });
-    }
-
-    // Skills stream
-    if (missingStreams.includes('skills')) {
-      this.createStream<SkillDataUpdateEvent>('skills', 'skills', {
-        window: this.config.aggregationWindow,
-        enabled: this.config.enableAggregation,
-        function: (events) => events[events.length - 1] // Keep latest
-      });
-    }
-
-    // Performance stream
-    if (missingStreams.includes('performance')) {
-      this.createStream<PerformanceMetricsUpdateEvent>('performance', 'performance', {
-        window: this.config.aggregationWindow,
-        enabled: this.config.enableAggregation,
-        function: (events) => events[events.length - 1] // Keep latest
-      });
-    }
-
-    console.log(`[StreamingService] Created ${missingStreams.length} missing cognitive streams`);
+    console.log(`[StreamingService] Created ${missingStreams.length} missing simplified streams`);
   }
 }
 
@@ -656,41 +562,44 @@ export const streamingService = new StreamingService();
 
 // Export utility functions for creating common transformers and filters
 export const createCommonTransformers = () => ({
-  // Normalize personality traits
-  normalizePersonalityTraits: {
-    id: 'normalize-personality-traits',
-    transform: (data: PersonalityTraitUpdateEvent) => ({
+  // Normalize agent state data
+  normalizeAgentState: {
+    id: 'normalize-agent-state',
+    transform: (data: AgentStateUpdateEvent) => ({
       ...data,
-      traits: Object.fromEntries(
-        Object.entries(data.traits).map(([key, value]) => [
-          key,
-          Math.max(0, Math.min(1, value)) // Clamp between 0 and 1
-        ])
-      )
-    }),
-    enabled: true
-  },
-
-  // Calculate emotion intensity
-  calculateEmotionIntensity: {
-    id: 'calculate-emotion-intensity',
-    transform: (data: PersonalityEmotionEvent) => ({
-      ...data,
-      calculatedIntensity: (data as any).intensity * 100 // Convert to percentage
-    }),
-    enabled: true
-  },
-
-  // Extract memory metrics
-  extractMemoryMetrics: {
-    id: 'extract-memory-metrics',
-    transform: (data: MemoryUpdateEvent) => ({
-      ...data,
-      metrics: {
-        totalMemories: Array.isArray(data.memory) ? data.memory.length : 0,
-        lastUpdate: data.timestamp,
-        memoryType: data.memoryType
+      state: {
+        worldContext: data.state?.worldContext || {},
+        personality: data.state?.personality || '',
+        goals: data.state?.goals || '',
+        mandate: data.state?.mandate || '',
+        conversation: data.state?.conversation || {},
+        lastAction: data.state?.lastAction || '',
+        response: data.state?.response || ''
       }
+    }),
+    enabled: true
+  },
+
+  // Extract message content
+  extractMessageContent: {
+    id: 'extract-message-content',
+    transform: (data: any) => ({
+      ...data,
+      messageContent: data.message?.content || '',
+      sender: data.message?.sender || 'unknown',
+      timestamp: data.timestamp || Date.now()
+    }),
+    enabled: true
+  },
+
+  // Extract action details
+  extractActionDetails: {
+    id: 'extract-action-details',
+    transform: (data: any) => ({
+      ...data,
+      actionType: data.action?.type || 'unknown',
+      actionTarget: data.action?.target || null,
+      executionTime: data.executionTime || 0
     }),
     enabled: true
   }
@@ -704,10 +613,10 @@ export const createCommonFilters = () => ({
     enabled: true
   },
 
-  // Filter out low-intensity emotions
-  filterLowIntensityEmotions: {
-    id: 'filter-low-intensity-emotions',
-    filter: (data: PersonalityEmotionEvent) => (data as any).intensity > 0.1,
+  // Filter out empty messages
+  filterEmptyMessages: {
+    id: 'filter-empty-messages',
+    filter: (data: any) => data.message && data.message.content && data.message.content.length > 0,
     enabled: true
   },
 

@@ -101,7 +101,7 @@ export class InterruptiblePathfinder {
       priority: options.priority || 0,
       context: {
         source,
-        metadata: options.metadata
+        metadata: options.metadata || {}
       }
     };
 

@@ -1,0 +1,58 @@
+{
+  "totalTests": 55,
+  "passedTests": 51,
+  "failedTests": 4,
+  "errors": [
+    "❌ FAIL: Equipment extracted",
+    "❌ FAIL: Latest message detected",
+    "❌ FAIL: Message sender identified",
+    "❌ FAIL: Help request detected"
+  ],
+  "performanceMetrics": {
+    "perceptionNode": {
+      "duration": 0.87,
+      "memoryDelta": 27
+    },
+    "conversationNode": {
+      "duration": 0.43,
+      "memoryDelta": 12
+    },
+    "conversationNodeFallback": {
+      "duration": 0.34,
+      "memoryDelta": 12
+    },
+    "decisionNode": {
+      "duration": 0.19,
+      "memoryDelta": 4
+    },
+    "executionNode": {
+      "duration": 0.16,
+      "memoryDelta": 2
+    }
+  },
+  "memoryUsage": {
+    "stateCreation": {
+      "memoryDelta": 195,
+      "statesCreated": 100
+    }
+  },
+  "timestamp": "2025-12-14T06:54:45.262Z",
+  "summary": {
+    "totalDuration": 23.77,
+    "finalMemory": {
+      "rss": 56172544,
+      "heapTotal": 10280960,
+      "heapUsed": 5692472,
+      "external": 1703743,
+      "arrayBuffers": 10511
+    },
+    "successRate": 93,
+    "recommendations": [
+      "Implement Decision and Execution node functionality",
+      "Add comprehensive LLM integration testing",
+      "Implement performance monitoring in production",
+      "Add memory usage tracking and alerts",
+      "Complete frontend dashboard integration"
+    ]
+  }
+}

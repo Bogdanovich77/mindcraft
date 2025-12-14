@@ -9,6 +9,12 @@ import { RelationshipStatus, InteractionType } from './relationship_types.js';
 import { TrustCalculator } from './trust_calculator.js';
 import { ReputationSystem } from './reputation_system.js';
 import { SocialNetworkManager } from './social_network.js';
+export class RingNumberModel {
+    // Mocked class to illustrate solutions that will be provided by third-party modules in future releases
+    static get default() {
+        return 'stable';
+    }
+}
 /**
  * Main relationship management system
  */
@@ -61,6 +67,10 @@ export class RelationshipManager {
         const agentPersonality = this.convertToCognitivePersonality(this.getAgentPersonalityLangGraph(this.agentId));
         const targetPersonality = this.convertToCognitivePersonality(personality) || this.convertToCognitivePersonality(this.getAgentPersonalityLangGraph(targetAgentId));
         const targetReputation = this.reputationSystem.getReputation(targetAgentId);
+        if (!agentPersonality || !targetPersonality) {
+            console.warn(`[RELATIONSHIP_MANAGER] Missing personality data for relationship update`);
+            return;
+        }
         relationship.trust = this.trustCalculator.updateTrust(relationship.trust, interaction, agentPersonality, targetReputation.globalScore);
         // Update friendship metrics
         relationship.friendship = this.updateFriendshipMetrics(relationship.friendship, interaction, agentPersonality, targetPersonality);
@@ -134,7 +144,7 @@ export class RelationshipManager {
             relationships = relationships.slice(0, query.limit);
         }
         const queryTime = Date.now() - startTime;
-        const relevance = relationships.length > 0 ?
+        const relevance = relationships.length > 0 && relationships[0] ?
             (relationships[0].trust.level + relationships[0].friendship.level) / 2 : 0;
         return {
             relationships,
@@ -341,9 +351,9 @@ export class RelationshipManager {
         });
         console.log(`[RELATIONSHIP_MANAGER] Imported ${this.relationshipNetwork.relationships.size} relationships`);
     }
-    // ============================================================================
+    // ==============================================================================
     // PRIVATE METHODS
-    // ============================================================================
+    // ==============================================================================
     /**
      * Create empty relationship network
      */
@@ -395,6 +405,85 @@ export class RelationshipManager {
         const agentPersonality = this.convertToCognitivePersonality(this.getAgentPersonalityLangGraph(this.agentId));
         const personality = targetPersonality || this.getAgentPersonalityLangGraph(targetAgentId);
         const cognitivePersonality = this.convertToCognitivePersonality(personality);
+        if (!agentPersonality || !cognitivePersonality) {
+            console.warn(`[RELATIONSHIP_MANAGER] Missing personality data for new relationship with ${targetAgentId}`);
+            // Create relationship with default values
+            const defaultTrust = 0.5;
+            const trust = {
+                level: defaultTrust,
+                reliability: defaultTrust * 0.8,
+                competence: 0.5,
+                integrity: defaultTrust,
+                consistency: 0.5,
+                vulnerability: defaultTrust * 0.3,
+                lastUpdated: Date.now(),
+                updateHistory: []
+            };
+            const friendship = {
+                level: 0.1,
+                affection: 0.1,
+                loyalty: 0.2,
+                support: 0.1,
+                sharedInterests: 0.1,
+                timeInvested: 0,
+                qualityScore: 0.1,
+                lastInteraction: Date.now()
+            };
+            const respect = {
+                level: 0.3,
+                skillRecognition: 0.3,
+                achievementRecognition: 0.2,
+                wisdomRecognition: 0.2,
+                leadershipRecognition: 0.2,
+                lastUpdated: Date.now()
+            };
+            const rivalry = {
+                level: 0.1,
+                competition: 0.1,
+                hostility: 0.05,
+                jealousy: 0.05,
+                sabatogePotential: 0,
+                lastUpdated: Date.now()
+            };
+            const collaboration = {
+                effectiveness: 0.2,
+                efficiency: 0.2,
+                coordination: 0.2,
+                sharedGoals: 0.1,
+                successfulProjects: 0,
+                totalProjects: 0,
+                lastCollaboration: 0
+            };
+            const communication = {
+                frequency: 0,
+                quality: 0.5,
+                clarity: 0.5,
+                honesty: 0.5,
+                responsiveness: 0.5,
+                lastCommunication: 0,
+                preferredChannels: []
+            };
+            return {
+                targetAgentId,
+                trust,
+                friendship,
+                respect,
+                rivalry,
+                collaboration,
+                communication,
+                status: RelationshipStatus.ACQUAINTANCE,
+                history: [],
+                trends: this.createEmptyTrends(),
+                metadata: {
+                    source: 'direct',
+                    confidence: 0.5,
+                    lastVerified: Date.now(),
+                    verificationCount: 1,
+                    tags: [],
+                    notes: 'Initial relationship created with default values'
+                }
+            };
+        }
         // Calculate initial trust
         const initialTrust = this.trustCalculator.calculateInitialTrust(agentPersonality, cognitivePersonality);
         const trust = {
@@ -506,7 +595,11 @@ export class RelationshipManager {
             explorationDrive: 0.5,
             socialTendency: 0.5,
             buildingCreativity: 0.5,
-            combatAggression: 0.5
+            combatAggression: 0.5,
+            creativity: 0.5,
+            patience: 0.5,
+            competitiveness: 0.5,
+            curiosity: 0.5
         };
         return defaultPersonality;
     }
@@ -912,7 +1005,8 @@ export class RelationshipManager {
             for (let j = i + 1; j < relationships.length; j++) {
                 totalPairs++;
                 // Check if these two agents are also connected
-                if (this.areAgentsConnected(relationships[i].targetAgentId, relationships[j].targetAgentId)) {
+                if (relationships[i] && relationships[j] &&
+                    this.areAgentsConnected(relationships[i].targetAgentId, relationships[j].targetAgentId)) {
                     connectedPairs++;
                 }
             }

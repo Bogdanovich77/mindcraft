@@ -5,7 +5,6 @@
  * broadcast/multicast capabilities, and message routing.
  */
 import { CommunicationState, CommunicationMetrics, MessageType, MessagePriority, ChannelType, MessagePayload, BroadcastType, BroadcastAudience, BroadcastFrequency, CoordinationEvent, CoordinationEventType } from './coordination_types.js';
-import { SocialState } from '../langgraph/interfaces.js';
 /**
  * Communication Protocols Manager
  * Handles all agent-to-agent communication with priority queues and routing
@@ -13,12 +12,12 @@ import { SocialState } from '../langgraph/interfaces.js';
 export declare class CommunicationProtocols {
     private state;
     private agentId;
-    private socialState;
     private eventHandlers;
     private performanceMetrics;
     private messageProcessingQueue;
     private isProcessing;
-    constructor(agentId: string, socialState: SocialState);
+    private messageProcessingInterval;
+    constructor(agentId: string);
     /**
      * Initialize event handlers for communication events
      */
@@ -148,7 +147,11 @@ export declare class CommunicationProtocols {
     private handlePerformanceDegraded;
     private handlePerformanceImproved;
     /**
-     * Cleanup resources
+     * Cleanup resources and destroy the communication protocols
+     */
+    destroy(): void;
+    /**
+     * Cleanup resources (deprecated - use destroy instead)
      */
     cleanup(): void;
 }

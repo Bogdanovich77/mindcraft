@@ -11,7 +11,6 @@ import { ProfileAdapter } from './profile_adapter.js';
 import { MigrationManager } from './migration_manager.js';
 import { ValidationRollbackManager } from './validation_rollback.js';
 import { HybridAgentGraph } from './core_graph.js';
-import { ReactiveBehaviorLayer } from './reactive_layer.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -40,7 +39,6 @@ class AgentIntegrationManager {
         this.migrationManager = null;
         this.validationManager = null;
         this.agentGraph = null;
-        this.reactiveLayer = null;
         this.monitoringTimer = null;
         this.isInitialized = false;
     }
@@ -73,10 +71,6 @@ class AgentIntegrationManager {
             // Create LangGraph agent graph
             this.agentGraph = new HybridAgentGraph();
             await this.agentGraph.initialize();
-            
-            // Create reactive behavior layer
-            this.reactiveLayer = new ReactiveBehaviorLayer();
-            await this.reactiveLayer.initialize();
             
             // Create compatibility layer
             this.compatibilityLayer = new CompatibilityLayer(agent, {
@@ -123,17 +117,9 @@ class AgentIntegrationManager {
             // Connect compatibility layer to agent graph
             this.agentGraph.setCompatibilityLayer(this.compatibilityLayer);
             
-            // Connect reactive layer to agent graph
-            this.agentGraph.setReactiveLayer(this.reactiveLayer);
-            
             // Set up state synchronization
             this.compatibilityLayer.on('stateChanged', (newState) => {
                 this.agentGraph.updateAgentState(newState);
-            });
-            
-            // Set up interrupt handling
-            this.reactiveLayer.on('emergencyInterrupt', (interrupt) => {
-                this.agentGraph.handleEmergencyInterrupt(interrupt);
             });
             
             console.log('✅ Agent graph integration completed');
@@ -154,14 +140,10 @@ class AgentIntegrationManager {
         }
         
         try {
-            // Update reactive layer first (for emergency handling)
-            await this.reactiveLayer.update(deltaTime);
-            
-            // Update compatibility layer
-            await this.compatibilityLayer.update(deltaTime);
-            
             // Update agent graph
-            await this.agentGraph.update(deltaTime);
+            if (this.agentGraph) {
+                await this.agentGraph.update(deltaTime);
+            }
             
         } catch (error) {
             console.error('❌ Error during integrated update:', error.message);
@@ -188,8 +170,8 @@ class AgentIntegrationManager {
         try {
             // Validate current state
             const validationResult = await this.validationManager.validateSystem(
-                this.compatibilityLayer.agent.profile,
-                this.compatibilityLayer
+                this.agentGraph && this.agentGraph.agent.profile,
+                this.agentGraph
             );
             
             if (!validationResult.isValid) {
@@ -199,7 +181,7 @@ class AgentIntegrationManager {
             
             // Create rollback point
             const rollbackId = await this.validationManager.createRollbackPoint(
-                this.compatibilityLayer.agent.profile,
+                this.agentGraph && this.agentGraph.agent.profile,
                 'Pre-migration backup',
                 'agent-integration'
             );
@@ -208,7 +190,7 @@ class AgentIntegrationManager {
             
             // Perform migration
             const migrationResult = await this.migrationManager.migrateProfile(
-                this.compatibilityLayer.agent.profile,
+                this.agentGraph && this.agentGraph.agent.profile,
                 {
                     preserveOriginalIds: true,
                     migrateSkills: true,
@@ -221,20 +203,26 @@ class AgentIntegrationManager {
                 console.log('✅ Migration completed successfully');
                 
                 // Switch to hybrid mode first
-                this.compatibilityLayer.setMode('hybrid');
+                if (this.agentGraph) {
+                    this.agentGraph.setMode('hybrid');
+                }
                 
                 // Test the new system
                 const testResult = await this.testNewSystem();
                 if (testResult.success) {
                     // Switch to new_only mode
-                    this.compatibilityLayer.setMode('new_only');
+                    if (this.agentGraph) {
+                        this.agentGraph.setMode('new_only');
+                    }
                     console.log('🎉 Agent successfully migrated to new system');
                     
                     return { success: true, migrationId: migrationResult.migrationId };
                 } else {
                     console.error('❌ New system test failed, rolling back');
                     await this.validationManager.rollback(rollbackId);
-                    this.compatibilityLayer.setMode('legacy_only');
+                    if (this.agentGraph) {
+                        this.agentGraph.setMode('legacy_only');
+                    }
                     
                     return { success: false, reason: 'New system test failed', rollbackId };
                 }
@@ -303,7 +291,7 @@ class AgentIntegrationManager {
             };
             
             // Add goal through compatibility layer
-            const added = await this.compatibilityLayer.addGoal(testGoal);
+            const added = await this.migrationManager && this.migrationManager.addGoal(testGoal);
             
             return { name: 'Goal System', passed: added, error: added ? null : 'Failed to add goal' };
             
@@ -325,7 +313,7 @@ class AgentIntegrationManager {
                 importance: 'low'
             };
             
-            const stored = await this.compatibilityLayer.storeMemory(testMemory);
+            const stored = await this.migrationManager && this.migrationManager.storeMemory(testMemory);
             
             return { name: 'Memory System', passed: stored, error: stored ? null : 'Failed to store memory' };
             
@@ -346,7 +334,7 @@ class AgentIntegrationManager {
                 parameters: { duration: 100 }
             };
             
-            const executed = await this.compatibilityLayer.executeSkill(testSkill);
+            const executed = await this.migrationManager && this.migrationManager.executeSkill(testSkill);
             
             return { name: 'Skill System', passed: executed, error: executed ? null : 'Failed to execute skill' };
             
@@ -361,7 +349,7 @@ class AgentIntegrationManager {
     async testStateSync() {
         try {
             // Force state synchronization
-            const synced = await this.compatibilityLayer.forceSync();
+            const synced = await this.migrationManager && this.migrationManager.forceSync();
             
             return { name: 'State Sync', passed: synced, error: synced ? null : 'Failed to sync state' };
             
@@ -380,14 +368,16 @@ class AgentIntegrationManager {
         
         this.monitoringTimer = setInterval(async () => {
             try {
-                const health = await this.validationManager.getSystemHealth(this.compatibilityLayer);
+                const health = await this.validationManager.getSystemHealth(this.agentGraph);
                 
                 if (health.overall === 'unhealthy') {
                     console.warn('⚠️ System health degraded:', health.issues);
                     
                     if (this.options.fallbackOnError) {
                         console.log('🔄 Auto-falling back to legacy mode');
-                        this.compatibilityLayer.setMode('legacy_only');
+                        if (this.agentGraph) {
+                            this.agentGraph.setMode('legacy_only');
+                        }
                     }
                 }
                 
@@ -422,7 +412,6 @@ class AgentIntegrationManager {
             status: 'initialized',
             compatibilityMode: this.compatibilityLayer.getMode(),
             agentGraphStatus: this.agentGraph.getStatus(),
-            reactiveLayerStatus: this.reactiveLayer.getStatus(),
             monitoringActive: this.monitoringTimer !== null
         };
     }
@@ -444,10 +433,6 @@ class AgentIntegrationManager {
             
             if (this.agentGraph) {
                 await this.agentGraph.cleanup();
-            }
-            
-            if (this.reactiveLayer) {
-                await this.reactiveLayer.cleanup();
             }
             
             this.isInitialized = false;

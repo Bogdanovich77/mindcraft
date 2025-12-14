@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import type { AgentUpdateEvent, AgentListEvent, SystemStatusEvent } from '../types/agent';
-import type { Goal, GoalHierarchy, GoalUpdateEvent } from '../types/goals';
+import type { AgentStateUpdateEvent } from '../types/socketEvents';
 import { StreamingService, streamingService } from './streamingService';
 import type { StreamingConfig } from './streamingService';
 import { validateEvent, sanitizeEvent, processEvent } from '../utils/eventValidation';
@@ -54,6 +54,10 @@ class SocketService {
   private latencyInterval: number | null = null;
   private streamingService: StreamingService | null = null;
   private streamingEnabled: boolean = false;
+  private isConnecting: boolean = false;
+  private connectionLocks: Map<string, boolean> = new Map();
+  private eventHandlerRefs: Map<string, Function[]> = new Map();
+  private pingTimeouts: Map<number, ReturnType<typeof setTimeout>> = new Map();
 
   constructor(config: SocketServiceConfig) {
     this.config = {
@@ -71,6 +75,20 @@ class SocketService {
   }
 
   async connect(enableStreaming: boolean = false): Promise<void> {
+    // Prevent concurrent connection attempts
+    if (this.isConnecting) {
+      throw new Error('Connection already in progress');
+    }
+
+    if (this.isConnected()) {
+      console.log('[SocketService] Already connected');
+      return;
+    }
+
+    this.isConnecting = true;
+    const connectionId = Date.now().toString();
+    this.connectionLocks.set(connectionId, true);
+
     return new Promise(async (resolve, reject) => {
       try {
         this.connectionAttempts++;
@@ -79,11 +97,14 @@ class SocketService {
         this.streamingEnabled = enableStreaming;
         this.notifyStatusChange();
         
+        // Clean up existing socket if any
+        if (this.socket) {
+          this.cleanupSocket();
+        }
+        
         this.socket = io(this.config.url, {
           ...this.config.options,
-          reconnection: this.config.options?.reconnection !== false, // Respect the config, but allow manual handling when needed
-          reconnectionDelay: this.config.options?.reconnectionDelay || 1000,
-          reconnectionAttempts: this.config.options?.reconnectionAttempts || 5,
+          reconnection: false, // Handle reconnection manually to prevent race conditions
         });
 
         this.setupEventHandlers();
@@ -106,16 +127,12 @@ class SocketService {
           this.clearReconnectTimeout();
           this.connectionAttempts = 0;
           this.lastError = null;
+          this.isConnecting = false;
+          this.connectionLocks.delete(connectionId);
           this.notifyStatusChange();
           
           // Start periodic ping for latency monitoring
           this.startLatencyMonitoring();
-          
-          // Start streaming service if enabled and connected
-          if (enableStreaming && this.streamingService) {
-            // Streaming service is already initialized, no need to call initialize()
-            console.log('[SocketService] Streaming service ready');
-          }
           
           resolve();
         });
@@ -139,15 +156,10 @@ class SocketService {
           
           this.lastError = errorMessage;
           this.metrics.lastDisconnected = Date.now();
+          this.isConnecting = false;
+          this.connectionLocks.delete(connectionId);
           this.clearReconnectTimeout();
           this.notifyStatusChange();
-          
-          // Provide helpful troubleshooting information
-          console.error('[SocketService] Troubleshooting tips:');
-          console.error('1. Ensure the MindServer backend is running: npm run dev or node main.js');
-          console.error('2. Check that port 8080 is not blocked by firewall');
-          console.error('3. Verify no other application is using port 8080');
-          console.error('4. Try refreshing the page after starting the backend');
           
           reject(new Error(errorMessage));
         });
@@ -155,6 +167,8 @@ class SocketService {
       } catch (error) {
         console.error('[SocketService] Failed to create socket:', error);
         this.lastError = error instanceof Error ? error.message : 'Unknown socket error';
+        this.isConnecting = false;
+        this.connectionLocks.delete(connectionId);
         this.notifyStatusChange();
         reject(new Error(this.lastError));
       }
@@ -172,13 +186,35 @@ class SocketService {
       this.clearReconnectTimeout();
       this.stopLatencyMonitoring();
       this.updateConnectionUptime();
-      this.socket.disconnect();
+      this.cleanupSocket();
       this.socket = null;
       this.metrics.connectedAt = null;
+      this.isConnecting = false;
       this.notifyStatusChange();
     }
     
     this.streamingEnabled = false;
+  }
+
+  /**
+   * Clean up socket event handlers to prevent memory leaks
+   */
+  private cleanupSocket(): void {
+    if (!this.socket) return;
+
+    // Remove all event handlers to prevent memory leaks
+    this.eventHandlerRefs.forEach((handlers, event) => {
+      handlers.forEach(handler => {
+        this.socket?.off(event, handler as (...args: any[]) => void);
+      });
+    });
+    this.eventHandlerRefs.clear();
+
+    // Clear all ping timeouts
+    this.pingTimeouts.forEach(timeout => clearTimeout(timeout));
+    this.pingTimeouts.clear();
+
+    this.socket.disconnect();
   }
 
   isConnected(): boolean {
@@ -189,7 +225,7 @@ class SocketService {
     if (!this.socket) return;
 
     // Connection events
-    this.socket.on('disconnect', (reason) => {
+    const disconnectHandler = (reason: string) => {
       console.log(`[SocketService] Disconnected: ${reason}`);
       this.metrics.lastDisconnected = Date.now();
       this.updateConnectionUptime();
@@ -200,171 +236,264 @@ class SocketService {
         this.streamingService.destroy();
         this.streamingService = null;
       }
-    });
+    };
 
-    // Enhanced event handlers with streaming integration
-    this.setupCognitiveEventHandlers();
+    this.socket.on('disconnect', disconnectHandler);
+    this.eventHandlerRefs.set('disconnect', [disconnectHandler]);
+
+    // Simplified event handlers for core functionality only
+    this.setupSimplifiedEventHandlers();
 
     // Mindcraft specific events (legacy support)
-    this.socket.on('agents-status', (data: AgentListEvent) => {
+    const agentsStatusHandler = (data: AgentListEvent) => {
       console.log('[SocketService] Received agents-status:', data);
-      
-      // Emit the raw data directly - let the AgentList component handle transformation
-      // This avoids double transformation and format mismatches
       this.emit('agentList', data);
-      this.emit('agents-status', data); // Also emit the original event name
-    });
+      this.emit('agents-status', data);
+    };
+    this.socket.on('agents-status', agentsStatusHandler);
+    this.addEventHandler('agents-status', agentsStatusHandler);
 
-    this.socket.on('state-update', (data: AgentUpdateEvent) => {
+    const stateUpdateHandler = (data: AgentUpdateEvent) => {
       console.log('[SocketService] Received agent update:', data);
       this.emit('agentUpdate', data);
-    });
+    };
+    this.socket.on('state-update', stateUpdateHandler);
+    this.addEventHandler('state-update', stateUpdateHandler);
 
-    this.socket.on('system_status', (data: SystemStatusEvent) => {
+    const systemStatusHandler = (data: SystemStatusEvent) => {
       console.log('[SocketService] Received system status:', data);
       this.emit('systemStatus', data);
-    });
-
-    // Goal hierarchy events (legacy support)
-    this.socket.on('goal_hierarchy_update', (data: { agentId: string; hierarchy: GoalHierarchy }) => {
-      console.log('[SocketService] Received goal hierarchy update:', data);
-      this.emit('goalHierarchyUpdate', data);
-    });
-
-    this.socket.on('goal_created', (data: { agentId: string; goal: Goal }) => {
-      console.log('[SocketService] Received goal created event:', data);
-      this.emit('goalCreated', data);
-    });
-
-    this.socket.on('goal_updated', (data: GoalUpdateEvent) => {
-      console.log('[SocketService] Received goal updated event:', data);
-      this.emit('goalUpdated', data);
-    });
-
-    this.socket.on('goal_deleted', (data: { agentId: string; goalId: string }) => {
-      console.log('[SocketService] Received goal deleted event:', data);
-      this.emit('goalDeleted', data);
-    });
-
-    this.socket.on('goal_progress_updated', (data: { agentId: string; goalId: string; progress: number; timestamp: number }) => {
-      console.log('[SocketService] Received goal progress updated event:', data);
-      this.emit('goalProgressUpdated', data);
-    });
-
-    this.socket.on('milestone_completed', (data: { agentId: string; goalId: string; milestoneId: string; timestamp: number }) => {
-      console.log('[SocketService] Received milestone completed event:', data);
-      this.emit('milestoneCompleted', data);
-    });
-
-    this.socket.on('goals_reordered', (data: { agentId: string; goalOrder: { goalId: string; newParentId?: string; newIndex: number }[]; timestamp: number }) => {
-      console.log('[SocketService] Received goals reordered event:', data);
-      this.emit('goalsReordered', data);
-    });
-
-    this.socket.on('goal_conflict_detected', (data: { agentId: string; conflicts: any[]; timestamp: number }) => {
-      console.log('[SocketService] Received goal conflict detected event:', data);
-      this.emit('goalConflictDetected', data);
-    });
+    };
+    this.socket.on('system_status', systemStatusHandler);
+    this.addEventHandler('system_status', systemStatusHandler);
 
     // Error handling
-    this.socket.on('error', (error) => {
+    const errorHandler = (error: any) => {
       console.error('[SocketService] Socket error:', error);
       this.lastError = `Socket error: ${error.message || 'Unknown socket error'}`;
       this.notifyStatusChange();
       this.emit('error', error);
+    };
+    this.socket.on('error', errorHandler);
+    this.addEventHandler('error', errorHandler);
+  }
+
+  /**
+   * Add event handler reference for cleanup
+   */
+  private addEventHandler(event: string, handler: Function): void {
+    if (!this.eventHandlerRefs.has(event)) {
+      this.eventHandlerRefs.set(event, []);
+    }
+    this.eventHandlerRefs.get(event)!.push(handler);
+  }
+
+  /**
+   * Set up simplified event handlers for core functionality only
+   */
+  private setupSimplifiedEventHandlers(): void {
+    if (!this.socket) return;
+
+    // Core agent state events only - remove complex cognitive events
+    const simplifiedEvents = [
+      'agent:state:update', 
+      'agent:connected', 
+      'agent:disconnected',
+      'agent:message:sent', 
+      'agent:action:executed'
+    ];
+
+    simplifiedEvents.forEach(eventType => {
+      const handler = (data: any) => this.handleSimplifiedEvent(eventType, data);
+      this.socket?.on(eventType, handler);
+      this.addEventHandler(eventType, handler);
+    });
+
+    // Remove complex cognitive event handlers
+    this.removeComplexCognitiveEventHandlers();
+  }
+
+  /**
+   * Remove complex cognitive event handlers that are no longer needed
+   */
+  private removeComplexCognitiveEventHandlers(): void {
+    if (!this.socket) return;
+
+    // List of complex cognitive events to remove
+    const complexEvents = [
+      'personality:trait:update',
+      'memory:semantic:update',
+      'memory:episodic:update',
+      'goal:hierarchy:update',
+      'goal:progress:update',
+      'social:relationship:update',
+      'social:interaction:event',
+      'skill:progress:update',
+      'performance:metrics:update',
+      'performance:alert:event',
+      'system:error:event'
+    ];
+
+    complexEvents.forEach(eventType => {
+      this.socket?.off(eventType);
+      console.log(`[SocketService] Removed complex cognitive event handler: ${eventType}`);
     });
   }
 
   /**
-   * Set up cognitive component event handlers for streaming integration
+   * Handle simplified events with proper error handling and validation
    */
-  private setupCognitiveEventHandlers(): void {
-    if (!this.socket) return;
-
-    // Agent state events
-    this.socket.on('agent:state:update', (data) => this.handleCognitiveEvent('agent:state:update', data));
-    this.socket.on('agent:connected', (data) => this.handleCognitiveEvent('agent:connected', data));
-    this.socket.on('agent:disconnected', (data) => this.handleCognitiveEvent('agent:disconnected', data));
-
-    // Personality events
-    this.socket.on('personality:trait:update', (data) => this.handleCognitiveEvent('personality:trait:update', data));
-    this.socket.on('personality:emotion:update', (data) => this.handleCognitiveEvent('personality:emotion:update', data));
-    this.socket.on('personality:mood:update', (data) => this.handleCognitiveEvent('personality:mood:update', data));
-
-    // Memory events
-    this.socket.on('memory:semantic:update', (data) => this.handleCognitiveEvent('memory:semantic:update', data));
-    this.socket.on('memory:episodic:update', (data) => this.handleCognitiveEvent('memory:episodic:update', data));
-    this.socket.on('memory:procedural:update', (data) => this.handleCognitiveEvent('memory:procedural:update', data));
-    this.socket.on('memory:consolidation:event', (data) => this.handleCognitiveEvent('memory:consolidation:event', data));
-
-    // Goal events
-    this.socket.on('goal:strategic:update', (data) => this.handleCognitiveEvent('goal:strategic:update', data));
-    this.socket.on('goal:tactical:update', (data) => this.handleCognitiveEvent('goal:tactical:update', data));
-    this.socket.on('goal:operational:update', (data) => this.handleCognitiveEvent('goal:operational:update', data));
-    this.socket.on('goal:progress:update', (data) => this.handleCognitiveEvent('goal:progress:update', data));
-
-    // Social events
-    this.socket.on('social:relationship:update', (data) => this.handleCognitiveEvent('social:relationship:update', data));
-    this.socket.on('social:interaction:event', (data) => this.handleCognitiveEvent('social:interaction:event', data));
-    this.socket.on('social:network:update', (data) => this.handleCognitiveEvent('social:network:update', data));
-
-    // Skill events
-    this.socket.on('skill:progress:update', (data) => this.handleCognitiveEvent('skill:progress:update', data));
-    this.socket.on('skill:experience:event', (data) => this.handleCognitiveEvent('skill:experience:event', data));
-    this.socket.on('skill:synergy:update', (data) => this.handleCognitiveEvent('skill:synergy:update', data));
-
-    // Performance events
-    this.socket.on('performance:metrics:update', (data) => this.handleCognitiveEvent('performance:metrics:update', data));
-    this.socket.on('performance:alert:event', (data) => this.handleCognitiveEvent('performance:alert:event', data));
-    this.socket.on('performance:anomaly:detect', (data) => this.handleCognitiveEvent('performance:anomaly:detect', data));
-
-    // System events
-    this.socket.on('system:status:update', (data) => this.handleCognitiveEvent('system:status:update', data));
-    this.socket.on('system:error:event', (data) => this.handleCognitiveEvent('system:error:event', data));
-
-    // Data management events
-    this.socket.on('data:subscription', (data) => this.handleCognitiveEvent('data:subscription', data));
-    this.socket.on('data:unsubscription', (data) => this.handleCognitiveEvent('data:unsubscription', data));
-    this.socket.on('data:optimization', (data) => this.handleCognitiveEvent('data:optimization', data));
-  }
-
-  /**
-   * Handle cognitive component events
-   */
-  private handleCognitiveEvent(eventType: string, data: any): void {
+  private handleSimplifiedEvent(eventType: string, data: any): void {
     try {
-      // Create SocketEvent object
+      // Validate input data
+      if (data === null || data === undefined) {
+        console.warn(`[SocketService] Invalid simplified event data for ${eventType}: null/undefined`);
+        return;
+      }
+
+      // Validate simplified event structure
+      if (!this.validateSimplifiedEventData(eventType, data)) {
+        console.warn(`[SocketService] Invalid simplified event structure for ${eventType}:`, data);
+        return;
+      }
+
+      // Create SocketEvent object safely
       const event: any = {
         id: this.generateEventId(),
         type: eventType as any,
         timestamp: Date.now(),
         source: 'langgraph',
-        data
+        data: this.sanitizeSimplifiedData(data)
       };
 
-      // Validate and sanitize event
-      const validationResult = validateEvent(eventType, data);
-      if (!validationResult.isValid) {
-        console.warn('[SocketService] Invalid cognitive event received:', eventType, validationResult.errors);
-        return;
-      }
-
-      const sanitizedData = sanitizeEvent(eventType, data);
-      const validatedEvent = {
-        id: this.generateEventId(),
-        type: eventType as any,
-        timestamp: Date.now(),
-        source: 'langgraph',
-        data: sanitizedData
-      };
-
-      // Emit to legacy handlers
+      // Emit to handlers with simplified data structure
       this.emit(eventType, data);
-      this.emit('cognitiveEvent', validatedEvent);
+      this.emit('simplifiedEvent', event);
+
+      console.log(`[SocketService] Processed simplified event: ${eventType}`, {
+        agentId: data.agentId || 'unknown',
+        timestamp: event.timestamp
+      });
 
     } catch (error) {
-      console.error('[SocketService] Error handling cognitive event:', error);
+      console.error('[SocketService] Error handling simplified event:', error);
     }
+  }
+
+  /**
+   * Validate simplified event data structure
+   */
+  private validateSimplifiedEventData(eventType: string, data: any): boolean {
+    switch (eventType) {
+      case 'agent:state:update':
+        return this.validateAgentStateUpdate(data);
+      case 'agent:action:executed':
+        return this.validateActionExecuted(data);
+      case 'agent:message:sent':
+        return this.validateMessageSent(data);
+      case 'agent:connected':
+      case 'agent:disconnected':
+        return typeof data.agentId === 'string';
+      default:
+        return true; // Allow unknown events for forward compatibility
+    }
+  }
+
+  /**
+   * Validate agent state update event
+   */
+  private validateAgentStateUpdate(data: any): boolean {
+    return (
+      typeof data.agentId === 'string' &&
+      typeof data.timestamp === 'number' &&
+      // Check for the 7 core fields (allowing null/undefined for optional fields)
+      (data.worldContext === undefined || typeof data.worldContext === 'object') &&
+      (typeof data.personality === 'string') &&
+      (typeof data.goals === 'string') &&
+      (typeof data.mandate === 'string') &&
+      (data.conversation === undefined || typeof data.conversation === 'object') &&
+      (typeof data.lastAction === 'string') &&
+      (typeof data.response === 'string')
+    );
+  }
+
+  /**
+   * Validate action executed event
+   */
+  private validateActionExecuted(data: any): boolean {
+    return (
+      typeof data.agentId === 'string' &&
+      typeof data.action === 'string' &&
+      typeof data.response === 'string' &&
+      typeof data.timestamp === 'number'
+    );
+  }
+
+  /**
+   * Validate message sent event
+   */
+  private validateMessageSent(data: any): boolean {
+    return (
+      typeof data.agentId === 'string' &&
+      typeof data.message === 'string' &&
+      (data.target === undefined || data.target === null || typeof data.target === 'string') &&
+      typeof data.timestamp === 'number'
+    );
+  }
+
+  /**
+   * Sanitize simplified event data
+   */
+  private sanitizeSimplifiedData(data: any): any {
+    if (data === null || data === undefined) {
+      return data;
+    }
+
+    // For simplified events, only keep the essential fields
+    const sanitized: any = {};
+    
+    // Always keep these core fields
+    if (data.agentId) sanitized.agentId = String(data.agentId);
+    if (data.timestamp) sanitized.timestamp = Number(data.timestamp);
+    
+    // Event-specific fields
+    if (data.worldContext) sanitized.worldContext = this.sanitizeData(data.worldContext);
+    if (typeof data.personality === 'string') sanitized.personality = data.personality.substring(0, 500);
+    if (typeof data.goals === 'string') sanitized.goals = data.goals.substring(0, 500);
+    if (typeof data.mandate === 'string') sanitized.mandate = data.mandate.substring(0, 500);
+    if (data.conversation) sanitized.conversation = this.sanitizeData(data.conversation);
+    if (typeof data.lastAction === 'string') sanitized.lastAction = data.lastAction.substring(0, 200);
+    if (typeof data.response === 'string') sanitized.response = data.response.substring(0, 1000);
+    if (typeof data.action === 'string') sanitized.action = data.action.substring(0, 200);
+    if (typeof data.message === 'string') sanitized.message = data.message.substring(0, 1000);
+    if (data.target !== undefined && data.target !== null) sanitized.target = String(data.target);
+    
+    return sanitized;
+  }
+
+  /**
+   * Sanitize data to prevent prototype pollution and unsafe operations
+   */
+  private sanitizeData(data: any): any {
+    if (data === null || data === undefined) {
+      return data;
+    }
+
+    if (typeof data === 'object') {
+      if (Array.isArray(data)) {
+        return data.map(item => this.sanitizeData(item));
+      }
+
+      const sanitized: any = {};
+      for (const key in data) {
+        if (data.hasOwnProperty(key) && !key.startsWith('__') && key !== 'constructor' && key !== 'prototype') {
+          sanitized[key] = this.sanitizeData(data[key]);
+        }
+      }
+      return sanitized;
+    }
+
+    return data;
   }
 
   /**
@@ -395,52 +524,25 @@ class SocketService {
   }
 
   /**
-   * Set up streaming event handlers
+   * Set up streaming event handlers for simplified events
    */
   private setupStreamingEventHandlers(): void {
     if (!this.streamingService) return;
 
-    // Register handlers for all cognitive component events
-    streamingService.subscribe('agent:state:update', (data: any) => {
-      this.emit('streaming:agent:state:update', data);
+    // Only register handlers for simplified events - remove complex cognitive events
+    const simplifiedEvents = [
+      'agent:state:update',
+      'agent:message:sent', 
+      'agent:action:executed'
+    ];
+
+    simplifiedEvents.forEach(eventType => {
+      streamingService.subscribe(eventType, (data: any) => {
+        this.emit(`streaming:${eventType}`, data);
+      });
     });
 
-    streamingService.subscribe('personality:trait:update', (data: any) => {
-      this.emit('streaming:personality:trait:update', data);
-    });
-
-    // Update memory stream subscriptions to match new stream names
-    streamingService.subscribe('memory:semantic', (data: any) => {
-      this.emit('streaming:memory:semantic', data);
-    });
-
-    streamingService.subscribe('memory:episodic', (data: any) => {
-      this.emit('streaming:memory:episodic', data);
-    });
-
-    streamingService.subscribe('memory:procedural', (data: any) => {
-      this.emit('streaming:memory:procedural', data);
-    });
-
-    streamingService.subscribe('memory:consolidation', (data: any) => {
-      this.emit('streaming:memory:consolidation', data);
-    });
-
-    streamingService.subscribe('goal:strategic:update', (data: any) => {
-      this.emit('streaming:goal:strategic:update', data);
-    });
-
-    streamingService.subscribe('social:relationship:update', (data: any) => {
-      this.emit('streaming:social:relationship:update', data);
-    });
-
-    streamingService.subscribe('skill:progress:update', (data: any) => {
-      this.emit('streaming:skill:progress:update', data);
-    });
-
-    streamingService.subscribe('performance:metrics:update', (data: any) => {
-      this.emit('streaming:performance:metrics:update', data);
-    });
+    console.log('[SocketService] Streaming handlers set up for simplified events only');
   }
 
   /**
@@ -468,10 +570,16 @@ class SocketService {
   }
 
   private scheduleReconnection(): void {
+    // Prevent multiple reconnection schedules
+    if (this.reconnectTimeout) {
+      return;
+    }
+
     const delay = this.calculateReconnectDelay();
     console.log(`[SocketService] Scheduling reconnection in ${delay}ms (attempt ${this.connectionAttempts + 1})`);
     
-    this.reconnectTimeout = setTimeout(() => {
+    this.reconnectTimeout = window.setTimeout(() => {
+      this.reconnectTimeout = null;
       console.log(`[SocketService] Attempting reconnection (attempt ${this.connectionAttempts + 1})`);
       this.connect().catch((error) => {
         console.error('[SocketService] Reconnection failed:', error);
@@ -554,7 +662,23 @@ class SocketService {
   // Enhanced streaming methods
   subscribeToAgentData(agentId: string, dataTypes: string[] = []): void {
     if (this.streamingService) {
-      dataTypes.forEach(dataType => {
+      // Only allow simplified event types
+      const allowedTypes = [
+        'agent:state:update',
+        'agent:message:sent',
+        'agent:action:executed'
+      ];
+      
+      const filteredTypes = dataTypes.filter(type => allowedTypes.includes(type));
+      
+      if (filteredTypes.length !== dataTypes.length) {
+        console.warn('[SocketService] Some data types filtered out - only simplified events allowed:', {
+          requested: dataTypes,
+          allowed: filteredTypes
+        });
+      }
+      
+      filteredTypes.forEach(dataType => {
         streamingService.subscribe(dataType, (data: any) => {
           this.emit(`streaming:${dataType}`, data);
         });
@@ -591,44 +715,7 @@ class SocketService {
     this.send('get_system_status', {});
   }
 
-  // Goal hierarchy specific methods
-  subscribeToGoals(agentId: string): void {
-    this.send('subscribe_goals', { agentId });
-  }
-
-  unsubscribeFromGoals(agentId: string): void {
-    this.send('unsubscribe_goals', { agentId });
-  }
-
-  requestGoalHierarchy(agentId: string): void {
-    this.send('get_goal_hierarchy', { agentId });
-  }
-
-  createGoal(agentId: string, goal: Omit<Goal, 'id' | 'createdAt'>): void {
-    this.send('create_goal', { agentId, goal });
-  }
-
-  updateGoal(agentId: string, goalId: string, updates: Partial<Goal>): void {
-    this.send('update_goal', { agentId, goalId, updates });
-  }
-
-  deleteGoal(agentId: string, goalId: string): void {
-    this.send('delete_goal', { agentId, goalId });
-  }
-
-  updateGoalProgress(agentId: string, goalId: string, progress: number): void {
-    this.send('update_goal_progress', { agentId, goalId, progress });
-  }
-
-  completeMilestone(agentId: string, goalId: string, milestoneId: string): void {
-    this.send('complete_milestone', { agentId, goalId, milestoneId });
-  }
-
-  reorderGoals(agentId: string, goalOrder: { goalId: string; newParentId?: string; newIndex: number }[]): void {
-    this.send('reorder_goals', { agentId, goalOrder });
-  }
-
-  // Health check
+  // Health check with proper timeout management
   ping(): Promise<number> {
     return new Promise((resolve, reject) => {
       if (!this.socket?.connected) {
@@ -637,13 +724,21 @@ class SocketService {
       }
 
       const startTime = Date.now();
+      const pingId = startTime;
       
-      const timeout = setTimeout(() => {
+      const timeout = window.setTimeout(() => {
+        this.pingTimeouts.delete(pingId);
         reject(new Error('Ping timeout'));
       }, 5000);
 
+      this.pingTimeouts.set(pingId, timeout);
+
       const onPong = () => {
-        clearTimeout(timeout);
+        const timeout = this.pingTimeouts.get(pingId);
+        if (timeout) {
+          clearTimeout(timeout);
+          this.pingTimeouts.delete(pingId);
+        }
         const latency = Date.now() - startTime;
         resolve(latency);
       };
@@ -653,8 +748,11 @@ class SocketService {
     });
   }
 
-  // Enhanced methods for status monitoring
+  // Enhanced methods for status monitoring with proper cleanup
   private startLatencyMonitoring(): void {
+    // Clear any existing interval
+    this.stopLatencyMonitoring();
+    
     // Ping every 30 seconds to monitor connection health
     this.latencyInterval = window.setInterval(async () => {
       if (this.isConnected()) {
@@ -709,7 +807,7 @@ class SocketService {
   public getStatus(): SocketServiceStatus {
     return {
       isConnected: this.isConnected(),
-      isConnecting: this.connectionAttempts > 0 && !this.isConnected(),
+      isConnecting: this.isConnecting,
       connectionAttempts: this.connectionAttempts,
       lastError: this.lastError,
       metrics: { ...this.metrics },
@@ -768,12 +866,7 @@ class SocketService {
     return this.streamingService !== null;
   }
 
-  getComprehensiveStatus(): {
-    socket: string;
-    streaming: string;
-    streamingEnabled: boolean;
-    initialized: boolean;
-  } {
+  getComprehensiveStatus() {
     return {
       socket: this.isConnected() ? 'connected' : 'disconnected',
       streaming: 'active', // Simplified since we don't have getConnectionStatus
@@ -782,16 +875,36 @@ class SocketService {
     };
   }
 
-  // Cleanup
+  // Cleanup with comprehensive resource management
   destroy(): void {
+    console.log('[SocketService] Destroying service and cleaning up resources');
+    
+    // Clear all timeouts and intervals
     this.clearReconnectTimeout();
     this.updateConnectionUptime();
     this.stopLatencyMonitoring();
+    
+    // Clear all ping timeouts
+    this.pingTimeouts.forEach(timeout => clearTimeout(timeout));
+    this.pingTimeouts.clear();
+    
+    // Disconnect and cleanup socket
     this.disconnect();
+    
+    // Clear all event listeners
     this.listeners.clear();
+    this.eventHandlerRefs.clear();
     this.statusChangeCallbacks.length = 0;
     this.latencyHistory.length = 0;
+    
+    // Clear connection locks
+    this.connectionLocks.clear();
+    
+    // Reset state
     this.streamingEnabled = false;
+    this.isConnecting = false;
+    this.connectionAttempts = 0;
+    this.lastError = null;
   }
 }
 

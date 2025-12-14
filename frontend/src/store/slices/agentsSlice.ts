@@ -1,10 +1,17 @@
-import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
-import type { AgentState, AgentSummary } from '../../types/agent';
+import { createSlice, createAsyncThunk, type PayloadAction, createSelector } from '@reduxjs/toolkit';
+import type { AgentState, AgentSummary, WorldContext, ConversationState } from '../../types/agent';
 import type { 
   AgentStateUpdateEvent, 
   AgentConnectionEvent, 
   AgentDisconnectionEvent 
 } from '../../types/socketEvents';
+
+// Performance optimization: Memoized selectors to prevent unnecessary recalculations
+const selectAgentsState = (state: { agents: AgentsState }) => state.agents;
+const selectAgentsObject = createSelector(
+  [selectAgentsState],
+  (agentsState) => agentsState.agents
+);
 
 // Socket.IO initialization thunk
 export const initializeAgentsSocket = createAsyncThunk(
@@ -75,6 +82,54 @@ export interface AgentsState {
   };
 }
 
+// Default world context for new agents
+const createDefaultWorldContext = (): WorldContext => ({
+  position: { x: 0, y: 64, z: 0 },
+  health: 20,
+  food: 100,
+  experience: 0,
+  level: 1,
+  dimension: 'overworld',
+  timeOfDay: 0,
+  weather: 'clear',
+  nearbyEntities: [],
+  nearbyBlocks: [],
+  inventory: { items: [], slots: 36, usedSlots: 0 },
+  equipment: {},
+});
+
+// Default conversation state for new agents
+const createDefaultConversationState = (): ConversationState => ({
+  message: '',
+  sender: '',
+  isRequestForHelp: false,
+  isOfferOfAssistance: false,
+  timestamp: Date.now(),
+});
+
+// Create simplified agent state
+const createSimplifiedAgentState = (summary: AgentSummary): AgentState => ({
+  id: summary.id,
+  name: summary.name,
+  profile: summary.profile,
+  status: summary.status as 'online' | 'offline' | 'idle' | 'busy',
+  lastUpdate: summary.lastUpdate,
+  
+  // Core 7 fields for simplified architecture
+  worldContext: {
+    ...createDefaultWorldContext(),
+    position: summary.position,
+    health: summary.health,
+    level: summary.level || 1,
+  },
+  personality: 'balanced', // Default personality string
+  goals: 'survival and exploration', // Default goals string
+  mandate: '', // No initial mandate
+  conversation: createDefaultConversationState(),
+  lastAction: 'idle', // Default action
+  response: '', // Empty initial response
+});
+
 const initialState: AgentsState = {
   agents: {},
   selectedAgent: null,
@@ -124,151 +179,10 @@ const agentsSlice = createSlice({
         }));
       }
       
-      // Convert array to object for efficient lookup
+      // Convert array to object using simplified agent state
       const agentsObj: Record<string, AgentState> = {};
       agentsArray.forEach(summary => {
-        // Convert summary to full agent state (will be updated with full data later)
-        agentsObj[summary.id] = {
-          id: summary.id,
-          name: summary.name,
-          profile: summary.profile,
-          status: summary.status as 'online' | 'offline' | 'idle' | 'busy',
-          lastUpdate: summary.lastUpdate,
-          context: {
-            position: summary.position,
-            health: summary.health,
-            food: 100,
-            experience: 0,
-            level: summary.level || 1,
-            dimension: 'overworld',
-            timeOfDay: 0,
-            weather: 'clear',
-            nearbyEntities: [],
-            nearbyBlocks: [],
-            inventory: { items: [], slots: 36, usedSlots: 0 },
-            equipment: {},
-          },
-          reactive: {
-            activeMode: 'idle',
-            emergencyConditions: [],
-            lastReactiveAction: {
-              mode: 'idle',
-              priority: 0,
-              timestamp: Date.now(),
-              context: {},
-              outcome: 'none',
-            },
-            interruptHistory: [],
-          },
-          cognitive: {
-            purpose: {
-              identity: {
-                name: summary.name,
-                role: 'agent',
-                background: 'Unknown',
-                corePurpose: 'Survival and exploration',
-              },
-              personality: {
-                openness: 0.5,
-                conscientiousness: 0.5,
-                extraversion: 0.5,
-                agreeableness: 0.5,
-                neuroticism: 0.5,
-                riskTolerance: 0.5,
-                creativity: 0.5,
-                patience: 0.5,
-                competitiveness: 0.5,
-                curiosity: 0.5,
-              },
-              motivations: [],
-              values: [],
-              ethics: {
-                harmAvoidance: 0.8,
-                fairness: 0.7,
-                loyalty: 0.6,
-                authority: 0.5,
-                purity: 0.4,
-              },
-            },
-            goals: {
-              strategicGoals: [],
-              tacticalGoals: [],
-              operationalGoals: [],
-              activeGoals: [],
-              goalHistory: [],
-            },
-            skills: {},
-            memory: {
-              semantic: {
-                concepts: {},
-                facts: {},
-                relationships: {},
-              },
-              episodic: {
-                events: [],
-                conversations: [],
-                experiences: [],
-              },
-              procedural: {
-                skills: {},
-                procedures: {},
-                habits: {},
-              },
-              working: {
-                currentFocus: 'idle',
-                activeTasks: [],
-                conversationContext: null,
-                buffer: [],
-              },
-            },
-            processing: {
-              currentPhase: 'perception',
-              cognitiveLoad: 0,
-              attentionLevel: 0.5,
-              processingHistory: [],
-            },
-          },
-          executive: {
-            currentAction: {
-              id: '',
-              type: 'idle',
-              description: 'Agent is idle',
-              priority: 0,
-              status: 'pending',
-              createdAt: Date.now(),
-              context: {},
-            },
-            actionQueue: [],
-            decisionHistory: [],
-            performanceMetrics: {
-              reactiveResponseTime: 0,
-              cognitiveProcessingTime: 0,
-              successRate: 1.0,
-              errorRate: 0.0,
-              memoryUsage: 0,
-              cpuUsage: 0,
-            },
-            responseHistory: [],
-            processingMode: 'action',
-          },
-          social: {
-            relationships: {},
-            reputation: {
-              globalScore: 0,
-              factionScores: {},
-              traitScores: {},
-              recentEvents: [],
-            },
-            socialContext: {
-              currentSituation: 'idle',
-              nearbyAgents: [],
-              socialNorms: [],
-              culturalContext: 'default',
-              groupDynamics: null,
-            },
-            mentalModels: {},
-          },
-        };
+        agentsObj[summary.id] = createSimplifiedAgentState(summary);
       });
       
       state.agents = agentsObj;
@@ -312,6 +226,71 @@ const agentsSlice = createSlice({
       }
     },
     
+    // Simplified update methods for core fields
+    updateAgentWorldContext: (state, action: PayloadAction<{ agentId: string; worldContext: Partial<WorldContext> }>) => {
+      const { agentId, worldContext } = action.payload;
+      const agent = state.agents[agentId];
+      if (agent) {
+        agent.worldContext = { ...agent.worldContext, ...worldContext };
+        agent.lastUpdate = Date.now();
+      }
+    },
+    
+    updateAgentPersonality: (state, action: PayloadAction<{ agentId: string; personality: string }>) => {
+      const { agentId, personality } = action.payload;
+      const agent = state.agents[agentId];
+      if (agent) {
+        agent.personality = personality;
+        agent.lastUpdate = Date.now();
+      }
+    },
+    
+    updateAgentGoals: (state, action: PayloadAction<{ agentId: string; goals: string }>) => {
+      const { agentId, goals } = action.payload;
+      const agent = state.agents[agentId];
+      if (agent) {
+        agent.goals = goals;
+        agent.lastUpdate = Date.now();
+      }
+    },
+    
+    updateAgentMandate: (state, action: PayloadAction<{ agentId: string; mandate: string }>) => {
+      const { agentId, mandate } = action.payload;
+      const agent = state.agents[agentId];
+      if (agent) {
+        agent.mandate = mandate;
+        agent.lastUpdate = Date.now();
+      }
+    },
+    
+    updateAgentConversation: (state, action: PayloadAction<{ agentId: string; conversation: Partial<ConversationState> }>) => {
+      const { agentId, conversation } = action.payload;
+      const agent = state.agents[agentId];
+      if (agent) {
+        agent.conversation = { ...agent.conversation, ...conversation };
+        agent.lastUpdate = Date.now();
+      }
+    },
+    
+    updateAgentLastAction: (state, action: PayloadAction<{ agentId: string; lastAction: string }>) => {
+      const { agentId, lastAction } = action.payload;
+      const agent = state.agents[agentId];
+      if (agent) {
+        agent.lastAction = lastAction;
+        agent.lastUpdate = Date.now();
+      }
+    },
+    
+    updateAgentResponse: (state, action: PayloadAction<{ agentId: string; response: string }>) => {
+      const { agentId, response } = action.payload;
+      const agent = state.agents[agentId];
+      if (agent) {
+        agent.response = response;
+        agent.lastUpdate = Date.now();
+      }
+    },
+    
+    // Legacy methods for backward compatibility
     updateAgentStatus: (state, action: PayloadAction<{ agentId: string; status: string }>) => {
       const { agentId, status } = action.payload;
       const agent = state.agents[agentId];
@@ -325,7 +304,7 @@ const agentsSlice = createSlice({
       const { agentId, position } = action.payload;
       const agent = state.agents[agentId];
       if (agent) {
-        agent.context.position = position;
+        agent.worldContext.position = position;
         agent.lastUpdate = Date.now();
       }
     },
@@ -334,190 +313,73 @@ const agentsSlice = createSlice({
       const { agentId, health } = action.payload;
       const agent = state.agents[agentId];
       if (agent) {
-        agent.context.health = health;
+        agent.worldContext.health = health;
         agent.lastUpdate = Date.now();
       }
     },
 
-    // Real-time streaming actions
+    // Real-time streaming actions (simplified)
     agentStateUpdate: (state, action: PayloadAction<AgentStateUpdateEvent>) => {
-      const { agentId, state: agentState, changes, timestamp } = action.payload;
+      const { agentId, state: agentState, timestamp } = action.payload;
       const existingAgent = state.agents[agentId];
       
       if (existingAgent) {
-        // Update only the basic fields that come from the socket state
-        const updatedAgent: AgentState = {
-          ...existingAgent,
-          lastUpdate: timestamp,
-          status: agentState.status as any, // Handle status type compatibility
-          // Update context fields if they exist in the incoming state
-          context: {
-            ...existingAgent.context,
-            position: agentState.position || existingAgent.context.position,
-            health: agentState.health ?? existingAgent.context.health,
-            food: agentState.food ?? existingAgent.context.food,
-            experience: agentState.experience ?? existingAgent.context.experience,
-            level: agentState.level ?? existingAgent.context.level,
-            dimension: agentState.context?.dimension || existingAgent.context.dimension,
-            timeOfDay: agentState.context?.timeOfDay ?? existingAgent.context.timeOfDay,
-            weather: agentState.context?.weather || existingAgent.context.weather,
-          },
-        };
+        // Update only the 7 core fields
+        if (agentState.worldContext) {
+          existingAgent.worldContext = { 
+            ...existingAgent.worldContext, 
+            ...agentState.worldContext 
+          };
+        }
+        if (agentState.personality !== undefined) {
+          existingAgent.personality = agentState.personality;
+        }
+        if (agentState.goals !== undefined) {
+          existingAgent.goals = agentState.goals;
+        }
+        if (agentState.mandate !== undefined) {
+          existingAgent.mandate = agentState.mandate;
+        }
+        if (agentState.conversation) {
+          existingAgent.conversation = { 
+            ...existingAgent.conversation, 
+            ...agentState.conversation 
+          };
+        }
+        if (agentState.lastAction !== undefined) {
+          existingAgent.lastAction = agentState.lastAction;
+        }
+        if (agentState.response !== undefined) {
+          existingAgent.response = agentState.response;
+        }
         
-        state.agents[agentId] = updatedAgent;
+        existingAgent.lastUpdate = timestamp;
         state.streaming.lastStreamUpdate = timestamp;
         state.performance.totalUpdates++;
-        
-        // Calculate update frequency
-        if (state.streaming.lastStreamUpdate) {
-          const timeDiff = timestamp - state.streaming.lastStreamUpdate;
-          state.performance.updateFrequency = 1000 / timeDiff; // Updates per second
-        }
       } else {
-        // New agent, create full state with default structure
+        // Create new simplified agent
         const newAgent: AgentState = {
           id: agentId,
-          name: agentState.name,
-          profile: {} as any,
+          name: agentState.name || `Agent_${agentId}`,
+          profile: 'default',
           status: 'online',
           lastUpdate: timestamp,
-          context: {
-            position: agentState.position,
-            health: agentState.health,
-            food: agentState.food,
-            experience: agentState.experience,
-            level: agentState.level,
-            dimension: agentState.context?.dimension || 'overworld',
-            timeOfDay: agentState.context?.timeOfDay || 0,
-            weather: agentState.context?.weather || 'clear',
-            nearbyEntities: [],
-            nearbyBlocks: [],
-            inventory: { items: [], slots: 36, usedSlots: 0 },
-            equipment: {},
-          },
-          reactive: {
-            activeMode: 'idle',
-            emergencyConditions: [],
-            lastReactiveAction: {
-              mode: 'idle',
-              priority: 0,
-              timestamp: Date.now(),
-              context: {},
-              outcome: 'none',
-            },
-            interruptHistory: [],
-          },
-          cognitive: {
-            purpose: {
-              identity: {
-                name: agentState.name,
-                role: 'agent',
-                background: 'Unknown',
-                corePurpose: 'Survival and exploration',
-              },
-              personality: {
-                openness: 0.5,
-                conscientiousness: 0.5,
-                extraversion: 0.5,
-                agreeableness: 0.5,
-                neuroticism: 0.5,
-                riskTolerance: 0.5,
-                creativity: 0.5,
-                patience: 0.5,
-                competitiveness: 0.5,
-                curiosity: 0.5,
-              },
-              motivations: [],
-              values: [],
-              ethics: {
-                harmAvoidance: 0.8,
-                fairness: 0.7,
-                loyalty: 0.6,
-                authority: 0.5,
-                purity: 0.4,
-              },
-            },
-            goals: {
-              strategicGoals: [],
-              tacticalGoals: [],
-              operationalGoals: [],
-              activeGoals: [],
-              goalHistory: [],
-            },
-            skills: {},
-            memory: {
-              semantic: {
-                concepts: {},
-                facts: {},
-                relationships: {},
-              },
-              episodic: {
-                events: [],
-                conversations: [],
-                experiences: [],
-              },
-              procedural: {
-                skills: {},
-                procedures: {},
-                habits: {},
-              },
-              working: {
-                currentFocus: 'idle',
-                activeTasks: [],
-                conversationContext: null,
-                buffer: [],
-              },
-            },
-            processing: {
-              currentPhase: 'perception',
-              cognitiveLoad: 0,
-              attentionLevel: 0.5,
-              processingHistory: [],
-            },
-          },
-          executive: {
-            currentAction: {
-              id: '',
-              type: 'idle',
-              description: 'Agent is idle',
-              priority: 0,
-              status: 'pending',
-              createdAt: Date.now(),
-              context: {},
-            },
-            actionQueue: [],
-            decisionHistory: [],
-            performanceMetrics: {
-              reactiveResponseTime: 0,
-              cognitiveProcessingTime: 0,
-              successRate: 1.0,
-              errorRate: 0.0,
-              memoryUsage: 0,
-              cpuUsage: 0,
-            },
-            responseHistory: [],
-            processingMode: 'action',
-          },
-          social: {
-            relationships: {},
-            reputation: {
-              globalScore: 0,
-              factionScores: {},
-              traitScores: {},
-              recentEvents: [],
-            },
-            socialContext: {
-              currentSituation: 'idle',
-              nearbyAgents: [],
-              socialNorms: [],
-              culturalContext: 'default',
-              groupDynamics: null,
-            },
-            mentalModels: {},
-          },
+          worldContext: agentState.worldContext 
+            ? { ...createDefaultWorldContext(), ...agentState.worldContext }
+            : createDefaultWorldContext(),
+          personality: agentState.personality || 'balanced',
+          goals: agentState.goals || 'survival and exploration',
+          mandate: agentState.mandate || '',
+          conversation: agentState.conversation 
+            ? { ...createDefaultConversationState(), ...agentState.conversation }
+            : createDefaultConversationState(),
+          lastAction: agentState.lastAction || 'idle',
+          response: agentState.response || '',
         };
         
         state.agents[agentId] = newAgent;
+        state.streaming.lastStreamUpdate = timestamp;
+        state.performance.totalUpdates++;
       }
     },
 
@@ -611,182 +473,6 @@ const agentsSlice = createSlice({
         state.performance.averageUpdateSize = averageUpdateSize;
       }
     },
-
-    // Batch update for multiple agents (performance optimization)
-    batchAgentUpdates: (state, action: PayloadAction<AgentStateUpdateEvent[]>) => {
-      action.payload.forEach(update => {
-        const { agentId, state: agentState, timestamp } = update;
-        const existingAgent = state.agents[agentId];
-        
-        if (existingAgent) {
-          const updatedAgent: AgentState = {
-            ...existingAgent,
-            lastUpdate: timestamp,
-            status: agentState.status as any, // Handle status type compatibility
-            // Update context fields if they exist in the incoming state
-            context: {
-              ...existingAgent.context,
-              position: agentState.position || existingAgent.context.position,
-              health: agentState.health ?? existingAgent.context.health,
-              food: agentState.food ?? existingAgent.context.food,
-              experience: agentState.experience ?? existingAgent.context.experience,
-              level: agentState.level ?? existingAgent.context.level,
-              dimension: agentState.context?.dimension || existingAgent.context.dimension,
-              timeOfDay: agentState.context?.timeOfDay ?? existingAgent.context.timeOfDay,
-              weather: agentState.context?.weather || existingAgent.context.weather,
-            },
-          };
-          state.agents[agentId] = updatedAgent;
-        } else {
-          // For batch updates, create minimal agent state
-          const newAgent: AgentState = {
-            id: agentId,
-            name: agentState.name,
-            profile: {} as any,
-            status: 'online',
-            lastUpdate: timestamp,
-            context: {
-              position: agentState.position,
-              health: agentState.health,
-              food: agentState.food,
-              experience: agentState.experience,
-              level: agentState.level,
-              dimension: agentState.context.dimension,
-              timeOfDay: agentState.context.timeOfDay,
-              weather: agentState.context.weather,
-              nearbyEntities: [],
-              nearbyBlocks: [],
-              inventory: { items: [], slots: 36, usedSlots: 0 },
-              equipment: {},
-            },
-            reactive: {
-              activeMode: 'idle',
-              emergencyConditions: [],
-              lastReactiveAction: {
-                mode: 'idle',
-                priority: 0,
-                timestamp: Date.now(),
-                context: {},
-                outcome: 'none',
-              },
-              interruptHistory: [],
-            },
-            cognitive: {
-              purpose: {
-                identity: {
-                  name: agentState.name,
-                  role: 'agent',
-                  background: 'Unknown',
-                  corePurpose: 'Survival and exploration',
-                },
-                personality: {
-                  openness: 0.5,
-                  conscientiousness: 0.5,
-                  extraversion: 0.5,
-                  agreeableness: 0.5,
-                  neuroticism: 0.5,
-                  riskTolerance: 0.5,
-                  creativity: 0.5,
-                  patience: 0.5,
-                  competitiveness: 0.5,
-                  curiosity: 0.5,
-                },
-                motivations: [],
-                values: [],
-                ethics: {
-                  harmAvoidance: 0.8,
-                  fairness: 0.7,
-                  loyalty: 0.6,
-                  authority: 0.5,
-                  purity: 0.4,
-                },
-              },
-              goals: {
-                strategicGoals: [],
-                tacticalGoals: [],
-                operationalGoals: [],
-                activeGoals: [],
-                goalHistory: [],
-              },
-              skills: {},
-              memory: {
-                semantic: {
-                  concepts: {},
-                  facts: {},
-                  relationships: {},
-                },
-                episodic: {
-                  events: [],
-                  conversations: [],
-                  experiences: [],
-                },
-                procedural: {
-                  skills: {},
-                  procedures: {},
-                  habits: {},
-                },
-                working: {
-                  currentFocus: 'idle',
-                  activeTasks: [],
-                  conversationContext: null,
-                  buffer: [],
-                },
-              },
-              processing: {
-                currentPhase: 'perception',
-                cognitiveLoad: 0,
-                attentionLevel: 0.5,
-                processingHistory: [],
-              },
-            },
-            executive: {
-              currentAction: {
-                id: '',
-                type: 'idle',
-                description: 'Agent is idle',
-                priority: 0,
-                status: 'pending',
-                createdAt: Date.now(),
-                context: {},
-              },
-              actionQueue: [],
-              decisionHistory: [],
-              performanceMetrics: {
-                reactiveResponseTime: 0,
-                cognitiveProcessingTime: 0,
-                successRate: 1.0,
-                errorRate: 0.0,
-                memoryUsage: 0,
-                cpuUsage: 0,
-              },
-              responseHistory: [],
-              processingMode: 'action',
-            },
-            social: {
-              relationships: {},
-              reputation: {
-                globalScore: 0,
-                factionScores: {},
-                traitScores: {},
-                recentEvents: [],
-              },
-              socialContext: {
-                currentSituation: 'idle',
-                nearbyAgents: [],
-                socialNorms: [],
-                culturalContext: 'default',
-                groupDynamics: null,
-              },
-              mentalModels: {},
-            },
-          };
-          state.agents[agentId] = newAgent;
-        }
-      });
-      
-      state.streaming.lastStreamUpdate = Date.now();
-      state.performance.totalUpdates += action.payload.length;
-    },
   },
 });
 
@@ -802,6 +488,14 @@ export const {
   updateAgentStatus,
   updateAgentPosition,
   updateAgentHealth,
+  // New simplified update methods
+  updateAgentWorldContext,
+  updateAgentPersonality,
+  updateAgentGoals,
+  updateAgentMandate,
+  updateAgentConversation,
+  updateAgentLastAction,
+  updateAgentResponse,
   // Real-time streaming actions
   agentStateUpdate,
   agentConnected,
@@ -811,34 +505,81 @@ export const {
   incrementReconnectAttempts,
   resetStreamingMetrics,
   updatePerformanceMetrics,
-  batchAgentUpdates,
 } = agentsSlice.actions;
 
 export default agentsSlice.reducer;
 
-// Selectors
-export const selectAllAgents = (state: { agents: AgentsState }) => state.agents.agents;
-export const selectAgentById = (state: { agents: AgentsState }, agentId: string) => 
-  state.agents.agents[agentId];
-export const selectSelectedAgent = (state: { agents: AgentsState }) => {
-  const selectedId = state.agents.selectedAgent;
-  return selectedId ? state.agents.agents[selectedId] || null : null;
-};
-export const selectAgentsLoading = (state: { agents: AgentsState }) => state.agents.loading;
-export const selectAgentsError = (state: { agents: AgentsState }) => state.agents.error;
-export const selectAgentIds = (state: { agents: AgentsState }) => 
-  Object.keys(state.agents.agents);
-export const selectOnlineAgents = (state: { agents: AgentsState }) =>
-  Object.values(state.agents.agents).filter(agent => agent.status === 'online');
+// Performance optimization: Memoized selectors to prevent unnecessary recalculations
+export const selectAllAgents = createSelector(
+  [selectAgentsObject],
+  (agents) => agents
+);
 
-// Streaming selectors
-export const selectStreamingStatus = (state: { agents: AgentsState }) => state.agents.streaming;
-export const selectStreamingPerformance = (state: { agents: AgentsState }) => state.agents.performance;
-export const selectIsStreamingConnected = (state: { agents: AgentsState }) => state.agents.streaming.isConnected;
-export const selectConnectionQuality = (state: { agents: AgentsState }) => state.agents.streaming.connectionQuality;
-export const selectStreamingLatency = (state: { agents: AgentsState }) => state.agents.streaming.latency;
-export const selectStreamingErrors = (state: { agents: AgentsState }) => state.agents.streaming.streamErrors;
-export const selectUpdateFrequency = (state: { agents: AgentsState }) => state.agents.performance.updateFrequency;
+export const selectAgentById = createSelector(
+  [selectAgentsObject, (state: { agents: AgentsState }, agentId: string) => agentId],
+  (agents, agentId) => agents[agentId]
+);
+
+export const selectSelectedAgent = createSelector(
+  [selectAgentsObject, (state: { agents: AgentsState }) => state.agents.selectedAgent],
+  (agents, selectedId) => selectedId ? agents[selectedId] || null : null
+);
+
+export const selectAgentIds = createSelector(
+  [selectAgentsObject],
+  (agents) => Object.keys(agents)
+);
+
+export const selectOnlineAgents = createSelector(
+  [selectAgentsObject],
+  (agents) => Object.values(agents).filter(agent => agent.status === 'online')
+);
+
+export const selectAgentsLoading = createSelector(
+  [selectAgentsState],
+  (agentsState) => agentsState.loading
+);
+
+export const selectAgentsError = createSelector(
+  [selectAgentsState],
+  (agentsState) => agentsState.error
+);
+
+// Streaming selectors with memoization
+export const selectStreamingStatus = createSelector(
+  [selectAgentsState],
+  (agentsState) => agentsState.streaming
+);
+
+export const selectStreamingPerformance = createSelector(
+  [selectAgentsState],
+  (agentsState) => agentsState.performance
+);
+
+export const selectIsStreamingConnected = createSelector(
+  [selectStreamingStatus],
+  (streaming) => streaming.isConnected
+);
+
+export const selectConnectionQuality = createSelector(
+  [selectStreamingStatus],
+  (streaming) => streaming.connectionQuality
+);
+
+export const selectStreamingLatency = createSelector(
+  [selectStreamingStatus],
+  (streaming) => streaming.latency
+);
+
+export const selectStreamingErrors = createSelector(
+  [selectStreamingStatus],
+  (streaming) => streaming.streamErrors
+);
+
+export const selectUpdateFrequency = createSelector(
+  [selectStreamingPerformance],
+  (performance) => performance.updateFrequency
+);
 
 // Thunk actions for streaming
 export const handleAgentStateStream = (event: AgentStateUpdateEvent) => (dispatch: any) => {

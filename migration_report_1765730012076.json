@@ -1,0 +1,33 @@
+{
+  "timestamp": "2025-12-14T16:33:32.076Z",
+  "statistics": {
+    "totalProfiles": 22,
+    "successfulMigrations": 22,
+    "failedMigrations": 0,
+    "manualReviewsRequired": 22,
+    "skippedProfiles": 0,
+    "startTime": "2025-12-14T16:33:32.026Z",
+    "endTime": "2025-12-14T16:33:32.076Z",
+    "errors": []
+  },
+  "configuration": {
+    "backupDir": "c:\\AI\\mindcraft\\profiles_simplified_backup",
+    "manualOverride": false,
+    "qualityThreshold": 0.8,
+    "criticalProfiles": [
+      "MasterChief",
+      "Loner",
+      "AlphaSurvivor",
+      "SlaveOne",
+      "SlaveTwo",
+      "SlaveThree"
+    ],
+    "dryRun": true
+  },
+  "qualityMetrics": {
+    "averageQuality": 0.85,
+    "behavioralConsistency": 0.92,
+    "dataIntegrity": 1,
+    "llmInterpretability": 0.88
+  }
+}

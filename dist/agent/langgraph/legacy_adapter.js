@@ -2,19 +2,189 @@
  * Legacy Adapter - Main compatibility layer for existing NPC system
  * Wraps the existing NPCData, ItemGoal, and BuildGoal systems to work with LangGraph
  */
+// @ts-ignore - JS module without type definitions
 import { NPCData } from '../npc/data.js';
+// @ts-ignore - JS module without type definitions
 import { NPCContoller } from '../npc/controller.js';
+// @ts-ignore - JS module without type definitions
 import { MemoryBank } from '../memory_bank.js';
 /**
  * Legacy NPC Data Adapter
  * Converts between flat NPCData structure and hierarchical AgentState
  */
 export class LegacyNPCDataAdapter {
-    npcData;
+    npcData; // Changed from NPCData to any to avoid type issues
     originalProfile;
     constructor(profileData) {
         this.originalProfile = profileData;
         this.npcData = NPCData.fromObject(profileData.npc || {});
+    }
+    /**
+     * Extract purpose state from legacy profile
+     */
+    extractPurposeState() {
+        return {
+            identity: {
+                name: this.originalProfile.username || 'Unknown',
+                role: this.originalProfile.role || 'worker',
+                background: this.originalProfile.background || 'Minecraft inhabitant',
+                corePurpose: this.inferCorePurpose()
+            },
+            personality: this.extractPersonality(),
+            motivations: [{
+                    id: 'primary_motivation',
+                    type: 'resource_acquisition',
+                    strength: 0.8,
+                    satisfaction: 0.5,
+                    priority: 1
+                }],
+            values: [{
+                    id: 'efficiency',
+                    name: 'efficiency',
+                    importance: 0.8,
+                    priority: 1
+                }],
+            ethics: {
+                harmAvoidance: 0.7,
+                fairness: 0.5,
+                loyalty: 0.6,
+                authority: 0.4,
+                purity: 0.3
+            }
+        };
+    }
+    /**
+     * Extract goal state from flat NPC goals
+     */
+    extractGoalState() {
+        const goals = [];
+        // Convert flat goals to hierarchical goals
+        if (this.npcData.goals) {
+            this.npcData.goals.forEach((goal, index) => {
+                const hierarchicalGoal = {
+                    id: `legacy_goal_${index}`,
+                    type: 'operational', // Legacy goals are operational by nature
+                    priority: 'medium', // Changed from number to string enum
+                    status: 'pending',
+                    description: `Obtain ${goal.quantity}x ${goal.name}`,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                    dependencies: [],
+                    resources: {
+                        required: [{ type: goal.name, amount: goal.quantity }],
+                        allocated: [],
+                        items: [{ type: goal.name, amount: goal.quantity }],
+                        tools: this.inferRequiredTools(goal.name).map(tool => ({ type: tool, amount: 1 }))
+                    },
+                    progress: {
+                        current: 0,
+                        target: 100,
+                        percentage: 0
+                    }
+                };
+                goals.push(hierarchicalGoal);
+            });
+        }
+        // Add current goal if exists
+        if (this.npcData.curr_goal) {
+            const currentGoal = {
+                id: 'legacy_current_goal',
+                type: 'operational',
+                priority: 'high', // Changed from number to string enum
+                status: 'active',
+                description: `Current: Obtain ${this.npcData.curr_goal.quantity}x ${this.npcData.curr_goal.name}`,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                dependencies: [],
+                resources: {
+                    required: [{ type: this.npcData.curr_goal.name, amount: this.npcData.curr_goal.quantity }],
+                    allocated: [],
+                    items: [{ type: this.npcData.curr_goal.name, amount: this.npcData.curr_goal.quantity }],
+                    tools: this.inferRequiredTools(this.npcData.curr_goal.name).map(tool => ({ type: tool, amount: 1 }))
+                },
+                progress: {
+                    current: 0,
+                    target: 100,
+                    percentage: 0
+                }
+            };
+            goals.push(currentGoal);
+        }
+        return {
+            strategicGoals: [],
+            tacticalGoals: [],
+            operationalGoals: goals,
+            activeGoals: goals.filter(g => g.status === 'active'),
+            goalHistory: []
+        };
+    }
+    /**
+     * Extract skill state from legacy system
+     */
+    extractSkillState() {
+        return {
+            skills: new Map(),
+            learning: {
+                history: [],
+                metrics: {
+                    totalSessions: 0,
+                    averageDuration: 0,
+                    successRate: 0,
+                    recentGains: 0,
+                    plateauRisk: 0
+                },
+                learningRate: 0.1,
+                adaptiveFactor: 1.0
+            },
+            progression: {
+                level: 1,
+                experience: 0,
+                progressToNext: 0,
+                totalExperience: 0,
+                lastLevelUp: Date.now()
+            },
+            totalExperience: 0,
+            recentGains: [],
+            skillSynergies: new Map(),
+            adaptiveLearning: {
+                personalityInfluence: 0.5,
+                socialInfluence: 0.3,
+                environmentalInfluence: 0.2,
+                recentAdaptations: []
+            }
+        };
+    }
+    /**
+     * Extract memory state from legacy MemoryBank
+     */
+    extractMemoryState() {
+        return {
+            semantic: {
+                concepts: new Map(),
+                facts: new Map(),
+                relationships: new Map()
+            },
+            episodic: {
+                episodes: [],
+                conversations: [],
+                experiences: []
+            },
+            procedural: {
+                skills: new Map(),
+                procedures: new Map(),
+                habits: new Map()
+            },
+            working: {
+                currentFocus: '',
+                activeTasks: [],
+                conversationContext: null,
+                buffer: [],
+                capacity: 7,
+                utilization: 0,
+                items: [],
+                decayRate: 0.1
+            }
+        };
     }
     /**
      * Convert legacy NPCData to AgentState cognitive components
@@ -34,54 +204,23 @@ export class LegacyNPCDataAdapter {
                     processingHistory: []
                 },
                 social: {
-                    relationships: {
-                        agentId: this.originalProfile.username || 'legacy_agent',
-                        relationshipCount: 0,
-                        activeRelationships: [],
-                        trustLevels: {},
-                        friendshipLevels: {},
-                        reputationScore: 0.5,
-                        lastUpdate: Date.now()
-                    },
-                    theoryOfMind: {
-                        mentalModels: {},
-                        activePredictions: [],
-                        emotionalUnderstanding: {},
-                        perspectiveTakingHistory: [],
-                        lastUpdate: Date.now()
+                    relationships: new Map(),
+                    reputation: {
+                        globalScore: 0.5,
+                        factionScores: new Map(),
+                        traitScores: new Map(),
+                        recentEvents: [],
+                        reputationScore: 0.5
                     },
                     socialContext: {
+                        currentSituation: {},
                         nearbyAgents: [],
-                        groupDynamics: {
-                            leader: undefined,
-                            cohesion: 0.5,
-                            hierarchy: [],
-                            roles: {},
-                            alliances: []
-                        },
                         socialNorms: [],
-                        culturalContext: {
-                            culturalBackground: 'default',
-                            values: [],
-                            practices: [],
-                            communicationStyle: 'neutral',
-                            socialHierarchy: []
-                        },
-                        currentSituation: {
-                            type: 'neutral',
-                            participants: [],
-                            goals: [],
-                            resources: [],
-                            powerDynamics: {}
-                        }
+                        culturalContext: 'default',
+                        groupDynamics: {}
                     },
-                    socialLearning: {
-                        observedBehaviors: [],
-                        learnedPatterns: [],
-                        teachingHistory: [],
-                        socialSkillProgress: {},
-                        lastUpdate: Date.now()
-                    }
+                    theoryOfMind: new Map(),
+                    nearbyAgents: []
                 }
             },
             metadata: {
@@ -93,122 +232,6 @@ export class LegacyNPCDataAdapter {
             }
         };
         return agentState;
-    }
-    /**
-     * Extract purpose state from legacy profile
-     */
-    extractPurposeState() {
-        return {
-            identity: {
-                name: this.originalProfile.username || 'Unknown',
-                role: this.originalProfile.role || 'worker',
-                background: this.originalProfile.background || 'Minecraft inhabitant',
-                corePurpose: this.inferCorePurpose()
-            },
-            personality: this.extractPersonality(),
-            motivations: this.extractMotivations(),
-            values: this.extractValues(),
-            ethics: this.extractEthics()
-        };
-    }
-    /**
-     * Extract goal state from flat NPC goals
-     */
-    extractGoalState() {
-        const goals = [];
-        // Convert flat goals to hierarchical goals
-        if (this.npcData.goals) {
-            this.npcData.goals.forEach((goal, index) => {
-                const hierarchicalGoal = {
-                    id: `legacy_goal_${index}`,
-                    type: 'operational', // Legacy goals are operational by nature
-                    description: `Obtain ${goal.quantity}x ${goal.name}`,
-                    priority: 100 - index, // Simple priority based on order
-                    dependencies: [],
-                    resources: {
-                        items: { [goal.name]: goal.quantity },
-                        tools: this.inferRequiredTools(goal.name)
-                    },
-                    progress: {
-                        percentage: 0,
-                        completedSteps: [],
-                        blockers: []
-                    },
-                    status: 'pending',
-                    createdAt: Date.now()
-                };
-                goals.push(hierarchicalGoal);
-            });
-        }
-        // Add current goal if exists
-        if (this.npcData.curr_goal) {
-            const currentGoal = {
-                id: 'legacy_current_goal',
-                type: 'operational',
-                description: `Current: Obtain ${this.npcData.curr_goal.quantity}x ${this.npcData.curr_goal.name}`,
-                priority: 200, // Highest priority for current goal
-                dependencies: [],
-                resources: {
-                    items: { [this.npcData.curr_goal.name]: this.npcData.curr_goal.quantity },
-                    tools: this.inferRequiredTools(this.npcData.curr_goal.name)
-                },
-                progress: {
-                    percentage: 0,
-                    completedSteps: [],
-                    blockers: []
-                },
-                status: 'active',
-                createdAt: Date.now()
-            };
-            goals.push(currentGoal);
-        }
-        return {
-            strategicGoals: [],
-            tacticalGoals: [],
-            operationalGoals: goals,
-            activeGoals: goals.filter(g => g.status === 'active'),
-            goalHistory: []
-        };
-    }
-    /**
-     * Extract skill state from legacy system
-     */
-    extractSkillState() {
-        return {
-            skills: {},
-            experience: [],
-            learningRate: 0.1,
-            skillSynergies: {}
-        };
-    }
-    /**
-     * Extract memory state from legacy MemoryBank
-     */
-    extractMemoryState() {
-        return {
-            semantic: {
-                facts: {},
-                concepts: {},
-                relationships: {}
-            },
-            episodic: {
-                episodes: [],
-                currentIndex: 0,
-                compressionLevel: 0
-            },
-            procedural: {
-                procedures: {},
-                sequences: {},
-                habits: []
-            },
-            working: {
-                currentFocus: '',
-                activeTasks: [],
-                buffer: [],
-                capacity: 7,
-                decayRate: 0.1
-            }
-        };
     }
     /**
      * Update legacy NPCData from AgentState
@@ -226,10 +249,12 @@ export class LegacyNPCDataAdapter {
         const activeGoals = operationalGoals.filter(g => g.status === 'active');
         if (activeGoals.length > 0) {
             const current = activeGoals[0];
-            this.npcData.curr_goal = {
-                name: this.extractItemNameFromGoal(current.description),
-                quantity: this.extractQuantityFromGoal(current.resources)
-            };
+            if (current) {
+                this.npcData.curr_goal = {
+                    name: this.extractItemNameFromGoal(current.description),
+                    quantity: this.extractQuantityFromGoal(current.resources)
+                };
+            }
         }
         // Update routine flags
         this.npcData.do_routine = this.shouldDoRoutine(agentState);
@@ -249,7 +274,7 @@ export class LegacyNPCDataAdapter {
     }
     // Helper methods
     inferCorePurpose() {
-        if (this.npcData.goals.length > 0) {
+        if (this.npcData.goals && this.npcData.goals.length > 0) {
             return 'Resource gathering and construction';
         }
         return 'Survival and exploration';
@@ -262,6 +287,10 @@ export class LegacyNPCDataAdapter {
             agreeableness: 0.6,
             neuroticism: 0.3,
             riskTolerance: 0.4,
+            creativity: 0.5,
+            patience: 0.6,
+            competitiveness: 0.3,
+            curiosity: 0.5,
             explorationDrive: 0.5,
             socialTendency: 0.3,
             buildingCreativity: 0.6,
@@ -269,35 +298,29 @@ export class LegacyNPCDataAdapter {
         };
     }
     extractMotivations() {
-        return {
-            primaryMotivation: 'resource_acquisition',
-            secondaryMotivations: ['construction', 'survival'],
-            drives: {
-                resource_acquisition: 0.8,
-                construction: 0.6,
-                survival: 0.9
-            },
-            satisfactions: {}
-        };
+        return [{
+                id: 'primary_motivation',
+                type: 'resource_acquisition',
+                strength: 0.8,
+                satisfaction: 0.5,
+                priority: 1
+            }];
     }
     extractValues() {
-        return {
-            coreValues: ['efficiency', 'completion', 'survival'],
-            valuePriorities: {
-                efficiency: 0.8,
-                completion: 0.9,
-                survival: 1.0
-            },
-            moralConstraints: []
-        };
+        return [{
+                id: 'efficiency',
+                name: 'efficiency',
+                importance: 0.8,
+                priority: 1
+            }];
     }
     extractEthics() {
         return {
             harmAvoidance: 0.7,
-            fairnessConcern: 0.5,
-            loyaltyPriority: 0.6,
-            authorityRespect: 0.4,
-            purityConcern: 0.3
+            fairness: 0.5,
+            loyalty: 0.6,
+            authority: 0.4,
+            purity: 0.3
         };
     }
     inferRequiredTools(itemName) {
@@ -319,11 +342,14 @@ export class LegacyNPCDataAdapter {
     }
     extractItemNameFromGoal(description) {
         const match = description.match(/(\w+)\s*x?/);
-        return match ? match[1] : 'unknown';
+        return match?.[1] || 'unknown';
     }
     extractQuantityFromGoal(resources) {
         if (resources.items && Object.keys(resources.items).length > 0) {
             return Object.values(resources.items)[0];
+        }
+        if (resources.required && resources.required.length > 0) {
+            return resources.required[0].amount;
         }
         return 1;
     }
@@ -339,9 +365,9 @@ export class LegacyNPCDataAdapter {
  * Wraps the existing NPCController to work with the new Agent interface
  */
 export class LegacyControllerAdapter {
-    controller;
+    controller; // Changed from NPCContoller to any
     dataAdapter;
-    agent;
+    agent; // Changed from Agent to any
     constructor(agent, dataAdapter) {
         this.agent = agent;
         this.dataAdapter = dataAdapter;
@@ -410,7 +436,7 @@ export class LegacyControllerAdapter {
  * Bridges the old MemoryBank with new semantic memory system
  */
 export class LegacyMemoryAdapter {
-    memoryBank;
+    memoryBank; // Changed from MemoryBank to any
     constructor(memoryData) {
         this.memoryBank = new MemoryBank();
         if (memoryData) {

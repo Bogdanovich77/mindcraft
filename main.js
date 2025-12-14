@@ -75,19 +75,42 @@ Mindcraft.init(true, settings.mindserver_port, settings.auto_open_ui);
 const agentLoader = createAgentLoader();
 
 async function initializeAgents() {
-    console.log(`Initializing agents with ${settings.agent_system} system...`);
+    console.log(`[DEBUG] Initializing agents with ${settings.agent_system} system...`);
+    console.log('[DEBUG] Settings:', {
+        agent_system: settings.agent_system,
+        profiles_count: settings.profiles.length,
+        profiles: settings.profiles
+    });
     
     if (settings.agent_system === 'langgraph') {
         // Use new LangGraph agent system
+        console.log('[DEBUG] Agent system is set to langgraph, attempting to load LangGraph agents...');
         try {
+            console.log('[DEBUG] Creating agent loader...');
+            const agentLoader = createAgentLoader();
+            console.log('[DEBUG] Agent loader created successfully');
+            
+            console.log('[DEBUG] Loading all agents...');
             const agents = await agentLoader.loadAllAgents();
-            console.log(`Successfully loaded ${agents.length} LangGraph agents`);
+            console.log(`[DEBUG] Successfully loaded ${agents.length} LangGraph agents`);
+            
+            // Check what types of agents were actually loaded
+            agents.forEach((agent, index) => {
+                console.log(`[DEBUG] Agent ${index}:`, {
+                    name: agent.name || agent.profile?.name || 'unknown',
+                    constructor: agent.constructor.name,
+                    hasProfile: !!agent.profile,
+                    profileAgentType: agent.profile?.agentType
+                });
+            });
             
             // Register each loaded agent with the MindServer
             let agentIndex = 0;
             for (const agent of agents) {
                 if (agent.profile) {
                     const viewer_port = 3000 + agentIndex;
+                    console.log(`[DEBUG] Registering agent ${agent.profile.name} on port ${viewer_port}`);
+                    
                     // Register the agent with MindServer
                     Mindcraft.registerAgent({
                         profile: agent.profile,
@@ -99,35 +122,50 @@ async function initializeAgents() {
                     }, viewer_port);
                     
                     // Connect the agent to the MindServer
+                    console.log(`[DEBUG] Connecting agent ${agent.profile.name} to MindServer...`);
                     agent.connectToMindServer(settings.mindserver_port || 8080);
                     
                     agentIndex++;
-                    console.log(`Registered LangGraph agent: ${agent.profile.name}`);
+                    console.log(`[DEBUG] Registered LangGraph agent: ${agent.profile.name}`);
+                } else {
+                    console.warn('[DEBUG] Agent missing profile, skipping registration');
                 }
             }
             
             // Display agent statistics
+            console.log('[DEBUG] Getting agent statistics...');
             const stats = await agentLoader.getAgentStats();
-            console.log('Agent Statistics:', stats);
+            console.log('[DEBUG] Agent Statistics:', stats);
             
         } catch (error) {
-            console.error('Failed to load LangGraph agents, falling back to legacy system:', error);
+            console.error('[DEBUG] Failed to load LangGraph agents, falling back to legacy system:', error);
+            console.error('[DEBUG] Full error details:', error.stack);
             fallbackToLegacy();
         }
     } else {
+        console.log('[DEBUG] Agent system is not langgraph, using legacy system...');
         // Use legacy system
         fallbackToLegacy();
     }
 }
 
 function fallbackToLegacy() {
-    console.log('Using legacy agent system...');
+    console.log('[DEBUG] Using legacy agent system...');
     
     for (let profile of settings.profiles) {
-        const profile_json = JSON.parse(readFileSync(profile, 'utf8'));
-        // Merge global settings with profile-specific settings to ensure host/port are present
-        const agentSettings = { ...settings, profile: profile_json };
-        Mindcraft.createAgent(agentSettings);
+        console.log(`[DEBUG] Loading legacy profile: ${profile}`);
+        try {
+            const profile_json = JSON.parse(readFileSync(profile, 'utf8'));
+            console.log(`[DEBUG] Profile loaded: ${profile_json.name}, agentType: ${profile_json.agentType}`);
+            
+            // Merge global settings with profile-specific settings to ensure host/port are present
+            const agentSettings = { ...settings, profile: profile_json };
+            console.log(`[DEBUG] Creating legacy agent for ${profile_json.name}...`);
+            Mindcraft.createAgent(agentSettings);
+            console.log(`[DEBUG] Legacy agent created for ${profile_json.name}`);
+        } catch (error) {
+            console.error(`[DEBUG] Failed to load legacy profile ${profile}:`, error);
+        }
     }
 }
 

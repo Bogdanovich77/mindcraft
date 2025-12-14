@@ -3,6 +3,38 @@
  * Handles goal synchronization, decomposition, and priority management
  */
 /**
+ * Utility function to convert numeric priority to string literal
+ */
+function mapPriority(priority) {
+    if (priority >= 80)
+        return 'critical';
+    if (priority >= 60)
+        return 'high';
+    if (priority >= 40)
+        return 'medium';
+    return 'low';
+}
+/**
+ * Utility function to convert dictionary to ResourceRequirement array
+ */
+function convertToResourceRequirements(items) {
+    return Object.entries(items).map(([name, amount]) => ({
+        type: name,
+        amount,
+        priority: 1
+    }));
+}
+/**
+ * Utility function to convert string array to ResourceRequirement array
+ */
+function convertToolsToRequirements(tools) {
+    return tools.map(tool => ({
+        type: tool,
+        amount: 1,
+        priority: 1
+    }));
+}
+/**
  * Goal bridge class
  */
 export class GoalBridge {
@@ -129,12 +161,14 @@ export class GoalBridge {
             const activeGoals = operationalGoals.filter(g => g.status === 'active');
             if (activeGoals.length > 0) {
                 const activeGoal = activeGoals[0];
-                const legacyName = this.newToLegacyMap.get(activeGoal.id);
-                if (legacyName) {
-                    legacyData.curr_goal = {
-                        name: legacyName,
-                        quantity: this.extractQuantityFromGoal(activeGoal)
-                    };
+                if (activeGoal) {
+                    const legacyName = this.newToLegacyMap.get(activeGoal.id);
+                    if (legacyName) {
+                        legacyData.curr_goal = {
+                            name: legacyName,
+                            quantity: this.extractQuantityFromGoal(activeGoal)
+                        };
+                    }
                 }
             }
             else {
@@ -166,23 +200,28 @@ export class GoalBridge {
      */
     convertSingleLegacyGoal(legacyGoal, index) {
         const goalId = index === -1 ? 'legacy_current_goal' : `legacy_goal_${index}`;
+        const numericPriority = this.options.preservePriorities ? (100 - index) : 50;
         const goal = {
             id: goalId,
             type: 'operational',
             description: `Obtain ${legacyGoal.quantity}x ${legacyGoal.name}`,
-            priority: this.options.preservePriorities ? (100 - index) : 50,
+            priority: mapPriority(numericPriority),
+            status: 'pending',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
             dependencies: [],
             resources: this.options.estimateResources ? this.estimateResources(legacyGoal) : {
-                items: { [legacyGoal.name]: legacyGoal.quantity },
+                required: convertToResourceRequirements({ [legacyGoal.name]: legacyGoal.quantity }),
+                allocated: [],
+                items: convertToResourceRequirements({ [legacyGoal.name]: legacyGoal.quantity }),
                 tools: []
             },
             progress: {
+                current: 0,
+                target: legacyGoal.quantity,
                 percentage: 0,
-                completedSteps: [],
-                blockers: []
-            },
-            status: 'pending',
-            createdAt: Date.now()
+                completedSteps: 0
+            }
         };
         // Add strategic context if it's a construction goal
         if (this.isConstructionGoal(legacyGoal.name)) {
@@ -192,12 +231,176 @@ export class GoalBridge {
         return goal;
     }
     /**
+     * Extract quantity from a hierarchical goal
+     */
+    extractQuantityFromGoal(goal) {
+        if (goal.progress && goal.progress.target) {
+            return goal.progress.target;
+        }
+        // Extract from description as fallback
+        const match = goal.description.match(/(\d+)x?\s+(\w+)/);
+        if (match && match[1]) {
+            return parseInt(match[1], 10);
+        }
+        return 1; // Default quantity
+    }
+    /**
+     * Extract legacy goal from hierarchical goal
+     */
+    extractLegacyGoalFromHierarchical(goal) {
+        if (!goal || !goal.description) {
+            return null;
+        }
+        // Extract item name and quantity from description
+        const match = goal.description.match(/(?:Obtain|Build|Craft|Collect)\s+(\d+)x?\s+(\w+)/);
+        if (match && match[1] && match[2]) {
+            return {
+                name: match[2],
+                quantity: parseInt(match[1], 10)
+            };
+        }
+        // Fallback: extract item name without quantity
+        const nameMatch = goal.description.match(/(?:Obtain|Build|Craft|Collect)\s+(\w+)/);
+        if (nameMatch && nameMatch[1]) {
+            return {
+                name: nameMatch[1],
+                quantity: 1
+            };
+        }
+        return null;
+    }
+    /**
+     * Decompose build goals into sub-goals
+     */
+    decomposeBuildGoal(goal) {
+        const subGoals = [];
+        // Extract target structure from description
+        const structureMatch = goal.description.match(/Build\s+(.+)/);
+        if (!structureMatch) {
+            return [goal];
+        }
+        const structureName = structureMatch[1];
+        // Create sub-goals for common building materials
+        const commonMaterials = [
+            { name: 'wood', quantity: 64 },
+            { name: 'stone', quantity: 64 },
+            { name: 'cobblestone', quantity: 64 }
+        ];
+        commonMaterials.forEach((material, index) => {
+            const subGoal = {
+                id: `${goal.id}_material_${index}`,
+                type: 'operational',
+                description: `Collect ${material.quantity}x ${material.name} for ${structureName}`,
+                priority: goal.priority,
+                status: 'pending',
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                dependencies: [],
+                resources: {
+                    required: convertToResourceRequirements({ [material.name]: material.quantity }),
+                    allocated: [],
+                    items: convertToResourceRequirements({ [material.name]: material.quantity }),
+                    tools: convertToolsToRequirements(this.inferRequiredTools(material.name))
+                },
+                progress: {
+                    current: 0,
+                    target: material.quantity,
+                    percentage: 0,
+                    completedSteps: 0
+                }
+            };
+            subGoals.push(subGoal);
+        });
+        // Add the final building goal
+        const buildGoal = {
+            ...goal,
+            id: `${goal.id}_build`,
+            type: 'operational',
+            dependencies: subGoals.map(sg => sg.id),
+            resources: {
+                required: [],
+                allocated: [],
+                items: [],
+                tools: convertToolsToRequirements(['crafting_table'])
+            }
+        };
+        subGoals.push(buildGoal);
+        return subGoals;
+    }
+    /**
+     * Decompose craft goals into sub-goals
+     */
+    decomposeCraftGoal(goal) {
+        const subGoals = [];
+        // Extract target item from description
+        const itemMatch = goal.description.match(/Craft\s+(.+)/);
+        if (!itemMatch) {
+            return [goal];
+        }
+        const itemName = itemMatch[1];
+        // Create sub-goals for crafting materials (simplified)
+        const craftingMaterials = [
+            { name: 'wood', quantity: 4 },
+            { name: 'stone', quantity: 8 }
+        ];
+        craftingMaterials.forEach((material, index) => {
+            const subGoal = {
+                id: `${goal.id}_material_${index}`,
+                type: 'operational',
+                description: `Collect ${material.quantity}x ${material.name} for crafting ${itemName}`,
+                priority: goal.priority,
+                status: 'pending',
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                dependencies: [],
+                resources: {
+                    required: convertToResourceRequirements({ [material.name]: material.quantity }),
+                    allocated: [],
+                    items: convertToResourceRequirements({ [material.name]: material.quantity }),
+                    tools: convertToolsToRequirements(this.inferRequiredTools(material.name))
+                },
+                progress: {
+                    current: 0,
+                    target: material.quantity,
+                    percentage: 0,
+                    completedSteps: 0
+                }
+            };
+            subGoals.push(subGoal);
+        });
+        // Add the final crafting goal
+        const craftGoal = {
+            ...goal,
+            id: `${goal.id}_craft`,
+            type: 'operational',
+            dependencies: subGoals.map(sg => sg.id),
+            resources: {
+                required: [],
+                allocated: [],
+                items: [],
+                tools: convertToolsToRequirements(['crafting_table'])
+            }
+        };
+        subGoals.push(craftGoal);
+        return subGoals;
+    }
+    /**
+     * Decompose collect goals into sub-goals
+     */
+    decomposeCollectGoal(goal) {
+        // For collect goals, we typically don't need further decomposition
+        // Just return the original goal
+        return [goal];
+    }
+    /**
      * Estimate resource requirements for a legacy goal
      */
     estimateResources(legacyGoal) {
         const resources = {
-            items: { [legacyGoal.name]: legacyGoal.quantity },
-            tools: this.inferRequiredTools(legacyGoal.name)
+            required: convertToResourceRequirements({ [legacyGoal.name]: legacyGoal.quantity }),
+            allocated: [],
+            items: convertToResourceRequirements({ [legacyGoal.name]: legacyGoal.quantity }),
+            tools: convertToolsToRequirements(this.inferRequiredTools(legacyGoal.name))
         };
         // Add location requirement for construction goals
         if (this.isConstructionGoal(legacyGoal.name)) {
@@ -252,220 +455,6 @@ export class GoalBridge {
             }
         });
         return mergedGoals;
-    }
-    /**
-     * Extract quantity from hierarchical goal
-     */
-    extractQuantityFromGoal(goal) {
-        if (goal.resources.items && Object.keys(goal.resources.items).length > 0) {
-            return Object.values(goal.resources.items)[0];
-        }
-        return 1;
-    }
-    /**
-     * Extract legacy goal from hierarchical goal
-     */
-    extractLegacyGoalFromHierarchical(goal) {
-        // Try to extract item name and quantity from description
-        const match = goal.description.match(/(\w+)\s*x?(\d+)?/);
-        if (match) {
-            const name = match[1];
-            const quantity = match[2] ? parseInt(match[2]) : 1;
-            return { name, quantity };
-        }
-        return null;
-    }
-    /**
-     * Decompose build goals into sub-goals
-     */
-    decomposeBuildGoal(goal) {
-        const subGoals = [];
-        // Add resource collection goals
-        if (goal.resources.items) {
-            for (const [itemName, quantity] of Object.entries(goal.resources.items)) {
-                const resourceGoal = {
-                    id: `${goal.id}_collect_${itemName}`,
-                    type: 'operational',
-                    description: `Collect ${quantity}x ${itemName}`,
-                    priority: goal.priority - 10,
-                    dependencies: [],
-                    resources: {
-                        items: { [itemName]: quantity },
-                        tools: this.inferRequiredTools(itemName)
-                    },
-                    progress: {
-                        percentage: 0,
-                        completedSteps: [],
-                        blockers: []
-                    },
-                    status: 'pending',
-                    createdAt: Date.now()
-                };
-                subGoals.push(resourceGoal);
-            }
-        }
-        // Add the actual construction goal
-        const constructionGoal = {
-            ...goal,
-            id: `${goal.id}_build`,
-            description: `Build structure from ${goal.description}`,
-            dependencies: subGoals.map(g => g.id),
-            resources: {
-                ...goal.resources,
-                tools: [...(goal.resources.tools || []), 'crafting_table']
-            }
-        };
-        subGoals.push(constructionGoal);
-        return subGoals;
-    }
-    /**
-     * Decompose craft goals into sub-goals
-     */
-    decomposeCraftGoal(goal) {
-        const subGoals = [];
-        // Add resource collection goals for crafting materials
-        if (goal.resources.items) {
-            for (const [itemName, quantity] of Object.entries(goal.resources.items)) {
-                if (!this.isTool(itemName)) {
-                    const resourceGoal = {
-                        id: `${goal.id}_collect_${itemName}`,
-                        type: 'operational',
-                        description: `Collect ${quantity}x ${itemName}`,
-                        priority: goal.priority - 10,
-                        dependencies: [],
-                        resources: {
-                            items: { [itemName]: quantity },
-                            tools: this.inferRequiredTools(itemName)
-                        },
-                        progress: {
-                            percentage: 0,
-                            completedSteps: [],
-                            blockers: []
-                        },
-                        status: 'pending',
-                        createdAt: Date.now()
-                    };
-                    subGoals.push(resourceGoal);
-                }
-            }
-        }
-        // Add the actual crafting goal
-        const craftingGoal = {
-            ...goal,
-            id: `${goal.id}_craft`,
-            dependencies: subGoals.map(g => g.id),
-            resources: {
-                ...goal.resources,
-                tools: [...(goal.resources.tools || []), 'crafting_table']
-            }
-        };
-        subGoals.push(craftingGoal);
-        return subGoals;
-    }
-    /**
-     * Decompose collect goals into sub-goals
-     */
-    decomposeCollectGoal(goal) {
-        // For simple collection goals, no decomposition needed
-        return [goal];
-    }
-    /**
-     * Check if an item is a tool
-     */
-    isTool(itemName) {
-        const toolKeywords = ['pickaxe', 'axe', 'shovel', 'hoe', 'sword'];
-        return toolKeywords.some(keyword => itemName.includes(keyword));
-    }
-}
-/**
- * Goal bridge factory
- */
-export class GoalBridgeFactory {
-    /**
-     * Create goal bridge with default options
-     */
-    static create(dataAdapter) {
-        return new GoalBridge(dataAdapter);
-    }
-    /**
-     * Create goal bridge for development
-     */
-    static createForDevelopment(dataAdapter) {
-        return new GoalBridge(dataAdapter, {
-            preservePriorities: true,
-            autoDecompose: true,
-            estimateResources: true,
-            createDependencies: true
-        });
-    }
-    /**
-     * Create goal bridge for production
-     */
-    static createForProduction(dataAdapter) {
-        return new GoalBridge(dataAdapter, {
-            preservePriorities: true,
-            autoDecompose: false,
-            estimateResources: false,
-            createDependencies: false
-        });
-    }
-}
-/**
- * Goal utilities
- */
-export class GoalUtils {
-    /**
-     * Check if a goal is achievable with current resources
-     */
-    static isAchievable(goal, availableResources) {
-        // Check if required items are available
-        if (goal.resources.items) {
-            for (const [itemName, quantity] of Object.entries(goal.resources.items)) {
-                if (!availableResources[itemName] || availableResources[itemName] < quantity) {
-                    return false;
-                }
-            }
-        }
-        // Check if required tools are available
-        if (goal.resources.tools) {
-            for (const tool of goal.resources.tools) {
-                if (!availableResources[tool]) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-    /**
-     * Calculate goal priority based on multiple factors
-     */
-    static calculatePriority(goal, context) {
-        let priority = goal.priority;
-        // Adjust based on resource availability
-        if (this.isAchievable(goal, context.resources)) {
-            priority += 20; // Boost achievable goals
-        }
-        // Adjust based on deadline
-        if (goal.deadline) {
-            const timeUntilDeadline = goal.deadline - Date.now();
-            if (timeUntilDeadline < 60000) { // Less than 1 minute
-                priority += 50; // Urgent
-            }
-            else if (timeUntilDeadline < 300000) { // Less than 5 minutes
-                priority += 25; // High priority
-            }
-        }
-        return priority;
-    }
-    /**
-     * Sort goals by priority
-     */
-    static sortGoals(goals, context) {
-        return goals.sort((a, b) => {
-            const priorityA = context ? this.calculatePriority(a, context) : a.priority;
-            const priorityB = context ? this.calculatePriority(b, context) : b.priority;
-            return priorityB - priorityA; // Highest priority first
-        });
     }
 }
 //# sourceMappingURL=goal_bridge.js.map

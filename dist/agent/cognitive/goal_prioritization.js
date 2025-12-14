@@ -1,3 +1,9 @@
+/**
+ * Goal Prioritization Engine for LangGraph v2
+ *
+ * This engine calculates priority scores for goals based on multiple factors
+ * including agent personality, motivations, skills, resources, and context.
+ */
 export class GoalPrioritizationEngine {
     strategicWeight = 0.25;
     tacticalWeight = 0.25;
@@ -10,164 +16,205 @@ export class GoalPrioritizationEngine {
      * Calculate priority score for a goal
      */
     calculateGoalPriority(goal, agentState, context, executionContext) {
-        const factors = this.calculateGoalFactors(goal, agentState, context, executionContext);
-        const score = (factors.strategic * this.strategicWeight) +
-            (factors.tactical * this.tacticalWeight) +
-            (factors.operational * this.operationalWeight) +
-            (factors.social * this.socialWeight) +
-            (factors.personal * this.personalWeight) +
-            (factors.environmental * this.environmentalWeight) +
-            (factors.temporal * this.temporalWeight);
-        const confidence = this.calculateConfidence(goal, agentState, context);
-        const reasoning = this.generateReasoning(goal, factors, agentState);
+        // Create proper execution context if not provided
+        const fullExecutionContext = executionContext || {
+            currentStep: 0,
+            status: 'running',
+            startTime: Date.now(),
+            lastUpdate: Date.now(),
+            agentState,
+            decisionContext: context
+        };
+        const factors = this.calculatePrioritizationFactors(goal, agentState, fullExecutionContext);
+        const score = (factors.urgency * (factors.urgencyWeight || 0)) +
+            (factors.valueAlignment * (factors.importanceWeight || 0)) +
+            (factors.feasibility * (factors.feasibilityWeight || 0)) +
+            (factors.socialImpact * (factors.alignmentWeight || 0)) +
+            (factors.skillAlignment * (factors.resourceWeight || 0));
         return {
             goalId: goal.id,
             score: Math.max(0, Math.min(1, score)),
             factors,
-            confidence,
-            reasoning,
             timestamp: Date.now()
         };
     }
     /**
      * Calculate individual factor scores for a goal
      */
-    calculateGoalFactors(goal, agentState, context, executionContext) {
-        // Use the new Planning Engine components for enhanced feasibility and resource assessment
-        const feasibilityScore = this.calculateFeasibilityScore(goal, agentState, executionContext);
-        const resourceScore = this.calculateResourceScore(goal, agentState, executionContext);
+    calculatePrioritizationFactors(goal, agentState, executionContext) {
+        const urgency = this.calculateUrgencyFactor(goal, executionContext.decisionContext);
+        const valueAlignment = this.calculateValueAlignment(goal, agentState.cognitive.purpose.values);
+        const feasibility = this.calculateFeasibilityScore(goal, agentState, executionContext);
+        const socialImpact = this.calculateSocialPriorityFactor(goal, agentState.cognitive.social);
+        const skillAlignment = this.calculateSkillAlignmentFactor(goal, agentState.cognitive.skills);
         return {
-            strategic: this.calculateStrategicFactor(goal, agentState),
-            tactical: this.calculateTacticalFactor(goal, agentState),
-            operational: this.calculateOperationalFactor(goal, agentState),
-            social: this.calculateSocialFactor(goal, agentState),
-            personal: this.calculatePersonalFactor(goal, agentState),
-            environmental: this.calculateEnvironmentalFactor(goal, agentState),
-            temporal: this.calculateTemporalFactor(goal, agentState),
-            resource: resourceScore, // Use enhanced resource score from Planning Engine
-            risk: this.calculateRisk(goal, agentState),
-            learning: this.calculateLearning(goal, agentState)
+            urgency,
+            valueAlignment,
+            feasibility,
+            socialImpact,
+            skillAlignment,
+            urgencyWeight: this.temporalWeight,
+            importanceWeight: this.strategicWeight + this.tacticalWeight,
+            feasibilityWeight: 0.2,
+            resourceWeight: this.environmentalWeight,
+            alignmentWeight: this.personalWeight + this.socialWeight
         };
     }
     /**
-     * Calculate strategic alignment factor
+     * Calculate urgency factor
      */
-    calculateStrategicFactor(goal, agentState) {
-        const strategicGoals = agentState.cognitive.goals.strategicGoals;
-        const activeStrategicGoals = strategicGoals.filter(g => g.status === 'active');
-        if (activeStrategicGoals.length === 0) {
-            return goal.type === 'strategic' ? 0.8 : 0.5;
-        }
-        // Check if this goal supports active strategic goals
-        let alignmentScore = 0;
-        for (const strategicGoal of activeStrategicGoals) {
-            if (strategicGoal.dependencies.includes(goal.id) ||
-                goal.dependencies.includes(strategicGoal.id)) {
-                alignmentScore = Math.max(alignmentScore, 0.9);
+    calculateUrgencyFactor(goal, context) {
+        let urgencyScore = 0.5;
+        // Consider deadline urgency
+        const now = Date.now();
+        if (goal.deadline && goal.deadline > now) {
+            const timeRemaining = goal.deadline - now;
+            const totalDuration = goal.deadline - goal.createdAt;
+            const timeRatio = timeRemaining / totalDuration;
+            if (timeRatio < 0.1) {
+                urgencyScore = 1.0; // Very urgent
+            }
+            else if (timeRatio < 0.3) {
+                urgencyScore = 0.8; // Urgent
+            }
+            else if (timeRatio < 0.6) {
+                urgencyScore = 0.6; // Moderate urgency
+            }
+            else {
+                urgencyScore = 0.3; // Low urgency
             }
         }
-        return alignmentScore > 0 ? alignmentScore : (goal.type === 'strategic' ? 0.7 : 0.3);
+        // Consider context urgency
+        if (context.urgency) {
+            urgencyScore += context.urgency * 0.3;
+        }
+        return Math.max(0, Math.min(1, urgencyScore));
     }
     /**
-     * Calculate tactical importance factor
+     * Calculate skill alignment factor
      */
-    calculateTacticalFactor(goal, agentState) {
-        const tacticalGoals = agentState.cognitive.goals.tacticalGoals;
-        const activeTacticalGoals = tacticalGoals.filter(g => g.status === 'active');
-        // Check if goal is a tactical prerequisite for multiple operational goals
-        const dependentOperationalGoals = agentState.cognitive.goals.operationalGoals.filter(opGoal => opGoal.dependencies.includes(goal.id) && opGoal.status === 'active');
-        const dependencyCount = dependentOperationalGoals.length;
-        let tacticalScore = 0.5;
-        if (dependencyCount > 0) {
-            tacticalScore = Math.min(0.9, 0.5 + (dependencyCount * 0.1));
+    calculateSkillAlignmentFactor(goal, skills) {
+        const requiredSkills = this.extractRequiredSkills(goal);
+        let alignmentScore = 0;
+        for (const skillType of requiredSkills) {
+            const skill = skills.skills.get(skillType);
+            if (skill) {
+                alignmentScore += skill.proficiency.overall;
+            }
         }
-        // Adjust based on goal type
-        if (goal.type === 'tactical') {
-            tacticalScore *= 1.2;
-        }
-        return Math.max(0, Math.min(1, tacticalScore));
+        return requiredSkills.length > 0 ? alignmentScore / requiredSkills.length : 0.5;
     }
     /**
-     * Calculate operational readiness factor
+     * Extract required skills from goal
      */
-    calculateOperationalFactor(goal, agentState) {
-        if (goal.type !== 'operational')
-            return 0.3;
-        // Check if all dependencies are satisfied
-        const satisfiedDependencies = goal.dependencies.filter(depId => {
-            const allGoals = [
-                ...agentState.cognitive.goals.strategicGoals,
-                ...agentState.cognitive.goals.tacticalGoals,
-                ...agentState.cognitive.goals.operationalGoals
-            ];
-            const depGoal = allGoals.find(g => g.id === depId);
-            return depGoal && depGoal.status === 'completed';
+    extractRequiredSkills(goal) {
+        const skills = [];
+        const description = goal.description.toLowerCase();
+        if (description.includes('craft') || description.includes('build')) {
+            skills.push('crafting', 'construction');
+        }
+        if (description.includes('mine') || description.includes('dig')) {
+            skills.push('mining', 'excavation');
+        }
+        if (description.includes('fight') || description.includes('combat')) {
+            skills.push('combat', 'defense');
+        }
+        if (description.includes('explore') || description.includes('travel')) {
+            skills.push('exploration', 'navigation');
+        }
+        if (description.includes('farm') || description.includes('grow')) {
+            skills.push('farming', 'agriculture');
+        }
+        return skills;
+    }
+    /**
+     * Calculate value alignment
+     */
+    calculateValueAlignment(goal, values) {
+        let alignment = 0;
+        const goalKeywords = goal.description.toLowerCase().split(/\s+/);
+        values.forEach(value => {
+            if (goalKeywords.includes(value.name.toLowerCase())) {
+                alignment += value.priority;
+            }
         });
-        const dependencyRatio = goal.dependencies.length > 0
-            ? satisfiedDependencies.length / goal.dependencies.length
-            : 1.0;
-        // Check resource availability
-        const resourceScore = this.calculateResourceAvailability(goal, agentState);
-        return (dependencyRatio * 0.6) + (resourceScore * 0.4);
+        return Math.min(1.0, alignment);
     }
     /**
-     * Calculate social impact factor
+     * Calculate social priority factor
      */
-    calculateSocialFactor(goal, agentState) {
-        const socialState = agentState.cognitive.social;
-        const nearbyAgents = socialState.socialContext.nearbyAgents;
-        let socialScore = 0.5;
+    calculateSocialPriorityFactor(goal, socialState) {
+        let collaborationFactor = 0;
         // Goals that help others get higher social priority
-        if (goal.description.includes('help') ||
-            goal.description.includes('assist') ||
-            goal.description.includes('support')) {
-            socialScore += 0.3;
+        if (goal.description.toLowerCase().includes('help')) {
+            collaborationFactor += 0.5;
         }
         // Collaborative goals get higher priority when agents are nearby
         if (goal.resources.assistance && goal.resources.assistance.length > 0) {
-            if (nearbyAgents.length > 0) {
-                socialScore += 0.2;
+            if (socialState.nearbyAgents.length > 0) {
+                collaborationFactor += 0.3;
             }
         }
         // Consider reputation and trust levels
-        const reputationScore = socialState.relationships.reputationScore / 100;
-        socialScore += reputationScore * 0.2;
-        return Math.max(0, Math.min(1, socialScore));
+        const reputationScore = (socialState.reputation?.reputationScore || 0) / 100;
+        collaborationFactor += Math.min(0.3, Math.max(0.1, reputationScore));
+        return Math.max(0, Math.min(1, collaborationFactor));
     }
     /**
-     * Calculate personal alignment factor
+     * Calculate feasibility score
      */
-    calculatePersonalFactor(goal, agentState) {
-        const personality = agentState.cognitive.purpose.personality;
-        const motivations = agentState.cognitive.purpose.motivations;
-        const values = agentState.cognitive.purpose.values;
-        let personalScore = 0.5;
-        // Personality alignment
-        if (goal.description.includes('explore') || goal.description.includes('discover')) {
-            personalScore += personality.curiosity * 0.3;
-        }
-        if (goal.description.includes('build') || goal.description.includes('create')) {
-            personalScore += personality.creativity * 0.3;
-        }
-        if (goal.description.includes('fight') || goal.description.includes('combat')) {
-            personalScore += personality.riskTolerance * 0.3;
-        }
-        // Motivation alignment
-        if (motivations.primaryMotivation === 'achievement' &&
-            (goal.description.includes('complete') || goal.description.includes('achieve'))) {
-            personalScore += 0.2;
-        }
-        if (motivations.primaryMotivation === 'social' &&
-            (goal.description.includes('help') || goal.description.includes('trade'))) {
-            personalScore += 0.2;
-        }
-        // Value alignment
-        const valueAlignment = this.calculateValueAlignment(goal, values);
-        personalScore += valueAlignment * 0.2;
-        return Math.max(0, Math.min(1, personalScore));
+    calculateFeasibilityScore(goal, agentState, executionContext) {
+        // Resource availability assessment
+        const resourceAvailability = this.calculateResourceAvailabilityFactor(goal, agentState.context.inventory);
+        // Skill readiness assessment
+        const skillReadiness = this.calculateSkillFactor(goal, agentState.cognitive.skills);
+        // Environmental fit assessment
+        const environmentalFit = this.calculateEnvironmentalFactor(goal, agentState);
+        // Risk assessment
+        const riskAssessment = this.calculateRisk(goal, agentState);
+        const score = (resourceAvailability * 0.3) + (skillReadiness * 0.3) +
+            (environmentalFit * 0.2) + (riskAssessment * 0.2);
+        return Math.max(0, Math.min(1, score));
     }
     /**
-     * Calculate environmental suitability factor
+     * Calculate resource availability factor
+     */
+    calculateResourceAvailabilityFactor(goal, inventory) {
+        const requiredItems = goal.resources.items || [];
+        if (!requiredItems || requiredItems.length === 0) {
+            return 1.0;
+        }
+        let totalRequired = 0;
+        let availabilityScore = 0;
+        for (const required of requiredItems) {
+            totalRequired += required.amount;
+            const available = inventory.items.find((item) => item.type === required.type)?.count || 0;
+            availabilityScore += Math.min(1, available / required.amount);
+        }
+        return totalRequired > 0 ? availabilityScore / requiredItems.length : 1.0;
+    }
+    /**
+     * Calculate skill factor
+     */
+    calculateSkillFactor(goal, skills) {
+        const requiredSkills = this.extractRequiredSkills(goal);
+        if (requiredSkills.length === 0) {
+            return 0.8; // Base score for goals without specific skill requirements
+        }
+        let totalSkillLevel = 0;
+        for (const skillName of requiredSkills) {
+            const skill = skills.skills.get(skillName);
+            if (skill) {
+                totalSkillLevel += skill.proficiency.overall;
+            }
+            else {
+                totalSkillLevel += 0.1; // Low score for missing skills
+            }
+        }
+        return totalSkillLevel / requiredSkills.length;
+    }
+    /**
+     * Calculate environmental factor
      */
     calculateEnvironmentalFactor(goal, agentState) {
         const worldContext = agentState.context;
@@ -190,180 +237,7 @@ export class GoalPrioritizationEngine {
         return Math.max(0, Math.min(1, environmentalScore));
     }
     /**
-     * Calculate temporal urgency factor
-     */
-    calculateTemporalFactor(goal, agentState) {
-        let temporalScore = 0.5;
-        // Deadline considerations
-        const now = Date.now();
-        if ((goal.deadline || 0) > now) {
-            // Goal has a deadline and it's in the future
-            const timeRemaining = goal.deadline - now;
-            const timeRatio = timeRemaining / (goal.deadline - goal.createdAt);
-            if (timeRatio < 0.1) {
-                temporalScore = 1.0; // Very urgent
-            }
-            else if (timeRatio < 0.3) {
-                temporalScore = 0.8; // Urgent
-            }
-            else if (timeRatio < 0.6) {
-                temporalScore = 0.6; // Moderate urgency
-            }
-            else {
-                temporalScore = 0.3; // Low urgency
-            }
-        }
-        // Age of goal (older goals get slight priority boost)
-        const age = Date.now() - goal.createdAt;
-        const ageInHours = age / (1000 * 60 * 60);
-        if (ageInHours > 24) {
-            temporalScore += 0.1;
-        }
-        return Math.max(0, Math.min(1, temporalScore));
-    }
-    /**
-     * Calculate resource availability and efficiency (enhanced for Planning Engine)
-     */
-    calculateResource(goal, agentState, executionContext) {
-        // Use the new calculateResourceScore method
-        return this.calculateResourceScore(goal, agentState, executionContext);
-    }
-    /**
-     * Calculate resource availability score
-     */
-    calculateResourceAvailability(goal, agentState) {
-        const inventory = agentState.context.inventory;
-        const requiredItems = goal.resources.items;
-        if (Object.keys(requiredItems).length === 0) {
-            return 1.0; // No resources required
-        }
-        let availabilityScore = 0;
-        let totalRequired = 0;
-        for (const [itemType, required] of Object.entries(requiredItems)) {
-            totalRequired += required;
-            const available = inventory.find(item => item.type === itemType)?.count || 0;
-            availabilityScore += Math.min(1, available / required);
-        }
-        return totalRequired > 0 ? availabilityScore / Object.keys(requiredItems).length : 1.0;
-    }
-    /**
-     * Calculate resource efficiency score
-     */
-    calculateResourceEfficiency(goal, agentState) {
-        const inventory = agentState.context.inventory;
-        const requiredItems = goal.resources.items;
-        let efficiencyScore = 0.5; // Base efficiency
-        // Check tool quality and availability
-        for (const tool of goal.resources.tools) {
-            const toolItem = inventory.find(item => item.type === tool);
-            if (toolItem) {
-                efficiencyScore += 0.1; // Tool available
-                // Could check tool quality/durability here
-            }
-            else {
-                efficiencyScore -= 0.2; // Tool missing
-            }
-        }
-        return Math.max(0, Math.min(1, efficiencyScore));
-    }
-    /**
-     * Calculate cost-benefit analysis
-     */
-    calculateCostBenefit(goal, agentState) {
-        // Simple cost-benefit based on goal type and resources
-        let cost = 0;
-        let benefit = 0.5;
-        // Calculate resource cost
-        for (const [itemType, amount] of Object.entries(goal.resources.items)) {
-            cost += amount * 0.1; // Simple cost calculation
-        }
-        // Estimate benefit based on goal type
-        switch (goal.type) {
-            case 'strategic':
-                benefit = 0.9;
-                break;
-            case 'tactical':
-                benefit = 0.7;
-                break;
-            case 'operational':
-                benefit = 0.5;
-                break;
-        }
-        const costBenefitRatio = benefit / (cost + 0.1);
-        return Math.max(0, Math.min(1, costBenefitRatio));
-    }
-    /**
-     * Calculate sustainability score
-     */
-    calculateSustainability(goal, agentState) {
-        // Check if goal uses renewable resources
-        let sustainabilityScore = 0.7; // Base sustainability
-        const requiredItems = goal.resources.items;
-        // Penalize non-renewable resource usage
-        if (requiredItems['coal'] || requiredItems['diamond'] || requiredItems['iron']) {
-            sustainabilityScore -= 0.2;
-        }
-        // Bonus for renewable resources
-        if (requiredItems['wood'] || requiredItems['wheat'] || requiredItems['seeds']) {
-            sustainabilityScore += 0.2;
-        }
-        return Math.max(0, Math.min(1, sustainabilityScore));
-    }
-    /**
-     * Calculate opportunity value
-     */
-    calculateOpportunityValue(goal, agentState) {
-        let opportunityScore = 0.5;
-        // Check for time-sensitive opportunities
-        const worldContext = agentState.context;
-        if (worldContext.weather === 'clear' && goal.description.includes('explore')) {
-            opportunityScore += 0.3;
-        }
-        if (worldContext.timeOfDay >= 0 && worldContext.timeOfDay <= 12000 &&
-            goal.description.includes('build')) {
-            opportunityScore += 0.2; // Daytime building bonus
-        }
-        return Math.max(0, Math.min(1, opportunityScore));
-    }
-    /**
-     * Calculate resource scarcity impact
-     */
-    calculateResourceScarcity(goal, agentState) {
-        const inventory = agentState.context.inventory;
-        const requiredItems = goal.resources.items;
-        let scarcityScore = 0.5;
-        for (const [itemType, amount] of Object.entries(requiredItems)) {
-            const available = inventory.find(item => item.type === itemType)?.count || 0;
-            const ratio = available / amount;
-            if (ratio < 0.5) {
-                scarcityScore -= 0.2; // Resource is scarce
-            }
-            else if (ratio > 2) {
-                scarcityScore += 0.1; // Resource is abundant
-            }
-        }
-        return Math.max(0, Math.min(1, scarcityScore));
-    }
-    /**
-     * Calculate resource accessibility
-     */
-    calculateResourceAccessibility(goal, agentState) {
-        // Check if required resources are easily accessible
-        let accessibilityScore = 0.7;
-        // Check location requirements
-        if (goal.resources.location) {
-            const distance = this.calculateDistance(agentState.context.position, goal.resources.location);
-            if (distance < 50) {
-                accessibilityScore += 0.2;
-            }
-            else if (distance > 200) {
-                accessibilityScore -= 0.3;
-            }
-        }
-        return Math.max(0, Math.min(1, accessibilityScore));
-    }
-    /**
-     * Calculate risk assessment factor
+     * Calculate risk assessment
      */
     calculateRisk(goal, agentState) {
         let riskScore = 0.5;
@@ -382,114 +256,49 @@ export class GoalPrioritizationEngine {
             riskScore -= 0.2;
         }
         // Personality risk tolerance
-        const riskTolerance = agentState.cognitive.purpose.personality.riskTolerance;
+        const riskTolerance = agentState.cognitive.purpose.personality.riskTolerance || 0.5;
         riskScore += (riskTolerance - 0.5) * 0.4;
         return Math.max(0, Math.min(1, riskScore));
     }
     /**
-     * Calculate learning and growth potential
-     */
-    calculateLearning(goal, agentState) {
-        let learningScore = 0.5;
-        // Skill development opportunities
-        const skills = agentState.cognitive.skills;
-        if (goal.description.includes('craft')) {
-            const craftingSkill = skills.skills['crafting'];
-            if (craftingSkill && craftingSkill.proficiency.overall < 0.7) {
-                learningScore += 0.3;
-            }
-        }
-        if (goal.description.includes('explore')) {
-            const explorationSkill = skills.skills['exploration'];
-            if (explorationSkill && explorationSkill.proficiency.overall < 0.7) {
-                learningScore += 0.3;
-            }
-        }
-        // Personality learning preference
-        const openness = agentState.cognitive.purpose.personality.openness;
-        learningScore += (openness - 0.5) * 0.3;
-        return Math.max(0, Math.min(1, learningScore));
-    }
-    /**
-     * Calculate confidence in priority assessment
-     */
-    calculateConfidence(goal, agentState, context) {
-        let confidence = 0.7;
-        // Higher confidence for well-defined goals
-        if (goal.description.length > 50 && goal.resources.items) {
-            confidence += 0.1;
-        }
-        // Lower confidence in high-stress situations
-        if ((context.urgency || 0) > 0.8) {
-            confidence -= 0.2;
-        }
-        // Higher confidence with more complete information
-        if (agentState.context.nearbyEntities.length > 0 &&
-            agentState.context.nearbyBlocks.length > 0) {
-            confidence += 0.1;
-        }
-        return Math.max(0, Math.min(1, confidence));
-    }
-    /**
-     * Generate reasoning for priority score
-     */
-    generateReasoning(goal, factors, agentState) {
-        const reasons = [];
-        if (factors.strategic > 0.7) {
-            reasons.push('Strong strategic alignment');
-        }
-        if (factors.tactical > 0.7) {
-            reasons.push('Important tactical objective');
-        }
-        if (factors.operational > 0.7) {
-            reasons.push('Ready for execution');
-        }
-        if (factors.social > 0.7) {
-            reasons.push('High social impact');
-        }
-        if (factors.personal > 0.7) {
-            reasons.push('Strong personal alignment');
-        }
-        if (factors.resource > 0.7) {
-            reasons.push('Excellent resource availability');
-        }
-        if (factors.risk < 0.3) {
-            reasons.push('Low risk assessment');
-        }
-        if (factors.learning > 0.7) {
-            reasons.push('High learning potential');
-        }
-        return reasons.length > 0 ? reasons.join(', ') : 'Standard priority assessment';
-    }
-    /**
      * Prioritize multiple goals and return ranked results
      */
-    prioritizeGoals(goals, // Use the goal_types Goal type
-    context) {
+    prioritizeGoals(goals, context) {
         const startTime = Date.now();
         const goalScores = [];
         for (const goal of goals) {
-            const priorityScore = this.calculateGoalPriority(goal, context.agentState, context.decisionContext, context);
+            const priorityScoreResult = this.calculateGoalPriority(goal, context.agentState, context.decisionContext, context);
             const factors = {
-                urgency: this.calculateUrgencyFactor(goal, context.agentState.executive.decisionContext),
+                urgency: this.calculateUrgencyFactor(goal, context.agentState.executive?.decisionContext || { urgency: 0, situation: '', options: [], constraints: {}, priorities: {} }),
                 valueAlignment: this.calculateValueAlignment(goal, context.agentState.cognitive.purpose.values),
                 feasibility: this.calculateFeasibilityScore(goal, context.agentState, context),
                 socialImpact: this.calculateSocialPriorityFactor(goal, context.agentState.cognitive.social),
                 skillAlignment: this.calculateSkillAlignmentFactor(goal, context.agentState.cognitive.skills),
                 urgencyWeight: this.temporalWeight,
                 importanceWeight: this.strategicWeight + this.tacticalWeight,
-                feasibilityWeight: 0.2, // Weight for feasibility assessment
+                feasibilityWeight: 0.2,
                 resourceWeight: this.environmentalWeight,
                 alignmentWeight: this.personalWeight + this.socialWeight
             };
-            goalScores.push({
-                ...goal,
-                priorityScore,
+            const rankedGoal = {
+                id: goal.id,
+                type: goal.type,
+                priority: goal.priority,
+                status: goal.status,
+                description: goal.description,
+                createdAt: goal.createdAt,
+                updatedAt: goal.updatedAt,
+                dependencies: goal.dependencies,
+                resources: goal.resources,
+                progress: goal.progress,
+                deadline: goal.deadline || 0, // Provide default value for optional property
+                memberIds: goal.memberIds || [], // Provide default value for optional property
+                isAntiIdle: goal.isAntiIdle || false, // Provide default value for optional property
+                priorityScore: priorityScoreResult.score,
                 factors,
                 rank: 0, // Placeholder
-                reasoning: 'Detailed prioritization logic applied',
-                context: context.decisionContext,
-            });
+            };
+            goalScores.push(rankedGoal);
         }
         // Sort goals by priority score (descending)
         goalScores.sort((a, b) => b.priorityScore - a.priorityScore);
@@ -499,9 +308,7 @@ export class GoalPrioritizationEngine {
         });
         return {
             rankedGoals: goalScores,
-            prioritizationFactors: this.getFactors(),
-            context: context.decisionContext,
-            timestamp: Date.now()
+            processingTime: Date.now() - startTime
         };
     }
     /**
@@ -509,427 +316,17 @@ export class GoalPrioritizationEngine {
      */
     getFactors() {
         return {
+            urgency: 0,
+            valueAlignment: 0,
+            feasibility: 0,
+            socialImpact: 0,
+            skillAlignment: 0,
             urgencyWeight: this.temporalWeight,
             importanceWeight: this.strategicWeight + this.tacticalWeight,
-            feasibilityWeight: 0.2, // Weight for feasibility assessment
+            feasibilityWeight: 0.2,
             resourceWeight: this.environmentalWeight,
             alignmentWeight: this.personalWeight + this.socialWeight
         };
-    }
-    calculatePrioritizationFactors(goal, agentState, context) {
-        // Calculate individual factors
-        const urgency = this.calculateUrgencyFactor(goal, agentState.executive.decisionContext);
-        const valueAlignment = this.calculateValueAlignment(goal, agentState.cognitive.purpose.values);
-        const feasibility = this.calculateFeasibilityScore(goal, agentState, context);
-        const socialImpact = this.calculateSocialPriorityFactor(goal, agentState.cognitive.social);
-        const skillAlignment = this.calculateSkillAlignmentFactor(goal, agentState.cognitive.skills);
-        return {
-            urgency,
-            valueAlignment,
-            feasibility,
-            socialImpact,
-            skillAlignment,
-            urgencyWeight: this.temporalWeight,
-            importanceWeight: this.strategicWeight + this.tacticalWeight,
-            feasibilityWeight: 0.2, // Weight for feasibility assessment
-            resourceWeight: this.environmentalWeight,
-            alignmentWeight: this.personalWeight + this.socialWeight
-        };
-    }
-    /**
-     * Helper method to calculate distance between two positions
-     */
-    calculateDistance(pos1, pos2) {
-        const dx = pos1.x - pos2.x;
-        const dy = pos1.y - pos2.y;
-        const dz = pos1.z - pos2.z;
-        return Math.sqrt(dx * dx + dy * dy + dz * dz);
-    }
-    calculateSocialPriorityFactor(goal, socialState) {
-        // Simplified calculation based on reputation and collaboration potential
-        const reputationScore = (socialState.relationships.get(socialState.agentId)?.reputationScore || 0) / 100;
-        let collaborationFactor = 0;
-        // Goals that help others get higher social priority
-        if (goal.description.toLowerCase().includes('help')) {
-            collaborationFactor += 0.5;
-        }
-        // Collaborative goals get higher priority when agents are nearby
-        if (goal.resources.assistance && goal.resources.assistance.length > 0) {
-            if (socialState.nearbyAgents.length > 0) {
-                collaborationFactor += 0.3;
-            }
-        }
-        // Consider reputation and trust levels
-        const trustScore = Math.max(0.1, reputationScore);
-        collaborationFactor += Math.min(0.3, trustScore);
-        // Base score ranging from 0 to 1
-        return Math.max(0, Math.min(1, collaborationFactor));
-    }
-    calculateMotivationAlignment(goal, motivations) {
-        let alignment = 0;
-        if (motivations.primaryMotivation === 'achievement' &&
-            (goal.type === 'strategic' || goal.type === 'tactical')) {
-            alignment += 0.3;
-        }
-        if (motivations.primaryMotivation === 'social' &&
-            (goal.type === 'social' || goal.type === 'collaborative')) {
-            alignment += 0.3;
-        }
-        return alignment;
-    }
-    /**
-     * Helper method to calculate value alignment
-     */
-    calculateValueAlignment(goal, values) {
-        let alignment = 0;
-        const goalKeywords = goal.description.toLowerCase().split(/\s+/);
-        values.coreValues.forEach(value => {
-            if (goalKeywords.includes(value.name.toLowerCase())) {
-                alignment += value.importance;
-            }
-        });
-        return Math.min(1.0, alignment);
-    }
-    /**
-     * Calculate enhanced feasibility score with detailed assessment
-     * Returns a numeric score (0-1) for goal feasibility
-     */
-    calculateFeasibilityScore(goal, agentState, executionContext) {
-        // Resource availability assessment
-        const resourceAvailability = this.calculateResourceAvailabilityFactor(goal, agentState.context.inventory);
-        // Skill readiness assessment with detailed analysis
-        const skillReadiness = this.calculateSkillFactor(goal, agentState.cognitive.skills);
-        // Environmental fit assessment
-        const environmentalFit = this.calculateEnvironmentalFit(goal, agentState);
-        // Risk assessment
-        const riskAssessment = this.calculateRisk(goal, agentState);
-        // Time feasibility
-        const timeFeasibility = this.calculateTimeFeasibility(goal, agentState);
-        // Dependency feasibility
-        const dependencyFeasibility = this.calculateDependencyFeasibility(goal, agentState);
-        const score = (resourceAvailability * 0.25) + (skillReadiness * 0.25) +
-            (environmentalFit * 0.15) + (riskAssessment * 0.15) +
-            (timeFeasibility * 0.1) + (dependencyFeasibility * 0.1);
-        return Math.max(0, Math.min(1, score));
-    }
-    calculateResourceAvailabilityFactor(goal, inventory) {
-        const requiredItems = goal.resources.required;
-        if (!requiredItems || requiredItems.length === 0) {
-            return 1.0;
-        }
-        let totalRequired = 0;
-        let availabilityScore = 0;
-        for (const required of requiredItems) {
-            totalRequired += required.amount;
-            const available = inventory.items.find(item => item.type === required.type)?.count || 0;
-            availabilityScore += Math.min(1, available / required.amount);
-        }
-        return totalRequired > 0 ? availabilityScore / requiredItems.length : 1.0;
-    }
-    calculateToolAvailabilityFactor(goal, inventory) {
-        const requiredTools = goal.resources.tools;
-        if (!requiredTools || requiredTools.length === 0)
-            return 1.0;
-        let toolScore = 0;
-        for (const toolReq of requiredTools) {
-            const toolItem = inventory.items.find(item => item.type === toolReq.type);
-            if (toolItem) {
-                toolScore += 1.0;
-            }
-        }
-        return toolScore / requiredTools.length;
-    }
-    calculateAssistanceFactor(goal, socialState) {
-        const requiredAssistance = goal.resources.assistance;
-        if (!requiredAssistance || requiredAssistance.length === 0)
-            return 1.0;
-        const nearbyAgents = socialState.nearbyAgents.length;
-        return Math.min(1.0, nearbyAgents / requiredAssistance.length);
-    }
-    calculateCostFactor(goal, inventory) {
-        const requiredItems = goal.resources.items;
-        if (!requiredItems || requiredItems.length === 0)
-            return 1.0;
-        let cost = 0;
-        for (const required of requiredItems) {
-            cost += required.amount * 0.1; // Simple cost calculation
-        }
-        return Math.max(0.1, 1.0 - cost / 100); // Normalize cost
-    }
-    /**
-     * Calculate enhanced resource score with detailed assessment
-     * Returns a numeric score (0-1) for resource efficiency and availability
-     */
-    calculateResourceScore(goal, agentState, executionContext) {
-        const resourceAvailability = this.calculateResourceAvailabilityFactor(goal, agentState.context.inventory);
-        const resourceEfficiency = this.calculateResourceEfficiency(goal, agentState);
-        const costBenefit = this.calculateCostBenefit(goal, agentState);
-        const sustainability = this.calculateSustainability(goal, agentState);
-        const opportunityValue = this.calculateOpportunityValue(goal, agentState);
-        const resourceScarcity = this.calculateResourceScarcity(goal, agentState);
-        const resourceAccessibility = this.calculateResourceAccessibility(goal, agentState);
-        const score = (resourceAvailability * 0.25) + (resourceEfficiency * 0.25) +
-            (costBenefit * 0.2) + (sustainability * 0.15) + (opportunityValue * 0.1) +
-            (resourceScarcity * 0.05);
-        return Math.max(0, Math.min(1, score));
-    }
-    /**
-     * Calculate enhanced feasibility with detailed assessment (legacy method for backward compatibility)
-     */
-    calculateFeasibility(goal, agentState, executionContext) {
-        // Use the new calculateFeasibilityScore method for the overall feasibility
-        const feasibilityScore = this.calculateFeasibilityScore(goal, agentState, executionContext);
-        return {
-            strategic: this.calculateStrategicFactor(goal, agentState),
-            tactical: this.calculateTacticalFactor(goal, agentState),
-            operational: this.calculateOperationalFactor(goal, agentState),
-            social: this.calculateSocialFactor(goal, agentState),
-            personal: this.calculatePersonalFactor(goal, agentState),
-            environmental: this.calculateEnvironmentalFit(goal, agentState),
-            temporal: this.calculateTimeFeasibility(goal, agentState),
-            resource: this.calculateResourceScore(goal, agentState, executionContext),
-            risk: this.calculateRisk(goal, agentState),
-            learning: this.calculateLearning(goal, agentState)
-        };
-    }
-    /**
-     * Calculate detailed skill readiness assessment
-     */
-    calculateSkillReadiness(goal, agentState) {
-        const skills = agentState.cognitive.skills;
-        let totalSkillScore = 0;
-        let skillCount = 0;
-        // Analyze required skills based on goal description
-        const requiredSkills = this.extractRequiredSkills(goal);
-        for (const skillType of requiredSkills) {
-            const skill = skills.skills[skillType];
-            if (skill) {
-                // Calculate skill readiness with proficiency and recent usage
-                const proficiencyScore = skill.proficiency.overall;
-                const experienceBonus = this.calculateExperienceBonus(skill);
-                const generalCapability = this.assessGeneralCapability(skill);
-                const skillReadiness = (proficiencyScore * 0.5) +
-                    (experienceBonus * 0.3) +
-                    (generalCapability * 0.2);
-                totalSkillScore += skillReadiness;
-                skillCount++;
-            }
-            else {
-                // No skill available
-                totalSkillScore += 0.1;
-                skillCount++;
-            }
-        }
-        return skillCount > 0 ? totalSkillScore / skillCount : 0.5;
-    }
-    /**
-     * Calculate experience bonus based on recent skill usage
-     */
-    calculateExperienceBonus(skill) {
-        const recentUses = skill.usage.recentUses;
-        const now = Date.now();
-        const oneHourAgo = now - (60 * 60 * 1000);
-        // Count recent uses within the last hour
-        const recentCount = recentUses.filter(timestamp => timestamp > oneHourAgo).length;
-        // Bonus for recent usage (diminishing returns)
-        return Math.min(0.3, recentCount * 0.1);
-    }
-    /**
-     * Assess general capability beyond specific proficiency
-     */
-    assessGeneralCapability(skill) {
-        const successRate = (skill.usage.totalUses > 0)
-            ? skill.usage.successfulUses / skill.usage.totalUses
-            : 0.5;
-        const avgExecutionTime = skill.usage.averageExecutionTime;
-        const timeEfficiency = avgExecutionTime > 0
-            ? Math.max(0.1, 1 - ((avgExecutionTime || 0) / 10000)) // Normalize to 10 seconds
-            : 0.5; // Neutral if no data
-        return (successRate * 0.7) + (timeEfficiency * 0.3);
-    }
-    /**
-     * Calculate environmental fit assessment
-     */
-    calculateEnvironmentalFit(goal, agentState) {
-        const worldContext = agentState.context;
-        let fitScore = 0.5;
-        // Weather considerations for different goal types
-        if (goal.description.includes('build') || goal.description.includes('construct')) {
-            if (worldContext.weather === 'clear') {
-                fitScore += 0.3;
-            }
-            else if (worldContext.weather === 'rain') {
-                fitScore -= 0.2;
-            }
-        }
-        if (goal.description.includes('explore') || goal.description.includes('travel')) {
-            if (worldContext.weather === 'clear') {
-                fitScore += 0.2;
-            }
-            else if (worldContext.weather === 'thunder') {
-                fitScore -= 0.3;
-            }
-        }
-        // Time of day considerations
-        if (goal.description.includes('mine') || goal.description.includes('cave')) {
-            // Any time is good for mining, but night is slightly better
-            if (worldContext.timeOfDay >= 13000 && worldContext.timeOfDay <= 23000) {
-                fitScore += 0.1;
-            }
-        }
-        if (goal.description.includes('farm') || goal.description.includes('grow')) {
-            // Daytime is better for farming
-            if (worldContext.timeOfDay >= 0 && worldContext.timeOfDay <= 12000) {
-                fitScore += 0.2;
-            }
-        }
-        return Math.max(0, Math.min(1, fitScore));
-    }
-    calculateResourceFactor(goal, inventory) {
-        const requiredItems = goal.resources.required;
-        if (!requiredItems || requiredItems.length === 0)
-            return 1.0;
-        let totalScore = 0;
-        for (const required of requiredItems) {
-            const available = inventory.items.find(item => item.type === required.type)?.count || 0;
-            const ratio = available / required.amount;
-            totalScore += Math.min(1.0, ratio);
-        }
-        return totalScore / requiredItems.length;
-    }
-    calculateGoalTypeFactor(goal, requiredItems) {
-        if (!requiredItems)
-            return 0.5;
-        // Mining goals
-        if (requiredItems.some(r => r.type === 'coal' || r.type === 'diamond' || r.type === 'iron')) {
-            return 0.8;
-        }
-        // Farming/Gathering goals
-        if (requiredItems.some(r => r.type === 'wood' || r.type === 'wheat' || r.type === 'seeds')) {
-            return 0.6;
-        }
-        return 0.5;
-    }
-    /**
-     * Calculate time feasibility based on deadlines and duration
-     */
-    calculateTimeFeasibility(goal, agentState) {
-        let feasibilityScore = 0.7; // Base feasibility
-        const now = Date.now();
-        if ((goal.deadline || 0) > now) {
-            // Goal has a deadline and it's in the future
-            const timeRemaining = goal.deadline - now;
-            const timeSinceCreation = now - goal.createdAt;
-            const totalTime = timeSinceCreation + timeRemaining;
-            if (timeRemaining < 0) {
-                feasibilityScore = 0; // Past deadline
-            }
-            else if (timeRemaining < (totalTime * 0.1)) {
-                feasibilityScore = 0.2; // Very tight deadline
-            }
-            else if (timeRemaining < (totalTime * 0.3)) {
-                feasibilityScore = 0.5; // Tight deadline
-            }
-            else if (timeRemaining > (totalTime * 0.8)) {
-                feasibilityScore = 1.0; // Plenty of time
-            }
-        }
-        return feasibilityScore;
-    }
-    /**
-     * Calculate dependency feasibility
-     */
-    calculateDependencyFeasibility(goal, agentState) {
-        if (goal.dependencies.length === 0) {
-            return 1.0; // No dependencies
-        }
-        const allGoals = [
-            ...agentState.cognitive.goals.strategicGoals,
-            ...agentState.cognitive.goals.tacticalGoals,
-            ...agentState.cognitive.goals.operationalGoals
-        ];
-        let completedDependencies = 0;
-        let blockedDependencies = 0;
-        for (const depId of goal.dependencies) {
-            const depGoal = allGoals.find(g => g.id === depId);
-            if (depGoal) {
-                if (depGoal.status === 'completed') {
-                    completedDependencies++;
-                }
-                else if (depGoal.status === 'failed' || depGoal.status === 'paused') {
-                    blockedDependencies++;
-                }
-            }
-            else {
-                blockedDependencies++; // Dependency not found
-            }
-        }
-        if (blockedDependencies > 0) {
-            return 0.1; // Blocked dependencies
-        }
-        return completedDependencies / goal.dependencies.length;
-    }
-    /**
-     * Extract required skills from goal description
-     */
-    extractRequiredSkills(goal) {
-        const skills = [];
-        const description = goal.description.toLowerCase();
-        if (description.includes('mine') || description.includes('dig') || description.includes('ore')) {
-            skills.push('mining');
-        }
-        if (description.includes('craft') || description.includes('build') || description.includes('create')) {
-            skills.push('crafting');
-        }
-        if (description.includes('fight') || description.includes('combat') || description.includes('attack')) {
-            skills.push('combat');
-        }
-        if (description.includes('explore') || description.includes('travel') || description.includes('discover')) {
-            skills.push('exploration');
-        }
-        if (description.includes('farm') || description.includes('grow') || description.includes('harvest')) {
-            skills.push('agriculture');
-        }
-        if (description.includes('trade') || description.includes('buy') || description.includes('sell')) {
-            skills.push('trading');
-        }
-        if (description.includes('social') || description.includes('talk') || description.includes('help')) {
-            skills.push('social');
-        }
-        return skills.length > 0 ? skills : ['survival']; // Default skill
-    }
-    calculateSkillFactor(goal, skills) {
-        const craftingSkill = skills.skills.get('crafting');
-        const miningSkill = skills.skills.get('mining');
-        let skillScore = 0.5;
-        if (goal.type === 'crafting' && craftingSkill) {
-            skillScore = craftingSkill.proficiency.overall;
-        }
-        if (goal.type === 'exploration' && skills.skills.get('exploration')) {
-            skillScore = skills.skills.get('exploration').proficiency.overall;
-        }
-        return skillScore;
-    }
-    calculateSkillPriorityFactor(skillType, skills) {
-        const skill = skills.skills.get(skillType);
-        if (!skill)
-            return 0.5;
-        // 1. Recent Activity Factor
-        const recentUses = skill.usage.recentUses;
-        const oneHourAgo = Date.now() - 3600000;
-        const recentCount = (recentUses || []).filter(timestamp => timestamp > oneHourAgo).length;
-        const recentActivity = Math.min(1.0, recentCount / 10); // Max factor at 10 uses/hour
-        // 2. Success Factor
-        const successRate = (skill.usage.totalUses || 0) > 0
-            ? (skill.usage.successfulUses || 0) / (skill.usage.totalUses || 1)
-            : 0.5; // Neutral if no data
-        const successFactor = successRate;
-        // 3. Time Efficiency Factor
-        const avgExecutionTime = skill.usage.averageExecutionTime;
-        const timeEfficiency = avgExecutionTime > 0
-            ? Math.max(0.1, 1 - ((avgExecutionTime || 0) / 10000)) // Normalize to 10 seconds
-            : 0.5; // Neutral if no data
-        return (recentActivity * 0.4) + (successFactor * 0.4) + (timeEfficiency * 0.2);
     }
 }
 //# sourceMappingURL=goal_prioritization.js.map

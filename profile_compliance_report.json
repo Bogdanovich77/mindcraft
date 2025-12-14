@@ -1,0 +1,230 @@
+{
+  "summary": {
+    "totalProfiles": 22,
+    "compliantProfiles": 22,
+    "nonCompliantProfiles": 0,
+    "analysisDate": "2025-12-14T16:35:41.213Z"
+  },
+  "profiles": [
+    {
+      "profileName": "andy-4-reasoning",
+      "filePath": "profiles\\andy-4-reasoning.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "andy-4",
+      "filePath": "profiles\\andy-4.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "andy",
+      "filePath": "profiles\\andy.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "azure",
+      "filePath": "profiles\\azure.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "claude",
+      "filePath": "profiles\\claude.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "claude_thinker",
+      "filePath": "profiles\\claude_thinker.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "deepseek",
+      "filePath": "profiles\\deepseek.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "freeguy",
+      "filePath": "profiles\\freeguy.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "gemini",
+      "filePath": "profiles\\gemini.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "gpt",
+      "filePath": "profiles\\gpt.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "grok",
+      "filePath": "profiles\\grok.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "LavaChicken",
+      "filePath": "profiles\\LavaChicken.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "llama",
+      "filePath": "profiles\\llama.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "Loner",
+      "filePath": "profiles\\Loner.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "MasterChief",
+      "filePath": "profiles\\MasterChief.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "mercury",
+      "filePath": "profiles\\mercury.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "mistral",
+      "filePath": "profiles\\mistral.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "qwen",
+      "filePath": "profiles\\qwen.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "SlaveOne",
+      "filePath": "profiles\\SlaveOne.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "SlaveThree",
+      "filePath": "profiles\\SlaveThree.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "SlaveTwo",
+      "filePath": "profiles\\SlaveTwo.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    },
+    {
+      "profileName": "vllm",
+      "filePath": "profiles\\vllm.json",
+      "isCompliant": true,
+      "issues": [],
+      "missingRequired": [],
+      "hasForbiddenFields": [],
+      "hasForbiddenStructures": [],
+      "fieldValidationErrors": []
+    }
+  ]
+}

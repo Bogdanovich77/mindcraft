@@ -66,23 +66,7 @@ export declare class GoalBridge {
      */
     private convertSingleLegacyGoal;
     /**
-     * Estimate resource requirements for a legacy goal
-     */
-    private estimateResources;
-    /**
-     * Infer required tools for a goal
-     */
-    private inferRequiredTools;
-    /**
-     * Check if a goal is a construction goal
-     */
-    private isConstructionGoal;
-    /**
-     * Merge goals, preserving existing ones and adding new ones
-     */
-    private mergeGoals;
-    /**
-     * Extract quantity from hierarchical goal
+     * Extract quantity from a hierarchical goal
      */
     private extractQuantityFromGoal;
     /**
@@ -102,43 +86,21 @@ export declare class GoalBridge {
      */
     private decomposeCollectGoal;
     /**
-     * Check if an item is a tool
+     * Estimate resource requirements for a legacy goal
      */
-    private isTool;
-}
-/**
- * Goal bridge factory
- */
-export declare class GoalBridgeFactory {
+    private estimateResources;
     /**
-     * Create goal bridge with default options
+     * Infer required tools for a goal
      */
-    static create(dataAdapter: LegacyNPCDataAdapter): GoalBridge;
+    private inferRequiredTools;
     /**
-     * Create goal bridge for development
+     * Check if a goal is a construction goal
      */
-    static createForDevelopment(dataAdapter: LegacyNPCDataAdapter): GoalBridge;
+    private isConstructionGoal;
     /**
-     * Create goal bridge for production
+     * Merge goals, preserving existing ones and adding new ones
      */
-    static createForProduction(dataAdapter: LegacyNPCDataAdapter): GoalBridge;
-}
-/**
- * Goal utilities
- */
-export declare class GoalUtils {
-    /**
-     * Check if a goal is achievable with current resources
-     */
-    static isAchievable(goal: Goal, availableResources: any): boolean;
-    /**
-     * Calculate goal priority based on multiple factors
-     */
-    static calculatePriority(goal: Goal, context: any): number;
-    /**
-     * Sort goals by priority
-     */
-    static sortGoals(goals: Goal[], context?: any): Goal[];
+    private mergeGoals;
 }
 export {};
 //# sourceMappingURL=goal_bridge.d.ts.map

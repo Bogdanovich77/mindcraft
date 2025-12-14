@@ -1,9 +1,9 @@
 import { getSocketService } from './socketService';
-import type { Goal, GoalHierarchy, GoalUpdateEvent, GoalHierarchyEvent } from '../types/goals';
+import type { AgentStateUpdateEvent } from '../types/socketEvents';
 import { store } from '../store';
 
 /**
- * Goal Socket Service - Handles real-time goal updates via Socket.IO
+ * Simplified Goal Socket Service - Handles basic goal updates via Socket.IO
  * Integrates with Redux store for state management
  */
 class GoalSocketService {
@@ -33,8 +33,8 @@ class GoalSocketService {
     this.currentAgentId = agentId;
     this.isSubscribed = true;
 
-    // Subscribe to goal events
-    this.socketService.subscribeToGoals(agentId);
+    // Subscribe to simplified goal events
+    this.socketService.subscribeToAgent(agentId);
     
     // Set up event listeners
     this.setupEventListeners();
@@ -50,7 +50,7 @@ class GoalSocketService {
       return;
     }
 
-    this.socketService.unsubscribeFromGoals(this.currentAgentId);
+    this.socketService.unsubscribeFromAgent(this.currentAgentId);
     this.removeEventListeners();
     this.isSubscribed = false;
     this.currentAgentId = null;
@@ -59,219 +59,113 @@ class GoalSocketService {
   }
 
   /**
-   * Request goal hierarchy for an agent
+   * Update agent goals (simplified)
    */
-  requestGoalHierarchy(agentId: string): void {
+  updateAgentGoals(agentId: string, goals: string): void {
     if (!this.socketService) {
       console.warn('[GoalSocketService] Socket service not available');
       return;
     }
 
-    this.socketService.requestGoalHierarchy(agentId);
+    this.socketService.send('agent:goals:update', {
+      agentId,
+      goals,
+      timestamp: Date.now()
+    });
   }
 
   /**
-   * Create a new goal
+   * Update agent mandate (simplified)
    */
-  createGoal(agentId: string, goal: Omit<Goal, 'id' | 'createdAt'>): void {
+  updateAgentMandate(agentId: string, mandate: string): void {
     if (!this.socketService) {
       console.warn('[GoalSocketService] Socket service not available');
       return;
     }
 
-    this.socketService.createGoal(agentId, goal);
+    this.socketService.send('agent:mandate:update', {
+      agentId,
+      mandate,
+      timestamp: Date.now()
+    });
   }
 
   /**
-   * Update an existing goal
-   */
-  updateGoal(agentId: string, goalId: string, updates: Partial<Goal>): void {
-    if (!this.socketService) {
-      console.warn('[GoalSocketService] Socket service not available');
-      return;
-    }
-
-    this.socketService.updateGoal(agentId, goalId, updates);
-  }
-
-  /**
-   * Delete a goal
-   */
-  deleteGoal(agentId: string, goalId: string): void {
-    if (!this.socketService) {
-      console.warn('[GoalSocketService] Socket service not available');
-      return;
-    }
-
-    this.socketService.deleteGoal(agentId, goalId);
-  }
-
-  /**
-   * Update goal progress
-   */
-  updateGoalProgress(agentId: string, goalId: string, progress: number): void {
-    if (!this.socketService) {
-      console.warn('[GoalSocketService] Socket service not available');
-      return;
-    }
-
-    this.socketService.updateGoalProgress(agentId, goalId, progress);
-  }
-
-  /**
-   * Complete a milestone
-   */
-  completeMilestone(agentId: string, goalId: string, milestoneId: string): void {
-    if (!this.socketService) {
-      console.warn('[GoalSocketService] Socket service not available');
-      return;
-    }
-
-    this.socketService.completeMilestone(agentId, goalId, milestoneId);
-  }
-
-  /**
-   * Reorder goals
-   */
-  reorderGoals(agentId: string, goalOrder: { goalId: string; newParentId?: string; newIndex: number }[]): void {
-    if (!this.socketService) {
-      console.warn('[GoalSocketService] Socket service not available');
-      return;
-    }
-
-    this.socketService.reorderGoals(agentId, goalOrder);
-  }
-
-  /**
-   * Set up Socket.IO event listeners for goal updates
+   * Set up Socket.IO event listeners for simplified goal updates
    */
   private setupEventListeners(): void {
     if (!this.socketService) return;
 
-    // Goal hierarchy update
-    this.socketService.on('goalHierarchyUpdate', (data: { agentId: string; hierarchy: GoalHierarchy }) => {
-      console.log('[GoalSocketService] Received goal hierarchy update:', data);
-      store.dispatch({
-        type: 'goals/onHierarchyUpdate',
-        payload: {
-          agentId: data.agentId,
-          hierarchy: data.hierarchy,
-          timestamp: Date.now()
-        }
-      });
+    // Agent state update (includes goals and mandate)
+    this.socketService.on('agent:state:update', (data: AgentStateUpdateEvent) => {
+      console.log('[GoalSocketService] Received agent state update:', data);
+      
+      // Update agent state in Redux store
+      if (data.state && data.agentId) {
+        store.dispatch({
+          type: 'agents/updateAgentState',
+          payload: {
+            agentId: data.agentId,
+            state: data.state,
+            timestamp: data.timestamp
+          }
+        });
+      }
     });
 
-    // Goal created
-    this.socketService.on('goalCreated', (data: { agentId: string; goal: Goal }) => {
-      console.log('[GoalSocketService] Received goal created event:', data);
+    // Goals updated
+    this.socketService.on('agent:goals:updated', (data: { agentId: string; goals: string; timestamp: number }) => {
+      console.log('[GoalSocketService] Received goals updated event:', data);
+      
       store.dispatch({
-        type: 'goals/onGoalUpdate',
+        type: 'agents/updateAgentGoals',
         payload: {
           agentId: data.agentId,
-          goalId: data.goal.id,
-          updateType: 'created' as const,
-          goal: data.goal,
-          timestamp: Date.now()
-        }
-      });
-    });
-
-    // Goal updated
-    this.socketService.on('goalUpdated', (data: GoalUpdateEvent) => {
-      console.log('[GoalSocketService] Received goal updated event:', data);
-      store.dispatch({
-        type: 'goals/onGoalUpdate',
-        payload: {
-          agentId: data.agentId,
-          goalId: data.goalId,
-          updateType: 'updated' as const,
-          goal: data.goal,
+          goals: data.goals,
           timestamp: data.timestamp
         }
       });
     });
 
-    // Goal deleted
-    this.socketService.on('goalDeleted', (data: { agentId: string; goalId: string }) => {
-      console.log('[GoalSocketService] Received goal deleted event:', data);
-      // Create a mock goal for the delete event
-      const mockGoal: Goal = {
-        id: data.goalId,
-        type: 'operational',
-        priority: 3,
-        description: '',
-        status: 'cancelled',
-        dependencies: [],
-        resources: { required: [], allocated: [], totalCost: 0 },
-        progress: { current: 0, target: 0, percentage: 0, milestones: [], completedMilestones: [], lastUpdated: Date.now() },
-        createdAt: 0,
-        updatedAt: Date.now(),
-        childGoals: [],
-        tags: [],
-        metadata: {},
-        title: ''
-      };
-
+    // Mandate updated
+    this.socketService.on('agent:mandate:updated', (data: { agentId: string; mandate: string; timestamp: number }) => {
+      console.log('[GoalSocketService] Received mandate updated event:', data);
+      
       store.dispatch({
-        type: 'goals/onGoalUpdate',
+        type: 'agents/updateAgentMandate',
         payload: {
           agentId: data.agentId,
-          goalId: data.goalId,
-          updateType: 'deleted' as const,
-          goal: mockGoal,
-          timestamp: Date.now()
+          mandate: data.mandate,
+          timestamp: data.timestamp
         }
       });
     });
 
-    // Goal progress updated
-    this.socketService.on('goalProgressUpdated', (data: { agentId: string; goalId: string; progress: number; timestamp: number }) => {
-      console.log('[GoalSocketService] Received goal progress updated event:', data);
+    // Action executed (related to goals)
+    this.socketService.on('agent:action:executed', (data: { agentId: string; action: string; timestamp: number }) => {
+      console.log('[GoalSocketService] Received action executed event:', data);
+      
       store.dispatch({
-        type: 'goals/updateGoalProgress',
+        type: 'agents/updateAgentLastAction',
         payload: {
-          goalId: data.goalId,
-          progress: data.progress
+          agentId: data.agentId,
+          lastAction: data.action,
+          timestamp: data.timestamp
         }
       });
     });
 
-    // Milestone completed
-    this.socketService.on('milestoneCompleted', (data: { agentId: string; goalId: string; milestoneId: string; timestamp: number }) => {
-      console.log('[GoalSocketService] Received milestone completed event:', data);
-      // This would typically update the milestone status in the goal
-      // For now, we'll dispatch a goal update to refresh the data
+    // Response sent (related to goals/conversation)
+    this.socketService.on('agent:message:sent', (data: { agentId: string; response: string; timestamp: number }) => {
+      console.log('[GoalSocketService] Received message sent event:', data);
+      
       store.dispatch({
-        type: 'goals/updateLocalGoal',
+        type: 'agents/updateAgentResponse',
         payload: {
-          goalId: data.goalId,
-          updates: {
-            progress: {
-              ...{} as any, // Will be filled by the reducer
-              lastUpdated: data.timestamp
-            }
-          }
+          agentId: data.agentId,
+          response: data.response,
+          timestamp: data.timestamp
         }
-      });
-    });
-
-    // Goals reordered
-    this.socketService.on('goalsReordered', (data: { agentId: string; goalOrder: { goalId: string; newParentId?: string; newIndex: number }[]; timestamp: number }) => {
-      console.log('[GoalSocketService] Received goals reordered event:', data);
-      // This would typically update the goal hierarchy structure
-      // For now, we'll request a fresh hierarchy
-      this.requestGoalHierarchy(data.agentId);
-    });
-
-    // Goal conflict detected
-    this.socketService.on('goalConflictDetected', (data: { agentId: string; conflicts: any[]; timestamp: number }) => {
-      console.log('[GoalSocketService] Received goal conflict detected event:', data);
-      // Add conflicts to the store
-      data.conflicts.forEach(conflict => {
-        store.dispatch({
-          type: 'goals/addConflict',
-          payload: conflict
-        });
       });
     });
   }
@@ -282,14 +176,11 @@ class GoalSocketService {
   private removeEventListeners(): void {
     if (!this.socketService) return;
 
-    this.socketService.off('goalHierarchyUpdate');
-    this.socketService.off('goalCreated');
-    this.socketService.off('goalUpdated');
-    this.socketService.off('goalDeleted');
-    this.socketService.off('goalProgressUpdated');
-    this.socketService.off('milestoneCompleted');
-    this.socketService.off('goalsReordered');
-    this.socketService.off('goalConflictDetected');
+    this.socketService.off('agent:state:update');
+    this.socketService.off('agent:goals:updated');
+    this.socketService.off('agent:mandate:updated');
+    this.socketService.off('agent:action:executed');
+    this.socketService.off('agent:message:sent');
   }
 
   /**

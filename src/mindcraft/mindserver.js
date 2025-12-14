@@ -15,7 +15,90 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let io;
 let server;
 const agent_connections = {};
-const agent_listeners = [];
+const agent_listeners = {};
+
+function agentsStatusUpdate(socket) {
+    if (!socket) {
+        socket = io;
+    }
+    let agents = [];
+    for (let agentName in agent_connections) {
+        const conn = agent_connections[agentName];
+        agents.push({
+            name: agentName,
+            in_game: conn.in_game,
+            viewerPort: conn.viewer_port,
+            socket_connected: !!conn.socket
+        });
+    };
+    try {
+        socket.emit('agents-status', agents);
+    } catch (error) {
+        console.error('Failed to emit agents-status:', error);
+    }
+}
+
+// NEW: Simplified agent state update function
+function emitSimplifiedAgentState(agentName, agentState) {
+    try {
+        if (!agentState) {
+            console.warn(`[Simplified Events] No agent state provided for ${agentName}`);
+            return;
+        }
+
+        // Extract only the 7 core fields from the simplified AgentState
+        const simplifiedState = {
+            agentId: agentName,
+            worldContext: agentState.worldContext || null,
+            personality: agentState.personality || '',
+            goals: agentState.goals || '',
+            mandate: agentState.mandate || '',
+            conversation: agentState.conversation || null,
+            lastAction: agentState.lastAction || '',
+            response: agentState.response || '',
+            timestamp: Date.now()
+        };
+
+        console.log(`[Simplified Events] Emitting agent:state:update for ${agentName}`);
+        io.emit('agent:state:update', simplifiedState);
+    } catch (error) {
+        console.error(`[Simplified Events] Failed to emit agent state update for ${agentName}:`, error);
+    }
+}
+
+// NEW: Simplified action execution event
+function emitActionExecuted(agentName, action, response = '') {
+    try {
+        const actionData = {
+            agentId: agentName,
+            action: action || '',
+            response: response || '',
+            timestamp: Date.now()
+        };
+
+        console.log(`[Simplified Events] Emitting agent:action:executed for ${agentName}:`, action);
+        io.emit('agent:action:executed', actionData);
+    } catch (error) {
+        console.error(`[Simplified Events] Failed to emit action executed for ${agentName}:`, error);
+    }
+}
+
+// NEW: Simplified message sent event
+function emitMessageSent(agentName, message, target = null) {
+    try {
+        const messageData = {
+            agentId: agentName,
+            message: message || '',
+            target: target,
+            timestamp: Date.now()
+        };
+
+        console.log(`[Simplified Events] Emitting agent:message:sent for ${agentName}:`, message);
+        io.emit('agent:message:sent', messageData);
+    } catch (error) {
+        console.error(`[Simplified Events] Failed to emit message sent for ${agentName}:`, error);
+    }
+}
 
 const settings_spec = JSON.parse(readFileSync(path.join(__dirname, 'public/settings_spec.json'), 'utf8'));
 
@@ -42,6 +125,46 @@ export function logoutAgent(agentName) {
         agent_connections[agentName].in_game = false;
         agentsStatusUpdate();
     }
+}
+
+// NEW: Set up handlers for simplified agent events
+function setupSimplifiedAgentEventHandlers(agentSocket, agentName) {
+    if (!agentSocket || !agentName) return;
+
+    console.log(`[Simplified Events] Setting up event handlers for agent ${agentName}`);
+
+    // Handle simplified state updates
+    agentSocket.on('simplified:state:update', (data) => {
+        try {
+            if (data && data.agentState) {
+                emitSimplifiedAgentState(agentName, data.agentState);
+            }
+        } catch (error) {
+            console.error(`[Simplified Events] Error handling state update from ${agentName}:`, error);
+        }
+    });
+
+    // Handle simplified action execution
+    agentSocket.on('simplified:action:executed', (data) => {
+        try {
+            if (data) {
+                emitActionExecuted(agentName, data.action, data.response);
+            }
+        } catch (error) {
+            console.error(`[Simplified Events] Error handling action executed from ${agentName}:`, error);
+        }
+    });
+
+    // Handle simplified message sent
+    agentSocket.on('simplified:message:sent', (data) => {
+        try {
+            if (data) {
+                emitMessageSent(agentName, data.message, data.target);
+            }
+        } catch (error) {
+            console.error(`[Simplified Events] Error handling message sent from ${agentName}:`, error);
+        }
+    });
 }
 
 // Initialize the server
@@ -118,6 +241,10 @@ export function createMindServer(host_public = false, port = 8080) {
         socket.on('connect-agent-process', (agentName) => {
             if (agent_connections[agentName]) {
                 agent_connections[agentName].socket = socket;
+                
+                // NEW: Set up handlers for simplified agent events
+                setupSimplifiedAgentEventHandlers(socket, agentName);
+                
                 try {
                     agentsStatusUpdate();
                 } catch (error) {
@@ -288,28 +415,6 @@ export function createMindServer(host_public = false, port = 8080) {
     return server;
 }
 
-function agentsStatusUpdate(socket) {
-    if (!socket) {
-        socket = io;
-    }
-    let agents = [];
-    for (let agentName in agent_connections) {
-        const conn = agent_connections[agentName];
-        agents.push({
-            name: agentName,
-            in_game: conn.in_game,
-            viewerPort: conn.viewer_port,
-            socket_connected: !!conn.socket
-        });
-    };
-    try {
-        socket.emit('agents-status', agents);
-    } catch (error) {
-        console.error('Failed to emit agents-status:', error);
-    }
-}
-
-
 let listenerInterval = null;
 function addListener(listener_socket) {
     agent_listeners.push(listener_socket);
@@ -329,7 +434,14 @@ function addListener(listener_socket) {
                                     resolve({ error: String(error) });
                                 }
                             });
-                            states[agentName] = state;
+                            
+                            // NEW: Emit simplified agent state instead of complex state
+                            if (state && !state.error) {
+                                emitSimplifiedAgentState(agentName, state);
+                                states[agentName] = state; // Keep for backward compatibility
+                            } else {
+                                states[agentName] = { error: state.error || 'Unknown error' };
+                            }
                         } else {
                             states[agentName] = { error: 'Socket is null' };
                         }
@@ -338,6 +450,8 @@ function addListener(listener_socket) {
                     }
                 }
             }
+            
+            // Keep backward compatibility for existing listeners
             for (let listener of agent_listeners) {
                 try {
                     listener.emit('state-update', states);

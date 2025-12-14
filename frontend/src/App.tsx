@@ -17,12 +17,6 @@ import { useAppSelector, type AppDispatch } from './store';
 import { selectGlobalLoading, selectGlobalError } from './store/slices/uiSlice';
 import { connectToServer } from './store/slices/connectionSlice';
 import { initializeSocket } from './services/socketService';
-import { initializePersonalitySocket } from './store/slices/personalitySlice';
-import { initializeMemorySocket } from './store/slices/memorySlice';
-import { initializeGoalsSocket } from './store/slices/goalsSlice';
-import { initializeSocialSocket } from './store/slices/socialSlice';
-import { initializeSkillsSocket } from './store/slices/skillsSlice';
-import { initializePerformanceSocket } from './store/slices/performanceSlice';
 import { initializeAgentsSocket } from './store/slices/agentsSlice';
 
 // React Context Validator Component
@@ -100,11 +94,11 @@ const AppContent: React.FC = () => {
   const loading = useAppSelector(selectGlobalLoading);
   const error = useAppSelector(selectGlobalError);
 
-  // Initialize all streaming services on app start
+  // Initialize simplified streaming services on app start
   useEffect(() => {
     const initializeStreamingServices = async () => {
       try {
-        console.log('🚀 Starting streaming services initialization...');
+        console.log('🚀 Starting simplified streaming services initialization...');
         
         // Initialize the socket service first with default config
         const socketService = initializeSocket({
@@ -123,8 +117,8 @@ const AppContent: React.FC = () => {
         console.log('📡 Connecting to server...');
         await dispatch(connectToServer()).unwrap();
         
-        // Initialize streaming service once and create all cognitive streams
-        console.log('📊 Creating cognitive streams...');
+        // Initialize streaming service once
+        console.log('📊 Creating simplified streams...');
         const { streamingService } = await import('./services/streamingService');
         
         // Ensure streams are created before proceeding
@@ -133,15 +127,9 @@ const AppContent: React.FC = () => {
         // Wait a brief moment for streams to be fully registered
         await new Promise(resolve => setTimeout(resolve, 50));
         
-        // Then initialize all cognitive component sockets in sequence
-        console.log('🧠 Initializing cognitive components...');
+        // Then initialize simplified agents socket
+        console.log('🤖 Initializing simplified agent system...');
         const initPromises = [
-          dispatch(initializePersonalitySocket()).unwrap(),
-          dispatch(initializeMemorySocket()).unwrap(),
-          dispatch(initializeGoalsSocket()).unwrap(),
-          dispatch(initializeSocialSocket()).unwrap(),
-          dispatch(initializeSkillsSocket()).unwrap(),
-          dispatch(initializePerformanceSocket('default')).unwrap(),
           dispatch(initializeAgentsSocket()).unwrap(),
         ];
         
@@ -151,15 +139,15 @@ const AppContent: React.FC = () => {
         // Check for any failed initializations
         const failed = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
         if (failed.length > 0) {
-          console.warn('⚠️ Some cognitive components failed to initialize:', failed.map(f => f.reason));
+          console.warn('⚠️ Some simplified components failed to initialize:', failed.map(f => f.reason));
         } else {
-          console.log('✅ All cognitive components initialized successfully');
+          console.log('✅ Simplified components initialized successfully');
         }
         
-        console.log('🎉 All streaming services initialized successfully');
+        console.log('🎉 Simplified streaming services initialized successfully');
         
       } catch (error) {
-        console.error('❌ Failed to initialize streaming services:', error);
+        console.error('❌ Failed to initialize simplified streaming services:', error);
         // Don't let initialization failure crash the app
         // The dashboard will show connection status and allow retry
       }
@@ -181,7 +169,7 @@ const AppContent: React.FC = () => {
               <AppBar position="static" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
                 <Toolbar>
                   <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-                    Mindcraft Cognitive Dashboard
+                    Mindcraft Simplified Dashboard
                   </Typography>
                 </Toolbar>
               </AppBar>
@@ -190,7 +178,7 @@ const AppContent: React.FC = () => {
                 {loading && (
                   <Loading
                     overlay={true}
-                    message="Initializing dashboard..."
+                    message="Initializing simplified dashboard..."
                     size={60}
                   />
                 )}
