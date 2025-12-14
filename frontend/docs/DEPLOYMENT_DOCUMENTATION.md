@@ -177,7 +177,7 @@ USER nginx
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # Expose ports
 EXPOSE 8080
@@ -312,7 +312,7 @@ esac
 # Health check
 echo "Performing health check..."
 for i in {1..30}; do
-  if curl -f http://localhost:8080/health; then
+  if curl -f http://localhost:8000/health; then
     echo "Health check passed!"
     break
   fi
@@ -571,7 +571,7 @@ spec:
         }
       },
       "healthCheck": {
-        "command": ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"],
+        "command": ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"],
         "interval": 30,
         "timeout": 5,
         "retries": 3
@@ -1098,7 +1098,7 @@ USER nodejs
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # Use minimal base image
 FROM scratch
@@ -1297,7 +1297,7 @@ npm run analyze:performance
 echo "Performing health checks..."
 
 # Check application health
-if curl -f http://localhost:8080/health; then
+if curl -f http://localhost:8000/health; then
     echo "✅ Application health check passed"
 else
     echo "❌ Application health check failed"
@@ -1370,7 +1370,7 @@ docker-compose up -d
 
 # Health check
 sleep 30
-if curl -f http://localhost:8080/health; then
+if curl -f http://localhost:8000/health; then
     echo "✅ Rollback completed successfully"
 else
     echo "❌ Rollback failed - health check failed"

@@ -24,7 +24,7 @@ load_dotenv()
 
 # Import our application components
 from main import app
-from websocket import websocket_proxy
+from websocket import get_websocket_proxy
 
 # Configure logging
 log_level = os.getenv("LOG_LEVEL", "INFO").lower()
@@ -53,6 +53,7 @@ class FastAPIGateway:
     async def start_websocket_proxy(self):
         """Start the WebSocket proxy service"""
         try:
+            websocket_proxy = get_websocket_proxy()
             await websocket_proxy.start()
             logger.info("WebSocket proxy started successfully")
         except Exception as e:
@@ -62,6 +63,7 @@ class FastAPIGateway:
     def create_combined_app(self):
         """Create a combined FastAPI app with WebSocket support"""
         # Get the WebSocket ASGI app
+        websocket_proxy = get_websocket_proxy()
         websocket_app = websocket_proxy.get_app()
         
         # Mount the WebSocket app under /socket.io path
@@ -73,6 +75,7 @@ class FastAPIGateway:
             return {
                 "websocket_url": f"ws://{self.host}:{self.port}/socket.io",
                 "node_core": f"{self.node_core_host}:{self.node_core_port}",
+                websocket_proxy = get_websocket_proxy()
                 "status": "active" if websocket_proxy.internal_sio.connected else "disconnected"
             }
         
@@ -96,6 +99,7 @@ class FastAPIGateway:
         logger.info("Shutting down FastAPI Gateway...")
         
         # Stop WebSocket proxy
+        websocket_proxy = get_websocket_proxy()
         await websocket_proxy.stop()
         
         logger.info("FastAPI Gateway shutdown complete")

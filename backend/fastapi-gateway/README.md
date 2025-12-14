@@ -45,6 +45,22 @@ The FastAPI gateway is part of the hybrid 3-tier architecture:
 - Node.js Agent Core service running on port 8081
 - Frontend application (optional) for testing
 
+### ⚠️ CRITICAL: Virtual Environment Requirement
+
+**Before running the FastAPI gateway, you MUST activate the virtual environment:**
+
+```bash
+# Windows
+cd backend/fastapi-gateway
+.venv\Scripts\activate
+
+# Linux/Mac
+cd backend/fastapi-gateway
+source .venv/bin/activate
+```
+
+The virtual environment is located at `backend/fastapi-gateway/.venv/` and must be activated before starting the service.
+
 ### Installation and Setup
 
 1. **Navigate to the FastAPI gateway directory:**
@@ -52,32 +68,44 @@ The FastAPI gateway is part of the hybrid 3-tier architecture:
    cd backend/fastapi-gateway
    ```
 
-2. **Make the startup script executable (Linux/macOS):**
+2. **Activate the virtual environment (REQUIRED):**
+   ```bash
+   # Windows
+   .venv\Scripts\activate
+   
+   # Linux/Mac
+   source .venv/bin/activate
+   ```
+
+3. **Make the startup script executable (Linux/macOS):**
    ```bash
    chmod +x start.sh
    ```
 
-3. **Run the startup script:**
+4. **Run the startup script:**
    ```bash
    ./start.sh
    ```
 
    This script will:
-   - Create a Python virtual environment if it doesn't exist
-   - Install required dependencies from `../requirements.txt`
+   - Use the existing virtual environment at `.venv/`
+   - Install required dependencies from `../requirements.txt` if needed
    - Start the FastAPI gateway service
 
 ### Manual Setup
 
 If you prefer to set up manually:
 
-1. **Create and activate virtual environment:**
+1. **Activate the existing virtual environment (REQUIRED):**
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   # Windows
+   .venv\Scripts\activate
+   
+   # Linux/Mac
+   source .venv/bin/activate
    ```
 
-2. **Install dependencies:**
+2. **Install dependencies (if not already installed):**
    ```bash
    pip install -r ../requirements.txt
    ```
@@ -90,6 +118,11 @@ If you prefer to set up manually:
    ```bash
    python start.py
    ```
+
+**Note**: The virtual environment `.venv/` should already exist. If it doesn't, create it with:
+```bash
+python -m venv .venv
+```
 
 ## Configuration
 
@@ -241,22 +274,34 @@ Access the interactive API documentation:
 
 ### Common Issues
 
-1. **Port already in use:**
+1. **Virtual environment not activated:**
+   - **ERROR**: `ModuleNotFoundError: No module named 'fastapi'`
+   - **SOLUTION**: Always activate `.venv` before running:
+     ```bash
+     # Windows
+     cd backend/fastapi-gateway && .venv\Scripts\activate
+     
+     # Linux/Mac
+     cd backend/fastapi-gateway && source .venv/bin/activate
+     ```
+
+2. **Port already in use:**
    - Check if port 8000 is available: `netstat -an | grep 8000`
    - Kill existing process or change `FASTAPI_PORT` in `.env`
 
-2. **Connection to Node.js core fails:**
+3. **Connection to Node.js core fails:**
    - Ensure Node.js Agent Core is running on port 8081
    - Check `NODE_CORE_HOST` and `NODE_CORE_PORT` in `.env`
    - Verify firewall settings
 
-3. **CORS errors:**
+4. **CORS errors:**
    - Check that frontend URL is in `CORS_ORIGINS`
    - Ensure frontend is making requests to correct port (8000)
 
-4. **WebSocket connection issues:**
+5. **WebSocket connection issues:**
    - Check browser console for connection errors
    - Verify WebSocket endpoint: `ws://localhost:8000/socket.io`
+   - Ensure virtual environment is activated
 
 ### Logs
 

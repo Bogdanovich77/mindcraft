@@ -17,7 +17,7 @@ const settings = {
     "enable_learning_systems": true,
     
     "profiles": [
-        //"./andy.json",
+        //"./profiles/andy.json",
         // "./profiles/gpt.json",
         // "./profiles/claude.json",
         // "./profiles/gemini.json",

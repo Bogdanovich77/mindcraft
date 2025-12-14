@@ -21,7 +21,7 @@ load_dotenv()
 
 # Import routers
 from routes.profiles import router as profiles_router
-from websocket import websocket_proxy
+from websocket import get_websocket_proxy
 
 # Create FastAPI application
 app = FastAPI(
@@ -65,6 +65,7 @@ async def health_check():
 async def get_websocket_metrics():
     """Get WebSocket proxy metrics and connection information"""
     try:
+        websocket_proxy = get_websocket_proxy()
         metrics = websocket_proxy.get_metrics()
         return {
             "success": True,
@@ -77,6 +78,7 @@ async def get_websocket_metrics():
 async def get_websocket_health():
     """Get comprehensive WebSocket proxy health status"""
     try:
+        websocket_proxy = get_websocket_proxy()
         health = await websocket_proxy.health_check()
         return {
             "success": True,
@@ -89,6 +91,7 @@ async def get_websocket_health():
 async def get_websocket_status():
     """Get basic WebSocket proxy status"""
     try:
+        websocket_proxy = get_websocket_proxy()
         metrics = websocket_proxy.get_metrics()
         return {
             "success": True,
@@ -133,21 +136,26 @@ async def global_exception_handler(request, exc):
 async def startup_event():
     """Initialize WebSocket proxy on startup"""
     try:
+        websocket_proxy = get_websocket_proxy()
+        websocket_proxy = get_websocket_proxy()
         await websocket_proxy.start()
-        print("✅ WebSocket proxy initialized successfully")
+        print("[SUCCESS] WebSocket proxy initialized successfully")
     except Exception as e:
-        print(f"❌ Failed to initialize WebSocket proxy: {e}")
+        print(f"[ERROR] Failed to initialize WebSocket proxy: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up WebSocket proxy on shutdown"""
     try:
+        websocket_proxy = get_websocket_proxy()
+        websocket_proxy = get_websocket_proxy()
         await websocket_proxy.stop()
-        print("✅ WebSocket proxy stopped successfully")
+        print("[SUCCESS] WebSocket proxy stopped successfully")
     except Exception as e:
-        print(f"❌ Error stopping WebSocket proxy: {e}")
+        print(f"[ERROR] Error stopping WebSocket proxy: {e}")
 
 # Mount WebSocket app
+websocket_proxy = get_websocket_proxy()
 app.mount("/socket.io", websocket_proxy.get_app())
 
 if __name__ == "__main__":

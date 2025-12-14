@@ -35,7 +35,7 @@ This guide provides comprehensive procedures for maintaining the Mindcraft Cogni
 echo "Starting daily health checks..."
 
 # Check application status
-if curl -f http://localhost:8080/health; then
+if curl -f http://localhost:8000/health; then
     echo "✅ Application is healthy"
 else
     echo "❌ Application health check failed"
@@ -97,7 +97,7 @@ echo "Log rotation completed"
 echo "Starting daily performance monitoring..."
 
 # Check response times
-RESPONSE_TIME=$(curl -o /dev/null -s -w "%{time_total}" http://localhost:8080/health)
+RESPONSE_TIME=$(curl -o /dev/null -s -w "%{time_total}" http://localhost:8000/health)
 if (( $(echo "$RESPONSE_TIME < 0.5" | bc -l))); then
     echo "✅ Response time: ${RESPONSE_TIME}s (good)"
 else
@@ -201,7 +201,7 @@ docker-compose exec db psql -U postgres -d mindcraft -c "
 "
 
 # Clear application cache
-curl -X POST http://localhost:8080/api/cache/clear \
+curl -X POST http://localhost:8000/api/cache/clear \
     -H "Authorization: Bearer $ADMIN_TOKEN"
 
 # Optimize static assets
@@ -901,7 +901,7 @@ docker-compose up -d
 # Health check
 echo "Performing health check..."
 sleep 30
-if curl -f http://localhost:8080/health; then
+if curl -f http://localhost:8000/health; then
     echo "✅ Recovery completed successfully"
 else
     echo "❌ Recovery failed - health check failed"
@@ -1052,13 +1052,13 @@ echo "Executing emergency procedures..."
 docker-compose scale frontend=1
 
 # 2. Enable maintenance mode
-curl -X POST http://localhost:8080/api/maintenance/enable \
+curl -X POST http://localhost:8000/api/maintenance/enable \
     -H "Authorization: Bearer $ADMIN_TOKEN" \
     -H "Content-Type: application/json" \
     -d '{"message": "System maintenance in progress"}'
 
 # 3. Clear caches
-curl -X POST http://localhost:8080/api/cache/clear \
+curl -X POST http://localhost:8000/api/cache/clear \
     -H "Authorization: Bearer $ADMIN_TOKEN"
 
 # 4. Restart critical services

@@ -94,8 +94,7 @@ class WebSocketProxy:
         # Internal Socket.IO client for Node.js core communication
         self.internal_sio = socketio.AsyncClient(
             logger=False,
-            engineio_logger=False,
-            transports=['websocket', 'polling']
+            engineio_logger=False
         )
         
         # Configuration with enhanced defaults
@@ -998,5 +997,12 @@ class WebSocketProxy:
         if self.internal_sio.connected:
             await self.internal_sio.disconnect()
 
-# Global WebSocket proxy instance
-websocket_proxy = WebSocketProxy()
+# Global WebSocket proxy instance - will be initialized on demand
+websocket_proxy = None
+
+def get_websocket_proxy():
+    """Get or create the global WebSocket proxy instance"""
+    global websocket_proxy
+    if websocket_proxy is None:
+        websocket_proxy = WebSocketProxy()
+    return websocket_proxy

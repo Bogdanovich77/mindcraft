@@ -128,8 +128,7 @@ class NodeCoreSocketClient:
     def __init__(self):
         self.sio = socketio.AsyncClient(
             logger=False,
-            engineio_logger=False,
-            transports=['websocket', 'polling']
+            engineio_logger=False
         )
         self.node_core_url = f"http://{NODE_CORE_HOST}:{NODE_CORE_PORT}"
         self.connected = False

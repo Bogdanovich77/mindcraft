@@ -349,7 +349,7 @@ docker-compose up -d --force-recreate frontend
 # Health check
 echo "Performing health check..."
 for i in {1..30}; do
-    if curl -f http://localhost:8080/health; then
+    if curl -f http://localhost:8000/health; then
         echo "Health check passed!"
         break
     fi
@@ -653,7 +653,7 @@ USER nodejs
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # Expose port
 EXPOSE 8080
@@ -717,7 +717,7 @@ logrotate -f /etc/logrotate.d/mindcraft-frontend
 docker-compose exec frontend npm run cache:clear
 
 # Health check
-curl -f http://localhost:8080/health || echo "Health check failed"
+curl -f http://localhost:8000/health || echo "Health check failed"
 
 echo "Daily maintenance completed"
 ```
@@ -938,7 +938,7 @@ docker-compose up -d
 
 # Health check
 sleep 30
-curl -f http://localhost:8080/health || echo "Recovery failed - health check failed"
+curl -f http://localhost:8000/health || echo "Recovery failed - health check failed"
 
 echo "Recovery completed from $BACKUP_FILE"
 ```
@@ -1060,7 +1060,7 @@ curl -X POST https://monitoring.example.com/alerts \
   -H "Content-Type: application/json" \
   -d '{
     "name": "mindcraft-frontend",
-    "endpoint": "http://localhost:8080/health",
+    "endpoint": "http://localhost:8000/health",
     "interval": 60,
     "alerts": [
       {"type": "down", "threshold": 1},

@@ -4,32 +4,8 @@ setlocal enabledelayedexpansion
 echo Starting Mindcraft with 3-Tier Architecture...
 echo ============================================
 
-REM Function to check if a port is in use
-:check_port
-netstat -ano | findstr ":%1 " | findstr "LISTENING" >nul
-if %errorlevel% equ 0 (
-    echo Port %1 is already in use. Please stop the process using this port.
-    exit /b 1
-)
-exit /b 0
-
-REM Check if required ports are available
-echo Checking port availability...
-call :check_port 8081
-if %errorlevel% neq 0 (
-    echo Port 8081 check failed with error level %errorlevel%
-    exit /b 1
-)
-call :check_port 8000
-if %errorlevel% neq 0 (
-    echo Port 8000 check failed with error level %errorlevel%
-    exit /b 1
-)
-call :check_port 5173
-if %errorlevel% neq 0 (
-    echo Port 5173 check failed with error level %errorlevel%
-    exit /b 1
-)
+REM Simple port check - just try to start services and handle errors
+echo Starting services...
 
 REM Start Node.js Agent Core (Internal Port 8081)
 echo Starting Node.js Agent Core on port 8081...

@@ -7,7 +7,7 @@
 
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import { StateGraph, START, END, Annotation } from '@langchain/langgraph';
-import { InterruptPriority, ProcessingPhase, AgentStateAnnotation } from './interfaces.js';
+import { AgentStateAnnotation } from './interfaces.js';
 import { Prompter } from '../../models/prompter.js';
 
 export class LangGraphAgent {
@@ -84,7 +84,7 @@ export class LangGraphAgent {
         // Create state graph with proper annotation schema
         this.stateGraph = new StateGraph(AgentStateAnnotation)
             .addNode('perception', this.handlePerception.bind(this))
-            .addNode('conversation', this.handleConversation.bind(this))
+            .addNode('conversationHandler', this.handleConversation.bind(this))
             .addNode('decision', this.handleDecision.bind(this))
             .addNode('execution', this.handleExecution.bind(this))
             .addEdge(START, 'perception')
@@ -92,11 +92,11 @@ export class LangGraphAgent {
                 'perception',
                 this.shouldProcessConversation.bind(this),
                 {
-                    'conversation': 'conversation',
+                    'conversation': 'conversationHandler',
                     'decision': 'decision'
                 }
             )
-            .addEdge('conversation', 'decision')
+            .addEdge('conversationHandler', 'decision')
             .addEdge('decision', 'execution')
             .addEdge('execution', END);
         
