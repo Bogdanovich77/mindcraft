@@ -122,7 +122,7 @@ const AppContent: React.FC = () => {
         const { streamingService } = await import('./services/streamingService');
         
         // Ensure streams are created before proceeding
-        await streamingService.createCognitiveStreams();
+        await streamingService.createSimplifiedStreams();
         
         // Wait a brief moment for streams to be fully registered
         await new Promise(resolve => setTimeout(resolve, 50));

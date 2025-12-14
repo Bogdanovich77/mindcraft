@@ -27,8 +27,8 @@ export const initializeAgentsSocket = createAsyncThunk(
       }
 
       // Set up listener for the agentList event
-      socketService.on('agentList', (data: any) => {
-        console.log('[AgentsSlice] Received agentList:', data);
+      socketService.on('agents-status', (data: any) => {
+        console.log('[AgentsSlice] Received agents-status:', data);
         
         // Extract the agents array from either format
         let agentsArray = Array.isArray(data) ? data : data.agents || [];
@@ -47,6 +47,48 @@ export const initializeAgentsSocket = createAsyncThunk(
         
         // Dispatch the setAgents action with the transformed data
         dispatch(setAgents(agentSummaries));
+      });
+
+      // Also add listener for the old event name for backward compatibility
+      socketService.on('agentList', (data: any) => {
+        console.log('[AgentsSlice] Received agentList (legacy):', data);
+        
+        // Extract the agents array from either format
+        let agentsArray = Array.isArray(data) ? data : data.agents || [];
+        
+        // Transform the backend agent format to frontend AgentSummary format
+        const agentSummaries: AgentSummary[] = agentsArray.map((agent: any) => ({
+          id: agent.name,
+          name: agent.name,
+          profile: 'default', // Use 'default' as a placeholder profile
+          status: agent.in_game ? 'online' : 'offline',
+          position: { x: 0, y: 64, z: 0 }, // Use default position
+          health: 20, // Use default health
+          level: 1, // Use default level
+          lastUpdate: Date.now(),
+        }));
+        
+        // Dispatch the setAgents action with the transformed data
+        dispatch(setAgents(agentSummaries));
+      });
+
+      // Add listener for agentUpdate events (the real-time updates)
+      socketService.on('agentUpdate', (data: any) => {
+        console.log('[AgentsSlice] Received agent update:', data);
+        
+        // Transform object format to array format
+        const agentsArray = Object.entries(data).map(([name, agentData]: [string, any]) => ({
+          id: name,
+          name: name,
+          profile: 'default',
+          status: agentData.gameplay?.in_game ? 'online' : 'offline',
+          position: agentData.position || { x: 0, y: 64, z: 0 },
+          health: agentData.gameplay?.health || 20,
+          level: 1,
+          lastUpdate: Date.now(),
+        }));
+        
+        dispatch(setAgents(agentsArray));
       });
 
       console.log('✅ Agents socket initialization completed');
@@ -512,7 +554,7 @@ export default agentsSlice.reducer;
 // Performance optimization: Memoized selectors to prevent unnecessary recalculations
 export const selectAllAgents = createSelector(
   [selectAgentsObject],
-  (agents) => agents
+  (agents) => Object.values(agents) // Transform object to array for better usability
 );
 
 export const selectAgentById = createSelector(
@@ -535,26 +577,15 @@ export const selectOnlineAgents = createSelector(
   (agents) => Object.values(agents).filter(agent => agent.status === 'online')
 );
 
-export const selectAgentsLoading = createSelector(
-  [selectAgentsState],
-  (agentsState) => agentsState.loading
-);
+// Simplified selectors - direct property access instead of identity functions
+export const selectAgentsLoading = (state: { agents: AgentsState }) => state.agents.loading;
 
-export const selectAgentsError = createSelector(
-  [selectAgentsState],
-  (agentsState) => agentsState.error
-);
+export const selectAgentsError = (state: { agents: AgentsState }) => state.agents.error;
 
-// Streaming selectors with memoization
-export const selectStreamingStatus = createSelector(
-  [selectAgentsState],
-  (agentsState) => agentsState.streaming
-);
+// Streaming selectors - direct property access for better performance
+export const selectStreamingStatus = (state: { agents: AgentsState }) => state.agents.streaming;
 
-export const selectStreamingPerformance = createSelector(
-  [selectAgentsState],
-  (agentsState) => agentsState.performance
-);
+export const selectStreamingPerformance = (state: { agents: AgentsState }) => state.agents.performance;
 
 export const selectIsStreamingConnected = createSelector(
   [selectStreamingStatus],

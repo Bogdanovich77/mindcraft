@@ -1,34 +1,34 @@
 /**
  * Test script to verify performance fixes for duplicate stream creation
- * This script tests the streaming service optimizations we implemented
+ * This script tests the simplified streaming service optimizations we implemented
  */
 
 import { streamingService } from './src/services/streamingService.js';
 
 async function testStreamingOptimizations() {
-  console.log('🧪 Testing streaming service optimizations...\n');
+  console.log('🧪 Testing simplified streaming service optimizations...\n');
 
   try {
-    // Test 1: Check if createCognitiveStreams handles duplicates properly
+    // Test 1: Check if createSimplifiedStreams handles duplicates properly
     console.log('Test 1: Testing duplicate stream creation prevention...');
     
     // First call - should create all streams
-    const result1 = streamingService.createCognitiveStreams();
+    const result1 = streamingService.createSimplifiedStreams();
     console.log('✅ First call completed');
     
     // Second call - should handle duplicates gracefully
-    const result2 = streamingService.createCognitiveStreams();
+    const result2 = streamingService.createSimplifiedStreams();
     console.log('✅ Second call completed (should handle duplicates)');
     
     // Check if streams exist
-    const requiredStreams = ['agent-state', 'personality', 'emotions', 'memory', 'goals', 'social', 'skills', 'performance'];
+    const requiredStreams = ['agent-state', 'agent-messages', 'agent-actions'];
     const existingStreams = Array.from(streamingService.streams.keys());
     
     const missingStreams = requiredStreams.filter(id => !existingStreams.includes(id));
     const duplicateStreams = existingStreams.filter((id, index) => existingStreams.indexOf(id) !== index);
     
     if (missingStreams.length === 0 && duplicateStreams.length === 0) {
-      console.log('✅ All required streams created without duplicates');
+      console.log('✅ All required simplified streams created without duplicates');
     } else {
       console.log('❌ Stream issues detected:');
       if (missingStreams.length > 0) console.log(`  Missing: ${missingStreams.join(', ')}`);
@@ -40,7 +40,7 @@ async function testStreamingOptimizations() {
     const startTime = Date.now();
     
     for (let i = 0; i < 10; i++) {
-      streamingService.createCognitiveStreams();
+      streamingService.createSimplifiedStreams();
     }
     
     const endTime = Date.now();
@@ -71,7 +71,7 @@ async function testStreamingOptimizations() {
       console.log('❌ Individual stream creation failed:', error.message);
     }
 
-    console.log('\n🎉 All streaming optimization tests completed!');
+    console.log('\n🎉 All simplified streaming optimization tests completed!');
     
   } catch (error) {
     console.error('❌ Test failed:', error);

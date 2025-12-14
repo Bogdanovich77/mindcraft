@@ -122,20 +122,19 @@ const CognitiveDashboard: React.FC = () => {
     dispatch(clearConnectionError());
   };
 
-  // Enhanced refresh with loading state
+  // Enhanced refresh with loading state - Fixed to use correct events
   const handleRefresh = async () => {
     const socketService = getSocketService();
     if (!socketService) {
       console.error('[CognitiveDashboard] Socket service not available');
       return;
     }
-  
+   
     console.log('[CognitiveDashboard] Refreshing agent list...');
     setRefreshing(true);
     
     try {
-      socketService.requestAgentList();
-      socketService.send('getAgents', {});
+      socketService.requestAgentList(); // This uses the correct 'get_agent_list' event
       socketService.send('listen-to-agents', {});
       
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -371,7 +370,7 @@ const CognitiveDashboard: React.FC = () => {
                       {agent.name}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Health: {agent.context.health}/20
+                      Health: {agent.worldContext?.health || agent.health || 20}/20
                     </Typography>
                   </CardContent>
                 </Card>
