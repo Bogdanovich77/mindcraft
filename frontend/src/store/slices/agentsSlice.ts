@@ -17,6 +17,9 @@ const selectAgentsObject = createSelector(
 export const initializeAgentsSocket = createAsyncThunk(
   'agents/initializeAgentsSocket',
   async (_, { rejectWithValue, dispatch, getState }) => {
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+    let pendingUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+    
     try {
       // Import socketService dynamically to avoid circular dependencies
       const { getSocketService } = await import('../../services/socketService');
@@ -74,7 +77,6 @@ export const initializeAgentsSocket = createAsyncThunk(
 
       // Improved debouncing and throttling for agentUpdate events to prevent UI storms
       let lastUpdateTime = 0;
-      let pendingUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
       let pendingUpdateData: any = null;
       
       const UPDATE_THROTTLE_MS = 500; // Reduced to 500ms for more responsive updates
@@ -136,7 +138,6 @@ export const initializeAgentsSocket = createAsyncThunk(
       let retryCount = 0;
       const maxRetries = 5; // Increased max retries but with longer delays
       const baseRetryDelay = 2000; // Start with 2 seconds
-      let retryTimeout: ReturnType<typeof setTimeout> | null = null;
       
       const retryAgentListRequest = async () => {
         if (retryCount >= maxRetries) {
@@ -204,25 +205,94 @@ export const initializeAgentsSocket = createAsyncThunk(
         }
       }, 3000); // Increased from 2000ms to 3000ms
       
-      // Cleanup function to clear retry timeout if component unmounts
-      return () => {
-        if (retryTimeout) {
-          clearTimeout(retryTimeout);
-        }
+      // Return serializable success payload instead of cleanup function
+      return {
+        success: true,
+        message: 'Socket initialized successfully',
+        timestamp: Date.now()
       };
+
+      // CRITICAL FIX: Add missing agent:state:update event handler
+      socketService.on('agent:state:update', (data: any) => {
+        console.log('[AgentsSlice] Received agent:state:update:', data);
+        
+        if (data && data.agentId) {
+          // Transform the simplified event data to match our AgentState structure
+          const agentId = data.agentId;
+          const timestamp = data.timestamp || Date.now();
+          
+          // Map worldContext data properly
+          let worldContext = null;
+          if (data.worldContext) {
+            // Ensure worldContext has the expected structure
+            worldContext = {
+              position: data.worldContext.position || { x: 0, y: 64, z: 0 },
+              health: data.worldContext.health || 20,
+              food: data.worldContext.food || 100,
+              experience: data.worldContext.experience || 0,
+              level: data.worldContext.level || 1,
+              dimension: data.worldContext.dimension || 'overworld',
+              timeOfDay: data.worldContext.timeOfDay || 0,
+              weather: data.worldContext.weather || 'clear',
+              nearbyEntities: data.worldContext.nearbyEntities || [],
+              nearbyBlocks: data.worldContext.nearbyBlocks || [],
+              inventory: data.worldContext.inventory || { items: [], slots: 36, usedSlots: 0 },
+              equipment: data.worldContext.equipment || {}
+            };
+          }
+          
+          // Map conversation data properly
+          let conversation = null;
+          if (data.conversation) {
+            conversation = {
+              message: data.conversation.message || '',
+              sender: data.conversation.sender || '',
+              isRequestForHelp: data.conversation.isRequestForHelp || false,
+              isOfferOfAssistance: data.conversation.isOfferOfAssistance || false,
+              targetBot: data.conversation.targetBot,
+              timestamp: data.conversation.timestamp || Date.now()
+            };
+          }
+          
+          // Dispatch the agent state update with properly structured data
+          dispatch(agentStateUpdate({
+            agentId,
+            state: {
+              worldContext,
+              personality: data.personality || '',
+              goals: data.goals || '',
+              mandate: data.mandate || '',
+              conversation,
+              lastAction: data.lastAction || '',
+              response: data.response || ''
+            },
+            timestamp
+          }));
+        }
+      });
 
       console.log('✅ Agents socket initialization completed');
       
-      // Return cleanup function for the event listeners
-      return () => {
-        // Clear any pending update timeout
-        if (pendingUpdateTimeout) {
-          clearTimeout(pendingUpdateTimeout);
-          pendingUpdateTimeout = null;
-        }
+      // Return serializable success payload instead of cleanup function
+      // Note: Cleanup is now handled internally within the thunk
+      return {
+        success: true,
+        message: 'Agents socket initialization completed',
+        timestamp: Date.now()
       };
     } catch (error) {
       console.error('❌ Failed to initialize agents socket:', error);
+      
+      // Clean up timeouts on error
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+        retryTimeout = null;
+      }
+      if (pendingUpdateTimeout) {
+        clearTimeout(pendingUpdateTimeout);
+        pendingUpdateTimeout = null;
+      }
+      
       return rejectWithValue(error instanceof Error ? error.message : 'Failed to initialize agents socket');
     }
   }
@@ -493,13 +563,34 @@ const agentsSlice = createSlice({
       const { agentId, state: agentState, timestamp } = action.payload;
       const existingAgent = state.agents[agentId];
       
+      console.log(`[AgentsSlice] agentStateUpdate for ${agentId}:`, {
+        hasWorldContext: !!agentState.worldContext,
+        worldContextKeys: agentState.worldContext ? Object.keys(agentState.worldContext) : [],
+        hasInventory: agentState.worldContext ? !!agentState.worldContext.inventory : false,
+        inventoryData: agentState.worldContext?.inventory,
+        position: agentState.worldContext?.position,
+        existingAgent: !!existingAgent
+      });
+      
       if (existingAgent) {
         // Update only the 7 core fields
         if (agentState.worldContext) {
-          existingAgent.worldContext = { 
-            ...existingAgent.worldContext, 
-            ...agentState.worldContext 
+          console.log(`[AgentsSlice] Updating worldContext for ${agentId}:`, {
+            oldPosition: existingAgent.worldContext.position,
+            newPosition: agentState.worldContext.position,
+            oldInventory: existingAgent.worldContext.inventory,
+            newInventory: agentState.worldContext.inventory
+          });
+          
+          existingAgent.worldContext = {
+            ...existingAgent.worldContext,
+            ...agentState.worldContext
           };
+          
+          console.log(`[AgentsSlice] Updated worldContext for ${agentId}:`, {
+            finalPosition: existingAgent.worldContext.position,
+            finalInventory: existingAgent.worldContext.inventory
+          });
         }
         if (agentState.personality !== undefined) {
           existingAgent.personality = agentState.personality;

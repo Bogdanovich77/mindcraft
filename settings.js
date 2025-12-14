@@ -68,6 +68,16 @@ const settings = {
   
     "log_all_prompts": false, // log ALL prompts to file
 
+    // DEPRECATION SETTINGS
+    "ui_deprecation": {
+        "old_ui_deprecated": true,
+        "old_ui_port": 8080,
+        "new_ui_port": 5173,
+        "sunset_date": "2026-12-31",
+        "show_deprecation_warning": true,
+        "auto_redirect": true
+    }
+
 }
 
 if (process.env.SETTINGS_JSON) {

@@ -117,7 +117,7 @@ export default defineConfig(({ mode }) => {
         },
         '/socket.io': {
           target: env.VITE_SOCKET_URL || 'http://localhost:8080',
-          changeOrigin: true,
+          change: true,
           ws: true,
           timeout: 10000,
         },

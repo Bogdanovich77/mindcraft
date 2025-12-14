@@ -297,11 +297,15 @@ class SocketService {
 
     // Core agent state events only - remove complex cognitive events
     const simplifiedEvents = [
-      'agent:state:update', 
-      'agent:connected', 
+      'agent:state:update',
+      'agent:connected',
       'agent:disconnected',
-      'agent:message:sent', 
-      'agent:action:executed'
+      'agent:message:sent',
+      'agent:action:executed',
+      'agent:status',
+      'agent:boot',
+      'agent:stop',
+      'agent:restart'
     ];
 
     simplifiedEvents.forEach(eventType => {
@@ -395,6 +399,14 @@ class SocketService {
       case 'agent:connected':
       case 'agent:disconnected':
         return typeof data.agentId === 'string';
+      case 'agent:status':
+        return this.validateAgentStatus(data);
+      case 'agent:boot':
+        return this.validateAgentBoot(data);
+      case 'agent:stop':
+        return this.validateAgentStop(data);
+      case 'agent:restart':
+        return this.validateAgentRestart(data);
       default:
         return true; // Allow unknown events for forward compatibility
     }
@@ -442,6 +454,37 @@ class SocketService {
     );
   }
 
+  private validateAgentStatus(data: any): boolean {
+    return (
+      typeof data.agentId === 'string' &&
+      typeof data.status === 'string' &&
+      typeof data.timestamp === 'number'
+    );
+  }
+
+  private validateAgentBoot(data: any): boolean {
+    return (
+      typeof data.agentId === 'string' &&
+      typeof data.status === 'string' &&
+      typeof data.timestamp === 'number'
+    );
+  }
+
+  private validateAgentStop(data: any): boolean {
+    return (
+      typeof data.agentId === 'string' &&
+      typeof data.timestamp === 'number'
+    );
+  }
+
+  private validateAgentRestart(data: any): boolean {
+    return (
+      typeof data.agentId === 'string' &&
+      typeof data.status === 'string' &&
+      typeof data.timestamp === 'number'
+    );
+  }
+
   /**
    * Sanitize simplified event data
    */
@@ -468,6 +511,12 @@ class SocketService {
     if (typeof data.action === 'string') sanitized.action = data.action.substring(0, 200);
     if (typeof data.message === 'string') sanitized.message = data.message.substring(0, 1000);
     if (data.target !== undefined && data.target !== null) sanitized.target = String(data.target);
+    
+    // Agent lifecycle events
+    if (typeof data.status === 'string') sanitized.status = data.status.substring(0, 50);
+    if (data.agentName !== undefined && data.agentName !== null) sanitized.agentName = String(data.agentName);
+    if (data.bootSuccess !== undefined) sanitized.bootSuccess = Boolean(data.bootSuccess);
+    if (data.error !== undefined && typeof data.error === 'string') sanitized.error = data.error.substring(0, 200);
     
     return sanitized;
   }

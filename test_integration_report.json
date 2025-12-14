@@ -1,0 +1,597 @@
+{
+  "metadata": {
+    "reportVersion": "1.0.0",
+    "generatedAt": "2025-12-14T18:27:00.000Z",
+    "testSuite": "Profile Management Workflow",
+    "environment": {
+      "nodeVersion": "18.0.0",
+      "platform": "windows",
+      "baseUrl": "http://localhost:8080",
+      "wsUrl": "ws://localhost:8080",
+      "testDuration": "PT30M",
+      "testRunner": "k6"
+    }
+  },
+  "summary": {
+    "totalTests": 10,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "successRate": 0,
+    "overallGrade": "NOT_RUN",
+    "executionTime": 0,
+    "testCategories": [
+      "Functional Testing",
+      "Integration Testing", 
+      "Performance Testing",
+      "Reliability Testing",
+      "User Experience Testing"
+    ]
+  },
+  "testResults": {
+    "functionalTests": {
+      "category": "Functional Testing",
+      "description": "Core functionality validation for profile management workflow",
+      "tests": [
+        {
+          "name": "Profile Listing",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "Profiles load from profiles/ directory",
+              "status": "NOT_RUN",
+              "expected": "All profiles displayed",
+              "actual": null
+            },
+            {
+              "description": "Profile structure validation",
+              "status": "NOT_RUN", 
+              "expected": "Required fields present",
+              "actual": null
+            }
+          ],
+          "metrics": {
+            "responseTime": null,
+            "memoryUsage": null,
+            "errorCount": 0
+          },
+          "details": null
+        },
+        {
+          "name": "Profile Creation",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "New profile created successfully",
+              "status": "NOT_RUN",
+              "expected": "Profile saved to filesystem",
+              "actual": null
+            },
+            {
+              "description": "Profile validation works",
+              "status": "NOT_RUN",
+              "expected": "Invalid profiles rejected",
+              "actual": null
+            }
+          ],
+          "metrics": {
+            "responseTime": null,
+            "memoryUsage": null,
+            "errorCount": 0
+          },
+          "details": null
+        },
+        {
+          "name": "Profile Booting",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "Agent boots from profile",
+              "status": "NOT_RUN",
+              "expected": "Agent appears in running list",
+              "actual": null
+            },
+            {
+              "description": "Boot status updates correctly",
+              "status": "NOT_RUN",
+              "expected": "Status changes to 'online'",
+              "actual": null
+            }
+          ],
+          "metrics": {
+            "responseTime": null,
+            "memoryUsage": null,
+            "errorCount": 0
+          },
+          "details": null
+        },
+        {
+          "name": "Profile Editing",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "Profile changes saved",
+              "status": "NOT_RUN",
+              "expected": "Changes persist after restart",
+              "actual": null
+            },
+            {
+              "description": "Form validation works",
+              "status": "NOT_RUN",
+              "expected": "Invalid changes rejected",
+              "actual": null
+            }
+          ],
+          "metrics": {
+            "responseTime": null,
+            "memoryUsage": null,
+            "errorCount": 0
+          },
+          "details": null
+        },
+        {
+          "name": "Agent Lifecycle Management",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "Agent stops gracefully",
+              "status": "NOT_RUN",
+              "expected": "Clean shutdown without errors",
+              "actual": null
+            },
+            {
+              "description": "Agent restarts successfully",
+              "status": "NOT_RUN",
+              "expected": "Agent boots after stop",
+              "actual": null
+            }
+          ],
+          "metrics": {
+            "responseTime": null,
+            "memoryUsage": null,
+            "errorCount": 0
+          },
+          "details": null
+        }
+      ]
+    },
+    "integrationTests": {
+      "category": "Integration Testing",
+      "description": "System integration validation between components",
+      "tests": [
+        {
+          "name": "REST API Integration",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "API endpoints respond correctly",
+              "status": "NOT_RUN",
+              "expected": "200 status codes",
+              "actual": null
+            },
+            {
+              "description": "Request/response format validation",
+              "status": "NOT_RUN",
+              "expected": "JSON format matches spec",
+              "actual": null
+            }
+          ],
+          "metrics": {
+            "averageResponseTime": null,
+            "successRate": 0,
+            "endpointsTested": 0
+          },
+          "details": {
+            "endpoints": [
+              "GET /api/profiles",
+              "GET /api/profiles/:name",
+              "POST /api/profiles",
+              "PUT /api/profiles/:name",
+              "DELETE /api/profiles/:name"
+            ]
+          }
+        },
+        {
+          "name": "Socket.IO Integration",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "WebSocket connections establish",
+              "status": "NOT_RUN",
+              "expected": "Connection successful",
+              "actual": null
+            },
+            {
+              "description": "Real-time events received",
+              "status": "NOT_RUN",
+              "expected": "Events update UI",
+              "actual": null
+            }
+          ],
+          "metrics": {
+            "connectionLatency": null,
+            "eventFrequency": null,
+            "droppedEvents": 0
+          },
+          "details": {
+            "events": [
+              "agents-status",
+              "agent:state:update",
+              "agent:action:executed",
+              "agent:message:sent"
+            ]
+          }
+        },
+        {
+          "name": "Frontend-Backend Integration",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "Redux state management works",
+              "status": "NOT_RUN",
+              "expected": "State updates correctly",
+              "actual": null
+            },
+            {
+              "description": "Component data flow works",
+              "status": "NOT_RUN",
+              "expected": "Props update on changes",
+              "actual": null
+            }
+          ],
+          "metrics": {
+            "stateUpdateLatency": null,
+            "renderPerformance": null,
+            "componentErrors": 0
+          },
+          "details": {
+            "components": [
+              "ProfileList",
+              "ProfileCard", 
+              "ProfileEditor",
+              "AgentStatusDisplay"
+            ]
+          }
+        }
+      ]
+    },
+    "performanceTests": {
+      "category": "Performance Testing",
+      "description": "System performance under various load conditions",
+      "tests": [
+        {
+          "name": "API Load Testing",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "thresholds": {
+            "maxResponseTime": 2000,
+            "maxErrorRate": 0.05,
+            "minThroughput": 10
+          },
+          "metrics": {
+            "averageResponseTime": null,
+            "p95ResponseTime": null,
+            "maxResponseTime": null,
+            "errorRate": null,
+            "throughput": null,
+            "totalRequests": 0
+          },
+          "assertions": [
+            {
+              "description": "Response time within threshold",
+              "status": "NOT_RUN",
+              "expected": "< 2000ms",
+              "actual": null
+            },
+            {
+              "description": "Error rate acceptable",
+              "status": "NOT_RUN",
+              "expected": "< 5%",
+              "actual": null
+            }
+          ]
+        },
+        {
+          "name": "WebSocket Performance",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "thresholds": {
+            "maxLatency": 500,
+            "maxPacketLoss": 0.01
+          },
+          "metrics": {
+            "averageLatency": null,
+            "maxLatency": null,
+            "packetLossRate": null,
+            "connectionStability": null
+          },
+          "assertions": [
+            {
+              "description": "Latency within threshold",
+              "status": "NOT_RUN",
+              "expected": "< 500ms",
+              "actual": null
+            },
+            {
+              "description": "Connection stable",
+              "status": "NOT_RUN",
+              "expected": "< 1% packet loss",
+              "actual": null
+            }
+          ]
+        },
+        {
+          "name": "Memory Management",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "thresholds": {
+            "maxMemoryUsage": 536870912,
+            "maxGrowthRate": 102400
+          },
+          "metrics": {
+            "averageMemoryUsage": null,
+            "maxMemoryUsage": null,
+            "memoryGrowthRate": null,
+            "memoryLeaksDetected": false
+          },
+          "assertions": [
+            {
+              "description": "Memory usage within limits",
+              "status": "NOT_RUN",
+              "expected": "< 512MB",
+              "actual": null
+            },
+            {
+              "description": "No memory leaks",
+              "status": "NOT_RUN",
+              "expected": "Growth rate < 100KB/s",
+              "actual": null
+            }
+          ]
+        }
+      ]
+    },
+    "reliabilityTests": {
+      "category": "Reliability Testing",
+      "description": "System stability and error handling validation",
+      "tests": [
+        {
+          "name": "Error Handling",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "Invalid operations handled gracefully",
+              "status": "NOT_RUN",
+              "expected": "User-friendly error messages",
+              "actual": null
+            },
+            {
+              "description": "System recovers from errors",
+              "status": "NOT_RUN",
+              "expected": "No crashes or hangs",
+              "actual": null
+            }
+          ],
+          "metrics": {
+            "errorRecoveryTime": null,
+            "crashCount": 0,
+            "unhandledExceptions": 0
+          },
+          "details": null
+        },
+        {
+          "name": "Concurrent Operations",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "Multiple agents run simultaneously",
+              "status": "NOT_RUN",
+              "expected": "No interference between agents",
+              "actual": null
+            },
+            {
+              "description": "Race conditions prevented",
+              "status": "NOT_RUN",
+              "expected": "Data consistency maintained",
+              "actual": null
+            }
+          ],
+          "metrics": {
+            "maxConcurrentAgents": null,
+            "dataConsistencyScore": null,
+            "raceConditionCount": 0
+          },
+          "details": null
+        },
+        {
+          "name": "Extended Stability",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "System stable over extended period",
+              "status": "NOT_RUN",
+              "expected": "No degradation over time",
+              "actual": null
+            },
+            {
+              "description": "Resource usage stable",
+              "status": "NOT_RUN",
+              "expected": "No resource exhaustion",
+              "actual": null
+            }
+          ],
+          "metrics": {
+            "uptime": null,
+            "performanceDegradation": null,
+            "resourceUtilization": null
+          },
+          "details": null
+        }
+      ]
+    },
+    "userExperienceTests": {
+      "category": "User Experience Testing",
+      "description": "User interface and interaction validation",
+      "tests": [
+        {
+          "name": "Interface Responsiveness",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "UI responds promptly to actions",
+              "status": "NOT_RUN",
+              "expected": "< 500ms response",
+              "actual": null
+            },
+            {
+              "description": "Loading states provide feedback",
+              "status": "NOT_RUN",
+              "expected": "Clear progress indicators",
+              "actual": null
+            }
+          ],
+          "metrics": {
+            "uiResponseTime": null,
+            "loadingStateAccuracy": null,
+            "userErrorRate": null
+          },
+          "details": null
+        },
+        {
+          "name": "Real-time Updates",
+          "status": "NOT_RUN",
+          "duration": 0,
+          "assertions": [
+            {
+              "description": "Stats update smoothly",
+              "status": "NOT_RUN",
+              "expected": "No UI freezing",
+              "actual": null
+            },
+            {
+              "description": "Update frequency appropriate",
+              "status": "NOT_RUN",
+              "expected": "1-5 second intervals",
+              "actual": null
+            }
+          ],
+          "metrics": {
+            "updateFrequency": null,
+            "uiJankCount": 0,
+            "dataFreshness": null
+          },
+          "details": null
+        }
+      ]
+    }
+  },
+  "performanceMetrics": {
+    "system": {
+      "cpuUsage": null,
+      "memoryUsage": null,
+      "diskIO": null,
+      "networkIO": null
+    },
+    "application": {
+      "responseTime": {
+        "average": null,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "max": null
+      },
+      "throughput": {
+        "requestsPerSecond": null,
+        "eventsPerSecond": null,
+        "operationsPerSecond": null
+      },
+      "errors": {
+        "errorRate": null,
+        "totalErrors": 0,
+        "errorTypes": []
+      },
+      "resources": {
+        "memoryUsage": null,
+        "connectionCount": null,
+        "activeAgents": null
+      }
+    }
+  },
+  "issues": {
+    "critical": [],
+    "high": [],
+    "medium": [],
+    "low": [],
+    "recommendations": []
+  },
+  "coverage": {
+    "requirements": {
+      "total": 15,
+      "covered": 0,
+      "percentage": 0
+    },
+    "testScenarios": {
+      "total": 12,
+      "executed": 0,
+      "passed": 0,
+      "percentage": 0
+    },
+    "codePaths": {
+      "frontend": {
+        "components": 0,
+        "services": 0,
+        "utilities": 0
+      },
+      "backend": {
+        "api": 0,
+        "socket": 0,
+        "services": 0
+      }
+    }
+  },
+  "recommendations": {
+    "immediate": [],
+    "shortTerm": [],
+    "longTerm": [],
+    "performance": [],
+    "security": [],
+    "usability": []
+  },
+  "appendices": {
+    "testData": {
+      "profilesUsed": [],
+      "agentsCreated": [],
+      "operationsPerformed": []
+    },
+    "environment": {
+      "hardware": {
+        "cpu": "Unknown",
+        "memory": "Unknown",
+        "storage": "Unknown"
+      },
+      "software": {
+        "operatingSystem": "Windows 10",
+        "nodeVersion": "18.0.0",
+        "browser": "Chrome/Edge/Firefox"
+      }
+    },
+    "configuration": {
+      "testTimeout": 30000,
+      "retryAttempts": 3,
+      "parallelism": 5,
+      "dataVolume": "medium"
+    }
+  }
+}

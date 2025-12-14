@@ -5,7 +5,7 @@ console.log('Testing the new frontend UI connection to MindServer\n');
 
 // Test configuration
 const SERVER_URL = 'http://localhost:8080';
-const FRONTEND_URL = 'http://localhost:5174';
+const FRONTEND_URL = 'http://localhost:5173';
 const TEST_TIMEOUT = 10000; // 10 seconds
 
 let testPassed = false;
@@ -145,19 +145,25 @@ setTimeout(() => {
   
   if (allTestsPassed) {
     console.log('\n✅ New UI connection verified successfully!');
-    console.log('   - MindServer is responding correctly');
+    console.log('   - MindServer API is responding correctly on port 8080');
     console.log('   - Agent data is being received properly');
     console.log('   - All agents are connected and in-game');
     console.log(`   - Frontend should be accessible at ${FRONTEND_URL}`);
+    console.log('\n📋 Migration Status:');
+    console.log('   - New UI (port 5173): ✅ Ready');
+    console.log('   - API (port 8080): ✅ Ready');
+    console.log('   - Old UI (port 8080/ui): ⚠️  Deprecated');
     console.log('\nNext steps:');
     console.log('   1. Open your browser and navigate to the frontend URL');
     console.log('   2. Verify the agent list displays correctly');
     console.log('   3. Check that connection status shows "Connected"');
     console.log('   4. Test agent interactions and state updates');
+    console.log('\n💡 Use "npm run ui:new" to start the new UI');
+    console.log('💡 Use "npm run ui:both" to start both services');
   } else {
     console.log('\n❌ New UI connection issues detected:');
     if (!testResults.connectionEstablished) {
-      console.log('   - Unable to establish connection to MindServer');
+      console.log('   - Unable to establish connection to MindServer API');
     }
     if (!testResults.agentsStatusReceived) {
       console.log('   - agents-status event not received');
@@ -168,6 +174,10 @@ setTimeout(() => {
     if (!testResults.connectionStable) {
       console.log('   - Agent connections are unstable');
     }
+    console.log('\n💡 Troubleshooting:');
+    console.log('   - Ensure MindServer is running: npm run ui:old');
+    console.log('   - Ensure new UI is running: npm run ui:new');
+    console.log('   - Or start both: npm run ui:both');
   }
   
   if (socket) {

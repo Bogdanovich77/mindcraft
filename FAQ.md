@@ -36,3 +36,9 @@
 - Texture Packs? Apparently these cause issues and refuse to connect. Not sure why
   
 - Baritone? Baritone is a mod that is completely different from mineflayer. There is currently no easy way to integrate the two programs.
+
+- **UI Deprecation?** The old UI (port 8080) is deprecated and will be discontinued on 2026-12-31. Use the new UI at **http://localhost:5173**. See the [Migration Guide](README.md#ui-migration-guide) for details.
+
+- **Where is the new UI?** The new React-based UI runs on port 5173. Start it with `cd frontend && npm run dev` or use `npm run ui:both` to start both backend and new UI.
+
+- **Can I still use the old UI?** Yes, the old UI remains functional during the deprecation period, but we strongly recommend migrating to the new UI for better features and future compatibility.

@@ -43,6 +43,12 @@ Do not connect this bot to public servers with coding enabled. This project allo
 5. Start a minecraft world and open it to LAN on localhost port `55916`
 
 6. Run `node main.js` from the installed directory
+7. Open the new UI at **http://localhost:5173** (recommended) or the old UI at http://localhost:8080 (deprecated)
+
+> [!Warning]
+> The old UI (port 8080) is deprecated and will be discontinued on 2026-12-31.
+> Please use the new React-based UI at **http://localhost:5173** for the best experience.
+> See [Migration Guide](#ui-migration-guide) for details.
 
 If you encounter issues, check the [FAQ](https://github.com/mindcraft-bots/mindcraft/blob/main/FAQ.md) or find support on [discord](https://discord.gg/mp73p35dzC). We are currently not very responsive to github issues. To run tasks please refer to [Minecollab Instructions](minecollab.md#installation)
 
@@ -431,12 +437,84 @@ If you want more optimization and automatic launching of the minecraft world, yo
 If you intend to `allow_insecure_coding`, it is a good idea to run the app in a docker container to reduce the risks of running unknown code. This is strongly recommended before connecting to remote servers, although still does not guarantee complete safety.
 
 ```bash
-docker build -t mindcraft . && docker run --rm --add-host=host.docker.internal:host-gateway -p 8080:8080 -p 3000-3003:3000-3003 -e SETTINGS_JSON='{"auto_open_ui":false,"profiles":["./profiles/gemini.json"],"host":"host.docker.internal"}' --volume ./keys.json:/app/keys.json --name mindcraft mindcraft
+docker build -t mindcraft . && docker run --rm --add-host=host.docker.internal:host-gateway -p 8080:8080 -p 5173:5173 -p 3000-3003:3000-3003 -e SETTINGS_JSON='{"auto_open_ui":false,"profiles":["./profiles/gemini.json"],"host":"host.docker.internal"}' --volume ./keys.json:/app/keys.json --name mindcraft mindcraft
 ```
 or simply
 ```bash
 docker-compose up --build
 ```
+
+# UI Migration Guide
+
+## 🚨 Important: Old UI Deprecation
+
+The old UI (port 8080) is **deprecated** and will be discontinued on **2026-12-31**.
+
+### New UI Benefits
+- **Modern React-based interface** with enhanced performance
+- **Real-time updates** and improved agent visualization
+- **Mobile-responsive design** for better accessibility
+- **Enhanced debugging tools** and error handling
+- **Better developer experience** with hot reload and modern tooling
+
+### Quick Migration Steps
+
+1. **Update Your Bookmarks**
+   - Remove: `http://localhost:8080`
+   - Add: `http://localhost:5173`
+
+2. **Start the New UI**
+   ```bash
+   # Start backend (required)
+   node main.js
+   
+   # Start new UI (in separate terminal)
+   cd frontend
+   npm run dev
+   ```
+
+3. **Access the Interface**
+   - Open **http://localhost:5173** in your browser
+   - All functionality from the old UI is available and enhanced
+
+### Development Workflow
+
+For development, we recommend using the new workflow:
+
+```bash
+# Start both backend and new UI
+npm run ui:both
+
+# Or start individually
+npm run ui:new  # Frontend only (port 5173)
+npm run ui:old  # Backend only (port 8080, deprecated)
+```
+
+### Migration Timeline
+
+- **2025-12-14**: Deprecation announcement
+- **2026-06-01**: Enhanced deprecation warnings begin
+- **2026-12-31**: Old UI sunset (final discontinuation)
+
+### Getting Help
+
+- **Documentation**: See `/frontend/README.md` for new UI specifics
+- **API Access**: Backend API endpoints remain unchanged
+- **Support**: Join our [Discord](https://discord.gg/mp73p35dzC) for assistance
+
+### Feature Comparison
+
+| Feature | Old UI (8080) | New UI (5173) |
+|---------|---------------|---------------|
+| Agent Management | ✅ Basic | ✅ Enhanced |
+| Real-time Updates | ⚠️ Limited | ✅ Full |
+| Mobile Support | ❌ No | ✅ Responsive |
+| Debugging Tools | ⚠️ Basic | ✅ Advanced |
+| Performance | ⚠️ Standard | ✅ Optimized |
+| Developer Experience | ⚠️ Basic | ✅ Modern |
+
+> [!Note]
+> The backend API and all agent functionality remain unchanged. Only the web interface is being upgraded.
 
 When running in docker, if you want the bot to join your local minecraft server, you have to use a special host address `host.docker.internal` to call your localhost from inside your docker container. Put this into your [settings.js](settings.js):
 

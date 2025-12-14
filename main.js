@@ -68,6 +68,22 @@ if (process.env.LOG_ALL) {
     settings.log_all_prompts = process.env.LOG_ALL;
 }
 
+// Show deprecation warning if auto_open_ui is enabled
+if (settings.auto_open_ui && settings.ui_deprecation?.old_ui_deprecated !== false) {
+    console.log('');
+    console.log('⚠️  UI DEPRECATION WARNING ⚠️');
+    console.log('The old UI (port 8080) is deprecated and will be discontinued on 2026-12-31.');
+    console.log('');
+    console.log('Recommended actions:');
+    console.log('1. Use the new UI: cd frontend && npm run dev');
+    console.log('2. Open http://localhost:5173 instead of http://localhost:8080');
+    console.log('3. Run npm run migrate for migration assistance');
+    console.log('4. See UI_MIGRATION_GUIDE.md for detailed instructions');
+    console.log('');
+    console.log('To suppress this warning, set auto_open_ui: false in settings.js');
+    console.log('');
+}
+
 // Initialize Mindcraft server
 Mindcraft.init(true, settings.mindserver_port, settings.auto_open_ui);
 

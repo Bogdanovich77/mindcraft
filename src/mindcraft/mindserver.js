@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as mindcraft from './mindcraft.js';
 import { readFileSync } from 'fs';
+import ProfileManager from './profileManager.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Mindserver is:
@@ -16,6 +17,7 @@ let io;
 let server;
 const agent_connections = {};
 const agent_listeners = {};
+const profileManager = new ProfileManager();
 
 function agentsStatusUpdate(socket) {
     if (!socket) {
@@ -173,9 +175,45 @@ export function createMindServer(host_public = false, port = 8080) {
     server = http.createServer(app);
     io = new Server(server);
 
-    // Serve static files
+    // Serve static files with deprecation warnings
     const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    app.use(express.static(path.join(__dirname, 'public')));
+    
+    // Add deprecation middleware
+    app.use((req, res, next) => {
+        // Add deprecation headers for all non-API routes
+        if (!req.path.startsWith('/api')) {
+            res.setHeader('Deprecation', 'true');
+            res.setHeader('Sunset', '2026-12-31'); // One year deprecation timeline
+            res.setHeader('Link', '<http://localhost:5173>; rel="new-ui"; type="text/html"');
+        }
+        next();
+    });
+
+    // Add redirect for root path to new UI
+    app.get('/', (req, res) => {
+        console.log('[DEPRECATION] Old UI accessed from', req.ip, '- redirecting to new UI');
+        res.status(301).send({
+            message: 'This interface is deprecated. Please use the new UI at http://localhost:5173',
+            redirect: 'http://localhost:5173',
+            deprecationNotice: 'The old UI (port 8080) will be discontinued. Please update your bookmarks.',
+            migrationGuide: 'See documentation for migration instructions.'
+        });
+    });
+
+    // Add deprecation warning for static files
+    app.use(express.static(path.join(__dirname, 'public'), {
+        setHeaders: (res, path) => {
+            res.setHeader('Deprecation', 'true');
+            res.setHeader('Sunset', '2026-12-31');
+            res.setHeader('X-Deprecation-Warning', 'This UIered content will be removed. Use the new UI at http://localhost:5173');
+        }
+    }));
+    
+    // Add JSON middleware for REST API
+    app.use(express.json());
+    
+    // REST API Routes for Profile Management
+    setupProfileRoutes(app);
 
     // Socket.io connection handling
     io.on('connection', (socket) => {
@@ -421,12 +459,315 @@ export function createMindServer(host_public = false, port = 8080) {
         });
     });
 
+    // Socket.IO Events for Profile Management
+    setupProfileSocketHandlers(socket);
+
     let host = host_public ? '0.0.0.0' : 'localhost';
     server.listen(port, host, () => {
         console.log(`MindServer running on port ${port}`);
+        console.log(`⚠️  DEPRECATION WARNING: The old UI (port ${port}) is deprecated and will be discontinued.`);
+        console.log(`   Please use the new UI at http://localhost:5173`);
+        console.log(`   Migration guide: http://localhost:${port}/api/deprecation-info`);
+        console.log(`   Sunset: 2026-12-31`);
     });
 
     return server;
+}
+
+/**
+ * Setup REST API routes for profile management
+ */
+function setupProfileRoutes(app) {
+    // GET /api/profiles - List all profiles
+    app.get('/api/profiles', async (req, res) => {
+        try {
+            const profiles = await profileManager.getProfiles();
+            res.json({
+                success: true,
+                data: profiles,
+                meta: {
+                    timestamp: new Date().toISOString(),
+                    count: profiles.length
+                }
+            });
+        } catch (error) {
+            console.error('GET /api/profiles error:', error);
+            res.status(500).json({
+                success: false,
+                error: error.message,
+                meta: {
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+    });
+
+    // GET /api/profiles/:name - Get specific profile
+    app.get('/api/profiles/:name', async (req, res) => {
+        try {
+            const { name } = req.params;
+            const profile = await profileManager.getProfile(name);
+            res.json({
+                success: true,
+                data: profile,
+                meta: {
+                    timestamp: new Date().toISOString()
+                }
+            });
+        } catch (error) {
+            console.error(`GET /api/profiles/${req.params.name} error:`, error);
+            res.status(404).json({
+                success: false,
+                error: error.message,
+                meta: {
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+    });
+
+    // PUT /api/profiles/:name - Update profile
+    app.put('/api/profiles/:name', async (req, res) => {
+        try {
+            const { name } = req.params;
+            const profileData = req.body;
+            
+            const updatedProfile = await profileManager.saveProfile(name, profileData);
+            res.json({
+                success: true,
+                data: updatedProfile,
+                meta: {
+                    timestamp: new Date().toISOString(),
+                    message: `Profile '${name}' updated successfully`
+                }
+            });
+        } catch (error) {
+            console.error(`PUT /api/profiles/${req.params.name} error:`, error);
+            res.status(400).json({
+                success: false,
+                error: error.message,
+                meta: {
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+    });
+
+    // POST /api/profiles - Create new profile
+    app.post('/api/profiles', async (req, res) => {
+        try {
+            const profileData = req.body;
+            
+            const newProfile = await profileManager.createProfile(profileData);
+            res.status(201).json({
+                success: true,
+                data: newProfile,
+                meta: {
+                    timestamp: new Date().toISOString(),
+                    message: `Profile '${newProfile.name}' created successfully`
+                }
+            });
+        } catch (error) {
+            console.error('POST /api/profiles error:', error);
+            res.status(400).json({
+                success: false,
+                error: error.message,
+                meta: {
+                    timestamp: new Date().toISOString()
+                }
+            });
+        }
+    });
+
+    // DELETE /api/profiles/:name - Delete profile
+    app.delete('/api/profiles/:name', async (req, res) => {
+        try {
+            const { name } = req.params;
+            
+            await profileManager.deleteProfile(name);
+            res.json({
+                success: true,
+                data: null,
+                meta: {
+                    timestamp: new().toISOString(),
+                    message: `Profile '${疲惫'${name}' deleted successfully`
+                }
+            });
+        } catch (error) {
+            console.error(`DELETE /api/profiles/${req.params.name} error:`, error);
+            res.status(404).json({
+               : false,
+                error: error.message,
+                meta: {
+                    timestamp: new().toISOString()
+                }
+            });
+        }
+    });
+
+    // DEPRECATION INFO /api/deprecation-info - Migration information
+    app.get('/api/deprecation-info', (req, res) => {
+        res.json({
+            success: true,
+            data: {
+                title: 'UI Deprecation Notice',
+                message: 'The old UI (port 8080) is deprecated and will be discontinued.',
+                sunsetDate: '2026-12-31',
+                newUI: {
+                    url: 'http://localhost:5173',
+                    description: 'New React-based cognitive dashboard with enhanced features'
+                },
+                migration: {
+                    steps: [
+                        'Update your bookmarks from port 8080 to 5173',
+                        'The new UI provides all functionality of the old interface',
+                        'API endpoints remain unchanged for backend integration',
+                        'Development workflow: npm run dev in frontend/ directory'
+                    ],
+                    benefits: [
+                        'Modern React-based interface',
+                        'Real-time updates and improved performance',
+                        'Enhanced agent visualization',
+                        'Better error handling and debugging tools',
+                        'Mobile-responsive design'
+                    ]
+                },
+                timeline: {
+                    '2025-12-14': 'Deprecation announcement',
+                    '2026-06-01': 'Begin deprecation warnings',
+                    '2026-12-31': 'Final sunset of old UI'
+                },
+                support: {
+                    'documentation': 'See README.md for new UI setup',
+                    'issues': 'Report issues on GitHub',
+                    'community': 'Discord support available'
+                }
+            },
+            meta: {
+                timestamp: new Date().toISOString(),
+                apiVersion: '1.0.0'
+            }
+        });
+    });
+}
+
+/**
+ * Setup Socket.IO handlers for profile management
+ */
+function setupProfileSocketHandlers(socket) {
+    // get-profiles - Return list of available profiles
+    socket.on('get-profiles', async (callback) => {
+        try {
+            const profiles = await profileManager.getProfiles();
+            callback({ success: true, data: profiles });
+        } catch (error) {
+            console.error('Socket get-profiles error:', error);
+            callback({ success: false, error: error.message });
+        }
+    });
+
+    // get-profile - Get specific profile details by name
+    socket.on('get-profile', async (name, callback) => {
+        try {
+            const profile = await profileManager.getProfile(name);
+            callback({ success: true, data: profile });
+        } catch (error) {
+            console.error(`Socket get-profile ${name} error:`, error);
+            callback({ success: false, error: error.message });
+        }
+    });
+
+    // save-profile - Save/modify a profile
+    socket.on('save-profile', async (name, profileData, callback) => {
+        try {
+            const updatedProfile = await profileManager.saveProfile(name, profileData);
+            callback({
+                success: true,
+                data: updatedProfile,
+                message: `Profile '${name}' saved successfully`
+            });
+        } catch (error) {
+            console.error(`Socket save-profile ${name} error:`, error);
+            callback({ success: false, error: error.message });
+        }
+    });
+
+    // create-agent-from-profile - Create and start an agent using a specific profile
+    socket.on('create-agent-from-profile', async (profileName, settings, callback) => {
+        try {
+            // First get the profile
+            const profile = await profileManager.getProfile(profileName);
+            
+            // Merge profile with any additional settings
+            const agentSettings = {
+                ...settings,
+                profile: profile
+            };
+
+            // Validate required settings
+            for (let key in settings_spec) {
+                if (!(key in agentSettings)) {
+                    if (settings_spec[key].required) {
+                        callback({ success: false, error: `Setting ${key} is required` });
+                        return;
+                    } else {
+                        agentSettings[key] = settings_spec[key].default;
+                    }
+                }
+            }
+
+            // Check if agent already exists
+            if (agent_connections[profile.name]) {
+                callback({ success: false, error: 'Agent already exists' });
+                return;
+            }
+
+            // Create the agent
+            let returned = await mindcraft.createAgent(agentSettings);
+            
+            if (returned.success) {
+                callback({
+                    success: true,
+                    data: { agentName: profile.name, profile: profile },
+                    message: `Agent '${profile.name}' created from profile successfully`
+                });
+                agentsStatusUpdate();
+            } else {
+                callback({ success: false, error: returned.error });
+                // Cleanup if creation failed
+                if (agent_connections[profile.name]) {
+                    mindcraft.destroyAgent(profile.name);
+                    delete agent_connections[profile.name];
+                }
+            }
+        } catch (error) {
+            console.error(`Socket create-agent-from-profile ${profileName} error:`, error);
+            callback({ success: false, error: error.message });
+        }
+    });
+
+    // delete-profile - Remove a profile file
+    socket.on('delete-profile', async (name, callback) => {
+        try {
+            // Check if agent is currently running with this profile
+            if (agent_connections[name]) {
+                callback({
+                    success: false,
+                    error: `Cannot delete profile '${name}' - agent is currently running. Please stop the agent first.`
+                });
+                return;
+            }
+
+            await profileManager.deleteProfile(name);
+            callback({
+                success: true,
+                message: `Profile '${name}' deleted successfully`
+            });
+        } catch (error) {
+            console.error(`Socket delete-profile ${name} error:`, error);
+            callback({ success: false, error: error.message });
+        }
+    });
 }
 
 let listenerInterval = null;

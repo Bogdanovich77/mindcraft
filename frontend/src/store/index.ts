@@ -11,6 +11,7 @@ import type { TypedUseSelectorHook } from 'react-redux';
 
 // Import essential reducers only
 import agentsReducer from './slices/agentsSlice';
+import profilesReducer from './slices/profilesSlice';
 import connectionReducer from './slices/connectionSlice';
 import uiReducer from './slices/uiSlice';
 import environmentReducer from './slices/environmentSlice';
@@ -18,6 +19,7 @@ import dashboardReducer from './slices/dashboardSlice';
 
 // Import essential exports from slices with aliases to avoid conflicts
 import * as AgentsSliceActions from './slices/agentsSlice';
+import * as ProfilesSliceActions from './slices/profilesSlice';
 import * as ConnectionSliceActions from './slices/connectionSlice';
 import * as UISliceActions from './slices/uiSlice';
 import * as EnvironmentSliceActions from './slices/environmentSlice';
@@ -27,6 +29,7 @@ import * as DashboardSliceActions from './slices/dashboardSlice';
 export const store = configureStore({
   reducer: {
     agents: agentsReducer,
+    profiles: profilesReducer,
     connection: connectionReducer,
     ui: uiReducer,
     environment: environmentReducer,
@@ -35,7 +38,17 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+        ignoredActions: [
+          'persist/PERSIST',
+          'persist/REHYDRATE',
+          // Ignore async thunk fulfilled/rejected actions that may have non-serializable payloads
+          'agents/initializeAgentsSocket/fulfilled',
+          'agents/initializeAgentsSocket/rejected',
+          'profiles/initializeProfilesSocket/fulfilled',
+          'profiles/initializeProfilesSocket/rejected',
+        ],
+        // Ignore specific paths in state that may contain non-serializable values
+        ignoredPaths: ['agents.streaming', 'agents.performance'],
       },
     }),
 });
@@ -104,6 +117,58 @@ export const {
   handleStreamingError: handleAgentsStreamingError,
   initializeAgentsSocket
 } = AgentsSliceActions;
+
+// --- Profiles Slice ---
+export const {
+  // Profiles Slice Actions
+  selectProfile: selectProfileFromProfiles,
+  clearSelectedProfile: clearProfilesSelectedProfile,
+  setProfilesLoading,
+  setProfilesError,
+  clearProfilesError,
+  addProfile,
+  updateProfile,
+  removeProfile,
+  updateProfileBootStatus,
+  updateProfileBootAttempts,
+  setProfileBooting,
+  handleProfileBootEvent,
+  handleProfileStatusEvent,
+  addProfileFromSocket,
+  updateProfileFromSocket,
+  removeProfileFromSocket,
+  startEditingProfile,
+  updateEditingProfile,
+  setValidationErrors,
+  stopEditingProfile,
+  setFilters,
+  clearFilters,
+  setView,
+  setSortBy,
+  setSortOrder,
+  toggleShowDetails,
+  setProfiles,
+  clearProfiles,
+  // Profiles Slice Selectors
+  selectAllProfiles,
+  selectProfileById,
+  selectSelectedProfile: selectProfilesSelectedProfile,
+  selectProfilesLoading,
+  selectProfilesError,
+  selectFilteredProfiles,
+  selectProfileStats,
+  selectBootingProfiles,
+  selectIsProfileBooting,
+  // Profiles Slice Thunks
+  fetchProfiles,
+  fetchProfile,
+  createProfile,
+  updateProfile: updateProfileThunk,
+  deleteProfile,
+  bootProfile,
+  stopProfile,
+  initializeProfilesSocket
+} = ProfilesSliceActions;
 
 // --- Connection Slice ---
 export const {
@@ -415,7 +480,6 @@ export const {
   updateTemporalViewConfig,
   updateInfluenceMapConfig,
   updateCommunityViewConfig,
-  setFilters,
   updateFilters,
   resetFilters,
   setRealTimeUpdates: setSocialRealTimeUpdates,
