@@ -145,11 +145,18 @@ const CognitiveDashboard: React.FC = () => {
     }
   };
 
-  // Initialize connection on mount
+  // Initialize connection on mount - App.tsx handles connection initialization
   useEffect(() => {
-    console.log('[CognitiveDashboard] Component mounted, initializing connection');
-    dispatch(connectToServer());
-  }, [dispatch]);
+    console.log('[CognitiveDashboard] Component mounted, connection handled by App.tsx');
+    
+    // No need to connect here - App.tsx handles it
+    // Just log the mount for debugging
+    
+    return () => {
+      console.log('[CognitiveDashboard] Component unmounting, cleaning up');
+      // Add any necessary cleanup here if needed
+    };
+  }, []); // No dependencies needed since we're just logging
 
   // Sync tab value with activeTab from store
   useEffect(() => {
@@ -335,7 +342,7 @@ const CognitiveDashboard: React.FC = () => {
           </Typography>
           <Grid container spacing={2}>
             {Object.values(agents).map((agent) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} key={agent.id}>
+              <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={agent.id}>
                 <Card
                   data-testid="agent-card"
                   sx={{

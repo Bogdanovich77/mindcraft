@@ -16,7 +16,13 @@ if (!rootElement) {
   throw new Error('Root element not found. Please ensure <div id="root"></div> exists in your HTML.');
 }
 
-const root = ReactDOM.createRoot(rootElement);
+// Check if root already exists to prevent multiple roots during HMR
+let root = (rootElement as any)._reactRootContainer?._internalRoot?.containerInfo
+  ? (rootElement as any)._reactRootContainer
+  : ReactDOM.createRoot(rootElement);
+
+// Store reference to prevent multiple roots
+(rootElement as any)._reactRootContainer = root;
 
 // Render with comprehensive error handling
 root.render(

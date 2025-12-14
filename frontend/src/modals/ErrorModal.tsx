@@ -172,9 +172,18 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
                     wordBreak: 'break-all'
                   }}
                 >
-                  <Typography variant="body2" component="pre">
+                  <Box component="pre" sx={{
+                    typography: 'body2',
+                    p: 1,
+                    bgcolor: 'grey.100',
+                    borderRadius: 1,
+                    fontSize: '0.875rem',
+                    fontFamily: 'monospace',
+                    overflow: 'auto',
+                    maxHeight: 200
+                  }}>
                     {getTechnicalDetails()}
-                  </Typography>
+                  </Box>
                 </Box>
               </Collapse>
             </Box>

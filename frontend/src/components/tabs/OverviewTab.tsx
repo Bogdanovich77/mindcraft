@@ -27,29 +27,29 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ agent }) => {
     agentId: agent.id,
     timestamp: Date.now(),
     cognitiveLoad: {
-      current: agent.cognitive.processing.cognitiveLoad,
+      current: 0.5, // Mock cognitive load for simplified architecture
       trend: 'stable' as const,
       threshold: 0.8,
-      history: [0.3, 0.4, 0.5, 0.6, 0.7, agent.cognitive.processing.cognitiveLoad],
+      history: [0.3, 0.4, 0.5, 0.6, 0.7, 0.5], // Mock history
     },
     performance: {
-      responseTime: agent.executive.performanceMetrics.cognitiveProcessingTime,
-      successRate: agent.executive.performanceMetrics.successRate,
-      memoryUsage: agent.executive.performanceMetrics.memoryUsage,
+      responseTime: 250, // Mock response time in ms
+      successRate: 0.95, // Mock success rate
+      memoryUsage: 128, // Mock memory usage in MB
       cpuUsage: 45, // Mock CPU usage
     },
     activity: {
-      currentAction: agent.executive.currentAction.description,
+      currentAction: agent.lastAction || 'idle',
       actionDuration: 5000, // Mock duration
       actionProgress: 0.75, // Mock progress
       goalProgress: 0.6, // Mock goal progress
     },
     health: {
-      healthStatus: agent.context.health > 15 ? 'optimal' :
-                   agent.context.health > 10 ? 'normal' :
-                   agent.context.health > 5 ? 'warning' : 'critical',
-      healthScore: (agent.context.health / 20) * 100,
-      energyLevel: agent.context.food / 20,
+      healthStatus: agent.worldContext.health > 15 ? 'optimal' :
+                   agent.worldContext.health > 10 ? 'normal' :
+                   agent.worldContext.health > 5 ? 'warning' : 'critical',
+      healthScore: (agent.worldContext.health / 20) * 100,
+      energyLevel: agent.worldContext.food / 20,
       resourceLevel: 0.8, // Mock resource level
     },
   }), [agent]);
@@ -61,28 +61,28 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ agent }) => {
     metrics: {
       responseTime: {
         timestamps: Array.from({ length: 10 }, (_, i) => Date.now() - (9 - i) * 60000),
-        values: Array.from({ length: 10 }, () => agent.executive.performanceMetrics.cognitiveProcessingTime + Math.random() * 100 - 50),
-        average: agent.executive.performanceMetrics.cognitiveProcessingTime,
-        min: agent.executive.performanceMetrics.cognitiveProcessingTime - 50,
-        max: agent.executive.performanceMetrics.cognitiveProcessingTime + 50,
+        values: Array.from({ length: 10 }, () => 250 + Math.random() * 100 - 50),
+        average: 250,
+        min: 200,
+        max: 300,
       },
       cognitiveLoad: {
         timestamps: Array.from({ length: 10 }, (_, i) => Date.now() - (9 - i) * 60000),
-        values: Array.from({ length: 10 }, () => agent.cognitive.processing.cognitiveLoad + Math.random() * 0.2 - 0.1),
-        average: agent.cognitive.processing.cognitiveLoad,
+        values: Array.from({ length: 10 }, () => 0.5 + Math.random() * 0.2 - 0.1),
+        average: 0.5,
         peaks: [0.8, 0.9],
       },
       successRate: {
         timestamps: Array.from({ length: 10 }, (_, i) => Date.now() - (9 - i) * 60000),
-        values: Array.from({ length: 10 }, () => agent.executive.performanceMetrics.successRate + Math.random() * 0.1 - 0.05),
-        average: agent.executive.performanceMetrics.successRate,
+        values: Array.from({ length: 10 }, () => 0.95 + Math.random() * 0.1 - 0.05),
+        average: 0.95,
         trend: 'stable' as const,
       },
       memoryUsage: {
         timestamps: Array.from({ length: 10 }, (_, i) => Date.now() - (9 - i) * 60000),
-        values: Array.from({ length: 10 }, () => agent.executive.performanceMetrics.memoryUsage + Math.random() * 20 - 10),
-        average: agent.executive.performanceMetrics.memoryUsage,
-        peak: agent.executive.performanceMetrics.memoryUsage + 20,
+        values: Array.from({ length: 10 }, () => 128 + Math.random() * 20 - 10),
+        average: 128,
+        peak: 148,
       },
       cpuUsage: {
         timestamps: Array.from({ length: 10 }, (_, i) => Date.now() - (9 - i) * 60000),
@@ -97,17 +97,17 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ agent }) => {
   const positionData = useMemo<AgentPositionData>(() => ({
     agentId: agent.id,
     currentPosition: {
-      x: agent.context.position.x,
-      y: agent.context.position.y,
-      z: agent.context.position.z,
-      dimension: agent.context.dimension,
+      x: agent.worldContext.position.x,
+      y: agent.worldContext.position.y,
+      z: agent.worldContext.position.z,
+      dimension: agent.worldContext.dimension,
     },
     positionHistory: Array.from({ length: 20 }, (_, i) => ({
       timestamp: Date.now() - (19 - i) * 30000,
-      x: agent.context.position.x + Math.random() * 10 - 5,
-      y: agent.context.position.y,
-      z: agent.context.position.z + Math.random() * 10 - 5,
-      dimension: agent.context.dimension,
+      x: agent.worldContext.position.x + Math.random() * 10 - 5,
+      y: agent.worldContext.position.y,
+      z: agent.worldContext.position.z + Math.random() * 10 - 5,
+      dimension: agent.worldContext.dimension,
     })),
     movement: {
       speed: 2.5, // Mock speed

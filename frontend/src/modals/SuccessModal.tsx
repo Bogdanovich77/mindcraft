@@ -126,9 +126,18 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
                   wordBreak: 'break-all'
                 }}
               >
-                <Typography variant="body2" component="pre">
+                <Box component="pre" sx={{
+                  typography: 'body2',
+                  p: 1,
+                  bgcolor: 'grey.100',
+                  borderRadius: 1,
+                  fontSize: '0.875rem',
+                  fontFamily: 'monospace',
+                  overflow: 'auto',
+                  maxHeight: 200
+                }}>
                   {typeof details === 'string' ? details : JSON.stringify(details, null, 2)}
-                </Typography>
+                </Box>
               </Box>
             </Box>
           )}

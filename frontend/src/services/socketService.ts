@@ -77,7 +77,8 @@ class SocketService {
   async connect(enableStreaming: boolean = false): Promise<void> {
     // Prevent concurrent connection attempts
     if (this.isConnecting) {
-      throw new Error('Connection already in progress');
+      console.log('[SocketService] Connection already in progress, skipping');
+      return;
     }
 
     if (this.isConnected()) {
@@ -913,9 +914,11 @@ let socketServiceInstance: SocketService | null = null;
 
 export const initializeSocket = (config: SocketServiceConfig): SocketService => {
   if (socketServiceInstance) {
-    socketServiceInstance.destroy();
+    console.log('[SocketService] Socket service already exists, reusing existing instance');
+    return socketServiceInstance;
   }
   
+  console.log('[SocketService] Creating new socket service instance');
   socketServiceInstance = new SocketService(config);
   return socketServiceInstance;
 };

@@ -72,8 +72,18 @@ export const initializeAgentsSocket = createAsyncThunk(
         dispatch(setAgents(agentSummaries));
       });
 
+      // Add throttling for agentUpdate events to prevent continuous update loops
+      let lastUpdateTime = 0;
+      const UPDATE_THROTTLE_MS = 1000; // 1 second minimum between updates
+      
       // Add listener for agentUpdate events (the real-time updates)
       socketService.on('agentUpdate', (data: any) => {
+        const now = Date.now();
+        if (now - lastUpdateTime < UPDATE_THROTTLE_MS) {
+          return; // Skip this update to prevent spam
+        }
+        lastUpdateTime = now;
+        
         console.log('[AgentsSlice] Received agent update:', data);
         
         // Transform object format to array format
@@ -85,7 +95,7 @@ export const initializeAgentsSocket = createAsyncThunk(
           position: agentData.position || { x: 0, y: 64, z: 0 },
           health: agentData.gameplay?.health || 20,
           level: 1,
-          lastUpdate: Date.now(),
+          lastUpdate: now,
         }));
         
         dispatch(setAgents(agentsArray));
@@ -554,8 +564,14 @@ export default agentsSlice.reducer;
 // Performance optimization: Memoized selectors to prevent unnecessary recalculations
 export const selectAllAgents = createSelector(
   [selectAgentsObject],
-  (agents) => Object.values(agents) // Transform object to array for better usability
+  (agents) => {
+    const values = Object.values(agents);
+    return values.length === 0 ? EMPTY_AGENTS_ARRAY : values;
+  }
 );
+
+// Cache empty array for agents
+const EMPTY_AGENTS_ARRAY: any[] = Object.freeze([]);
 
 export const selectAgentById = createSelector(
   [selectAgentsObject, (state: { agents: AgentsState }, agentId: string) => agentId],
@@ -567,14 +583,28 @@ export const selectSelectedAgent = createSelector(
   (agents, selectedId) => selectedId ? agents[selectedId] || null : null
 );
 
+// Create a memoized selector that properly handles array creation
 export const selectAgentIds = createSelector(
   [selectAgentsObject],
-  (agents) => Object.keys(agents)
+  (agents) => {
+    const keys = Object.keys(agents);
+    if (keys.length === 0) {
+      return EMPTY_ARRAY;
+    }
+    // Sort keys for consistent ordering
+    return keys.sort();
+  }
 );
+
+// Cache empty array reference to prevent new array creation
+const EMPTY_ARRAY: string[] = Object.freeze([]);
 
 export const selectOnlineAgents = createSelector(
   [selectAgentsObject],
-  (agents) => Object.values(agents).filter(agent => agent.status === 'online')
+  (agents) => {
+    const onlineAgents = Object.values(agents).filter(agent => agent.status === 'online');
+    return onlineAgents.length === 0 ? EMPTY_AGENTS_ARRAY : onlineAgents;
+  }
 );
 
 // Simplified selectors - direct property access instead of identity functions

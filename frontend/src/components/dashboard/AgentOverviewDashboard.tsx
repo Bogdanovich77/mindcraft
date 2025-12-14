@@ -88,13 +88,13 @@ const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({ agent, 
   const avgCognitiveLoad = useAppSelector(selectDashboardAverageCognitiveLoad);
   const avgSuccessRate = useAppSelector(selectDashboardAverageSuccessRate);
 
-  // Calculate derived metrics
+  // Calculate derived metrics with optimized dependencies
   const derivedMetrics = useMemo(() => {
     const totalAgents = allAgentIds.length;
     const onlineCount = onlineAgents.length;
     const offlineCount = totalAgents - onlineCount;
-    const healthStatus = onlineAgents.filter(agent => 
-      agent.context.health > 50 // Consider agents with health > 50 as healthy
+    const healthStatus = onlineAgents.filter(agent =>
+      agent.worldContext?.health > 50 // Consider agents with health > 50 as healthy
     ).length;
 
     return {
@@ -107,7 +107,7 @@ const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({ agent, 
       cognitiveLoad: avgCognitiveLoad * 100,
       successRate: avgSuccessRate * 100,
     };
-  }, [allAgentIds, onlineAgents, avgResponseTime, avgCognitiveLoad, avgSuccessRate]);
+  }, [allAgentIds.length, onlineAgents.length, avgResponseTime, avgCognitiveLoad, avgSuccessRate]);
 
   // Get performance and position data for selected agent
   const selectedPerformanceData = useAppSelector((state) => 
@@ -415,7 +415,7 @@ const AgentOverviewDashboard: React.FC<AgentOverviewDashboardProps> = ({ agent, 
                     profile: '',
                     status: 'online',
                     lastUpdate: Date.now(),
-                    context: {
+                    worldContext: {
                       position: { x: 0, y: 0, z: 0 },
                       health: selectedMetrics.health.healthScore,
                       food: 100,
