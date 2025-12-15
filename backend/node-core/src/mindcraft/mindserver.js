@@ -458,10 +458,20 @@ function setupProfileSocketHandlers(socket) {
     socket.on('get-profiles', async (callback) => {
         try {
             const profiles = await profileManager.getProfiles();
-            callback({ success: true, data: profiles });
+            if (typeof callback === 'function') {
+                callback({ success: true, data: profiles });
+            } else {
+                // If no callback provided, emit the response as an event
+                socket.emit('get-profiles-response', { success: true, data: profiles });
+            }
         } catch (error) {
             console.error('Socket get-profiles error:', error);
-            callback({ success: false, error: error.message });
+            if (typeof callback === 'function') {
+                callback({ success: false, error: error.message });
+            } else {
+                // If no callback provided, emit the error as an event
+                socket.emit('get-profiles-response', { success: false, error: error.message });
+            }
         }
     });
 
@@ -469,10 +479,20 @@ function setupProfileSocketHandlers(socket) {
     socket.on('get-profile', async (name, callback) => {
         try {
             const profile = await profileManager.getProfile(name);
-            callback({ success: true, data: profile });
+            if (typeof callback === 'function') {
+                callback({ success: true, data: profile });
+            } else {
+                // If no callback provided, emit the response as an event
+                socket.emit('get-profile-response', { success: true, data: profile });
+            }
         } catch (error) {
             console.error(`Socket get-profile ${name} error:`, error);
-            callback({ success: false, error: error.message });
+            if (typeof callback === 'function') {
+                callback({ success: false, error: error.message });
+            } else {
+                // If no callback provided, emit the error as an event
+                socket.emit('get-profile-response', { success: false, error: error.message });
+            }
         }
     });
 

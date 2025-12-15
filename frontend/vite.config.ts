@@ -102,10 +102,10 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '0.0.0.0',
       port: 5173,
-      // Enhanced HMR configuration
+      // Enhanced HMR configuration - use different port to avoid conflicts
       hmr: {
         overlay: true,
-        port: 5173, // Use same port as server to avoid WebSocket connection issues
+        port: 5174, // Use different port from main server to avoid WebSocket conflicts
       },
       // Enhanced proxy configuration for development
       proxy: {
@@ -117,7 +117,7 @@ export default defineConfig(({ mode }) => {
         },
         '/socket.io': {
           target: env.VITE_SOCKET_URL || 'http://localhost:8000',
-          change: true,
+          changeOrigin: true,
           ws: true,
           timeout: 10000,
         },
@@ -165,6 +165,12 @@ export default defineConfig(({ mode }) => {
         'lodash',
         'date-fns',
         'hoist-non-react-statics',
+      ],
+      // Dedupe emotion packages to prevent duplicate loading warnings
+      dedupe: [
+        '@emotion/react',
+        '@emotion/styled',
+        '@emotion/cache'
       ],
       // Force optimization to prevent duplicate React instances
       force: true,

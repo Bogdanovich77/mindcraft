@@ -171,19 +171,31 @@ export const connectToServer = createAsyncThunk(
       // Initialize socket connection
       const socketService = getSocketService();
       if (!socketService) {
-        throw new Error('Socket service not available');
+        console.error('[ConnectionSlice] Socket service not available - check FastAPI Gateway on port 8000');
+        throw new Error('Socket service not available. Please ensure FastAPI Gateway is running on port 8000');
       }
+      
+      console.log('[ConnectionSlice] Socket service found, attempting connection...');
       
       // Set up status change listener
       socketService.onStatusChange((status: SocketServiceStatus) => {
+        console.log('[ConnectionSlice] Status change:', {
+          isConnected: status.isConnected,
+          isConnecting: status.isConnecting,
+          connectionAttempts: status.connectionAttempts,
+          lastError: status.lastError
+        });
+        
         dispatch(updateConnectionAttempts(status.connectionAttempts));
         dispatch(updateMetrics(status.metrics));
         
         if (status.isConnected) {
+          console.log('[ConnectionSlice] Connection established successfully');
           dispatch(setConnectionStatus('connected'));
           dispatch(clearConnectionError());
           dispatch(setReconnecting(false));
         } else if (status.isConnecting) {
+          console.log('[ConnectionSlice] Connection in progress...');
           dispatch(setConnectionStatus('connecting'));
           // Only set reconnecting to true if this is actually a reconnection attempt
           // (connectionAttempts > 1 means we've been connected before)
@@ -193,16 +205,28 @@ export const connectToServer = createAsyncThunk(
             dispatch(setReconnecting(false));
           }
         } else {
+          console.error('[ConnectionSlice] Connection failed:', status.lastError);
           dispatch(setConnectionError(status.lastError || 'Connection failed'));
           dispatch(setReconnecting(false));
         }
       });
       
       await socketService.connect();
+      console.log('[ConnectionSlice] Socket connection completed');
       dispatch(setConnectionStatus('connected'));
       return { connected: true };
     } catch (error) {
-      dispatch(setConnectionError(error instanceof Error ? error.message : 'Unknown connection error'));
+      console.error('[ConnectionSlice] Connection error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown connection error';
+      
+      // Add helpful debugging information
+      if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('8000')) {
+        dispatch(setConnectionError('Cannot connect to FastAPI Gateway on port 8000. Please run: cd backend/fastapi-gateway && .venv\\Scripts\\activate && python main.py'));
+      } else if (errorMessage.includes('Authentication required')) {
+        dispatch(setConnectionError('Authentication required. The connection was established but authentication failed. Check JWT configuration.'));
+      } else {
+        dispatch(setConnectionError(errorMessage));
+      }
       throw error;
     }
   }

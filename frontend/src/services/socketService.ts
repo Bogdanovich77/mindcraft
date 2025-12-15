@@ -973,6 +973,14 @@ export const initializeSocket = (config: SocketServiceConfig): SocketService => 
 };
 
 export const getSocketService = (): SocketService | null => {
+  if (!socketServiceInstance) {
+    console.warn('[SocketService] Socket service not initialized. This indicates the FastAPI Gateway (port 8000) may not be running or the frontend has not connected to it yet.');
+    console.warn('[SocketService] To fix this issue:');
+    console.warn('  1. Ensure the FastAPI Gateway is running on port 8000');
+    console.warn('  2. Check that the frontend environment variables point to the correct URL');
+    console.warn('  3. Verify the socket service has been initialized with initializeSocket()');
+    console.warn('  4. Check browser console for connection errors');
+  }
   return socketServiceInstance;
 };
 

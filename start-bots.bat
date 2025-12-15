@@ -4,53 +4,50 @@ setlocal enabledelayedexpansion
 echo Starting Mindcraft with 3-Tier Architecture...
 echo ============================================
 
-REM Function to check if a port is in use
-:check_port
-netstat -ano | findstr ":%1 " | findstr "LISTENING" >nul
-if %errorlevel% equ 0 (
-    echo Port %1 is already in use. Please stop the process using this port.
-    exit /b 1
-)
-exit /b 0
-
 REM Check if required ports are available
 echo Checking port availability...
-call :check_port 8081
-if %errorlevel% neq 0 (
-    echo Port 8081 check failed with error level %errorlevel%
+
+REM Check port 8081
+netstat -ano | findstr ":8081 " | findstr "LISTENING" >nul
+if %errorlevel% equ 0 (
+    echo Port 8081 is already in use. Please stop the process using this port.
     exit /b 1
 )
-call :check_port 8000
-if %errorlevel% neq 0 (
-    echo Port 8000 check failed with error level %errorlevel%
+
+REM Check port 8000
+netstat -ano | findstr ":8000 " | findstr "LISTENING" >nul
+if %errorlevel% equ 0 (
+    echo Port 8000 is already in use. Please stop the process using this port.
     exit /b 1
 )
-call :check_port 5173
-if %errorlevel% neq 0 (
-    echo Port 5173 check failed with error level %errorlevel%
+
+REM Check port 5173
+netstat -ano | findstr ":5173 " | findstr "LISTENING" >nul
+if %errorlevel% equ 0 (
+    echo Port 5173 is already in use. Please stop the process using this port.
     exit /b 1
 )
 
 REM Start Node.js Agent Core (Internal Port 8081)
 echo Starting Node.js Agent Core on port 8081...
-start "Node.js Agent Core" cmd /k "cd backend/node-core && node main.js --profiles "./profiles/SlaveOne.json" "./profiles/SlaveTwo.json" "./profiles/SlaveThree.json" "./profiles/Loner.json" "./profiles/MasterChief.json""
+start "Node.js Agent Core" cmd /k "cd backend/node-core && node main.js --profiles "./profiles/SlaveOne.json" --profiles "./profiles/SlaveTwo.json" --profiles "./profiles/SlaveThree.json" --profiles "./profiles/Loner.json" --profiles "./profiles/MasterChief.json""
 
 echo Waiting for Node.js Agent Core to initialize...
-timeout /t 5 /nobreak >nul
+timeout /t 5 /nobreak > nul 2>&1
 
 REM Start FastAPI Gateway (Port 8000)
 echo Starting FastAPI Gateway on port 8000...
-start "FastAPI Gateway" cmd /k "cd backend/fastapi-gateway && if not exist .venv (python -m venv .venv) && .venv\Scripts\activate && pip install -r requirements.txt && python main.py"
+start "FastAPI Gateway" cmd /k "cd backend/fastapi-gateway && .venv\Scripts\activate.bat && python main.py"
 
 echo Waiting for FastAPI Gateway to initialize...
-timeout /t 10 /nobreak >nul
+timeout /t 10 /nobreak > nul 2>&1
 
 REM Start Frontend Development Server (Port 5173)
 echo Starting Frontend Development Server on port 5173...
 start "Frontend Dashboard" cmd /k "cd frontend && npm run dev"
 
 echo Waiting for Frontend to initialize...
-timeout /t 10 /nobreak >nul
+timeout /t 10 /nobreak > nul 2>&1
 
 echo.
 echo ============================================

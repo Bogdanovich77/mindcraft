@@ -55,8 +55,16 @@ const AppContent: React.FC = () => {
         
         // Step 1: Initialize the socket service first
         console.log('📡 Step 1: Initializing socket service...');
+        const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:8000';
+        console.log('📡 Socket URL:', socketUrl);
+        console.log('📡 Environment variables:', {
+          VITE_SOCKET_URL: import.meta.env.VITE_SOCKET_URL,
+          VITE_API_URL: import.meta.env.VITE_API_URL,
+          MODE: import.meta.env.MODE
+        });
+        
         const socketService = initializeSocket({
-          url: import.meta.env.VITE_SOCKET_URL || 'http://localhost:8000',
+          url: socketUrl,
           options: {
             transports: ['websocket', 'polling'],
             timeout: 20000,

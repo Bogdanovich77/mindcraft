@@ -7,9 +7,9 @@ let mindserver;
 let connected = false;
 let agent_processes = {};
 let agent_count = 0;
-let mindserver_port = 8080;
+let mindserver_port = 8081;
 
-export async function init(host_public=false, port=8080, auto_open_ui=true) {
+export async function init(host_public=false, port=8081, auto_open_ui=true) {
     if (connected) {
         console.error('Already initiliazed!');
         return;

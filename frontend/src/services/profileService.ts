@@ -88,17 +88,39 @@ async function fetchWithRetry<T>(
 class ProfileService implements IProfileService {
   private socketService = getSocketService();
   private eventListeners: Map<string, Function[]> = new Map();
+  private socketServiceAvailable: boolean;
 
   constructor() {
+    this.socketServiceAvailable = this.socketService !== null;
     this.setupSocketListeners();
+    this.validateSocketServiceInitialization();
   }
 
   /**
    * Set up Socket.IO event listeners for real-time profile updates
    */
+  /**
+   * Validate socket service initialization and provide helpful debugging info
+   */
+  private validateSocketServiceInitialization(): void {
+    if (!this.socketServiceAvailable) {
+      console.error('[ProfileService] Socket service initialization failed');
+      console.error('[ProfileService] This means real-time features (boot operations, status updates) will not work');
+      console.error('[ProfileService] Troubleshooting steps:');
+      console.error('  1. Start the FastAPI Gateway: cd backend/fastapi-gateway && .venv\\Scripts\\activate && python main.py');
+      console.error('  2. Verify the gateway is running on http://localhost:8000');
+      console.error('  3. Check that VITE_SOCKET_URL=http://localhost:8000 in frontend/.env.development');
+      console.error('  4. Ensure the Node.js Core service is running on port 8081');
+      console.error('  5. Check browser network tab for WebSocket connection failures');
+      console.error('  6. REST API operations will still work, but real-time features will be disabled');
+    } else {
+      console.log('[ProfileService] Socket service initialized successfully');
+    }
+  }
+
   private setupSocketListeners(): void {
-    if (!this.socketService) {
-      console.warn('[ProfileService] Socket service not available');
+    if (!this.socketServiceAvailable || !this.socketService) {
+      console.warn('[ProfileService] Socket service not available - real-time features disabled');
       return;
     }
 
@@ -286,11 +308,12 @@ class ProfileService implements IProfileService {
       console.log(`[ProfileService] Booting profile: ${name}`);
       
       // Use Socket.IO for boot operation to get real-time feedback
-      if (this.socketService) {
+      if (this.socketServiceAvailable && this.socketService) {
+        console.log(`[ProfileService] Using Socket.IO to boot profile: ${name}`);
         return new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             this.socketService?.off('profile:boot', handleBootResponse);
-            reject(new Error('Boot operation timeout'));
+            reject(new Error('Boot operation timeout - check if FastAPI Gateway is running'));
           }, 30000);
 
           const handleBootResponse = (data: any) => {
@@ -323,6 +346,7 @@ class ProfileService implements IProfileService {
           this.socketService.send('create-agent-from-profile', { profileName: name });
         });
       } else {
+        console.warn(`[ProfileService] Socket service not available, falling back to REST API for profile boot: ${name}`);
         // Fallback to REST API
         const response = await fetchWithRetry<ProfileBootResponse>(`${API_BASE_URL}/profiles/${encodeURIComponent(name)}/boot`, {
           method: 'POST',
@@ -339,10 +363,12 @@ class ProfileService implements IProfileService {
     try {
       console.log(`[ProfileService] Stopping profile: ${name}`);
       
-      if (this.socketService) {
+      if (this.socketServiceAvailable && this.socketService) {
+        console.log(`[ProfileService] Using Socket.IO to stop profile: ${name}`);
         // Use Socket.IO for real-time stop operation
         this.socketService.send('stop-agent', { agentName: name });
       } else {
+        console.warn(`[ProfileService] Socket service not available, falling back to REST API for profile stop: ${name}`);
         // Fallback to REST API
         await fetchWithRetry<void>(`${API_BASE_URL}/profiles/${encodeURIComponent(name)}/stop`, {
           method: 'POST',
@@ -376,12 +402,13 @@ class ProfileService implements IProfileService {
     try {
       console.log(`[ProfileService] Getting profile status: ${name}`);
       
-      if (this.socketService) {
+      if (this.socketServiceAvailable && this.socketService) {
+        console.log(`[ProfileService] Using Socket.IO to get profile status: ${name}`);
         // Use Socket.IO for real-time status check
         return new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             this.socketService?.off('agent:status', handleStatusResponse);
-            reject(new Error('Status check timeout'));
+            reject(new Error('Status check timeout - check if FastAPI Gateway is running'));
           }, 5000);
 
           const handleStatusResponse = (data: any) => {
@@ -401,6 +428,7 @@ class ProfileService implements IProfileService {
           this.socketService.send('get-agent-status', { agentName: name });
         });
       } else {
+        console.warn(`[ProfileService] Socket service not available, falling back to REST API for profile status: ${name}`);
         // Fallback to REST API
         const response = await fetchWithRetry<{ status: string; isRunning: boolean; agentId?: string }>(
           `${API_BASE_URL}/profiles/${encodeURIComponent(name)}/status`
@@ -418,12 +446,13 @@ class ProfileService implements IProfileService {
    */
 
   subscribeToProfileEvents(): void {
-    if (!this.socketService) {
+    if (!this.socketServiceAvailable || !this.socketService) {
       console.warn('[ProfileService] Cannot subscribe to profile events - socket service not available');
+      console.warn('[ProfileService] Real-time profile updates will not work without the FastAPI Gateway');
       return;
     }
 
-    console.log('[ProfileService] Subscribing to profile events');
+    console.log('[ProfileService] Subscribing to profile events via Socket.IO');
     
     // Request initial profile status
     this.socketService.send('get-profiles', {});
@@ -433,7 +462,10 @@ class ProfileService implements IProfileService {
   }
 
   unsubscribeFromProfileEvents(): void {
-    if (!this.socketService) return;
+    if (!this.socketServiceAvailable || !this.socketService) {
+      console.warn('[ProfileService] Cannot unsubscribe from profile events - socket service not available');
+      return;
+    }
 
     console.log('[ProfileService] Unsubscribing from profile events');
     

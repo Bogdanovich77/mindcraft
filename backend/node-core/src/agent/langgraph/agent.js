@@ -30,6 +30,23 @@ export class LangGraphAgent {
             peakMemory: process.memoryUsage(),
             lastCheck: Date.now()
         };
+        
+        // Add compatibility layer for prompter system
+        this._actionsCompatibility = null;
+    }
+
+    // Add compatibility property for prompter system
+    get actions() {
+        if (!this._actionsCompatibility) {
+            const self = this;
+            this._actionsCompatibility = {
+                get currentActionLabel() {
+                    if (!self.agentState?.lastAction) return 'Idle';
+                    return self.agentState.lastAction.type || 'Idle';
+                }
+            };
+        }
+        return this._actionsCompatibility;
     }
 
     /**
@@ -591,7 +608,7 @@ export class LangGraphAgent {
     /**
      * Connect to MindServer for UI visibility
      */
-    async connectToMindServer(port = 8080) {
+    async connectToMindServer(port = 8081) {
         try {
             const { io } = await import('socket.io-client');
             const socket = io(`http://localhost:${port}`);

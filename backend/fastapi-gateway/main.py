@@ -137,7 +137,6 @@ async def startup_event():
     """Initialize WebSocket proxy on startup"""
     try:
         websocket_proxy = get_websocket_proxy()
-        websocket_proxy = get_websocket_proxy()
         await websocket_proxy.start()
         print("[SUCCESS] WebSocket proxy initialized successfully")
     except Exception as e:
@@ -147,7 +146,6 @@ async def startup_event():
 async def shutdown_event():
     """Clean up WebSocket proxy on shutdown"""
     try:
-        websocket_proxy = get_websocket_proxy()
         websocket_proxy = get_websocket_proxy()
         await websocket_proxy.stop()
         print("[SUCCESS] WebSocket proxy stopped successfully")
